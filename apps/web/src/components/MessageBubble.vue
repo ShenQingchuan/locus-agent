@@ -2,7 +2,7 @@
 import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
 import { Tooltip } from '@locus-agent/ui'
 import MarkdownRender from 'markstream-vue'
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
 import ToolCallItem from './ToolCallItem.vue'
@@ -12,11 +12,26 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const editTextareaRef = ref<HTMLTextAreaElement>()
 
 const isUser = computed(() => props.message.role === 'user')
+const isEditing = computed(() => chatStore.editingMessageId === props.message.id)
 const { relative: relativeTime, absolute: absoluteTime } = useRelativeTime(
   () => props.message.timestamp,
 )
+
+// Auto-focus and auto-resize textarea when entering edit mode
+watch(isEditing, async (editing) => {
+  if (editing) {
+    await nextTick()
+    const textarea = editTextareaRef.value
+    if (textarea) {
+      textarea.focus()
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }
+})
 
 async function handleApprove(toolCallId: string) {
   await chatStore.approveToolExecution(toolCallId)
@@ -28,6 +43,34 @@ async function handleReject(toolCallId: string) {
 
 async function handleRetry() {
   await chatStore.retryFromMessage(props.message.id)
+}
+
+function handleEdit() {
+  chatStore.startEditMessage(props.message.id)
+}
+
+async function handleEditSave() {
+  await chatStore.saveEditMessage(props.message.id, chatStore.editingContent)
+}
+
+function handleEditCancel() {
+  chatStore.cancelEditMessage()
+}
+
+function handleEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    handleEditCancel()
+  }
+  else if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleEditSave()
+  }
+}
+
+function handleEditInput(e: Event) {
+  const textarea = e.target as HTMLTextAreaElement
+  textarea.style.height = 'auto'
+  textarea.style.height = `${textarea.scrollHeight}px`
 }
 
 const displayParts = computed<MessagePart[]>(() => {
@@ -69,6 +112,15 @@ function isLastTextPart(partIndex: number): boolean {
     <template v-if="isUser">
       <div class="max-w-[90%] text-right group">
         <div class="flex items-center gap-1 justify-end">
+          <!-- 编辑按钮 -->
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            title="编辑"
+            :disabled="chatStore.isLoading"
+            @click="handleEdit"
+          >
+            <div class="i-carbon-edit h-3 w-3" />
+          </button>
           <!-- 重试按钮 -->
           <button
             class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -84,7 +136,36 @@ function isLastTextPart(partIndex: number): boolean {
           <span class="text-xs text-muted-foreground block">用户</span>
           <div class="i-carbon-user text-xs text-muted-foreground" />
         </div>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-left w-full">
+
+        <!-- 编辑模式 -->
+        <div v-if="isEditing" class="mt-1 text-left">
+          <textarea
+            ref="editTextareaRef"
+            v-model="chatStore.editingContent"
+            class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+            rows="1"
+            @input="handleEditInput"
+            @keydown="handleEditKeydown"
+          />
+          <div class="flex items-center justify-end gap-2 mt-1.5">
+            <button
+              class="px-2.5 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted transition-colors"
+              @click="handleEditCancel"
+            >
+              取消
+            </button>
+            <button
+              class="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              :disabled="!chatStore.editingContent.trim()"
+              @click="handleEditSave"
+            >
+              保存并发送
+            </button>
+          </div>
+        </div>
+
+        <!-- 正常显示 -->
+        <div v-else class="prose prose-sm dark:prose-invert max-w-none text-right w-full">
           <MarkdownRender
             :content="message.content"
             custom-id="locus"
@@ -146,3 +227,16 @@ function isLastTextPart(partIndex: number): boolean {
     </div>
   </article>
 </template>
+
+<style scoped>
+/* 用户消息中的 markdown 内容右对齐 */
+.text-right .markstream-vue {
+  text-align: right;
+}
+
+.text-right .markstream-vue .paragraph-node,
+.text-right .markstream-vue .heading-node,
+.text-right .markstream-vue .list-node {
+  text-align: right;
+}
+</style>

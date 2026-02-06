@@ -51,6 +51,10 @@
   --tooltip: 240 10% 3.9%;
   --tooltip-foreground: 0 0% 98%;
 
+  /* Selection */
+  --selection-bg: 240 5% 75%;
+  --selection-bg-foreground: 0 0% 98%;
+
   /* Sidebar - unified with main area */
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 240 10% 3.9%;
@@ -113,6 +117,10 @@
   --tooltip: 240 5% 26%;
   --tooltip-foreground: 0 0% 98%;
 
+  /* Selection */
+  --selection-bg: 240 5% 45%;
+  --selection-bg-foreground: 0 0% 98%;
+
   /* Sidebar - unified with main area */
   --sidebar-background: 240 10% 3.9%;
   --sidebar-foreground: 0 0% 98%;
@@ -174,8 +182,8 @@ body {
 
 /* Selection */
 ::selection {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+  background-color: hsl(var(--selection-bg));
+  color: hsl(var(--selection-bg-foreground));
 }
 
 /* Scrollbar styling */
