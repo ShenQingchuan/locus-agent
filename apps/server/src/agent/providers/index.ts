@@ -5,44 +5,74 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 
 export type LLMProviderType = 'openai' | 'anthropic'
 
-const providerType = (Bun.env.LLM_PROVIDER || 'openai') as LLMProviderType
-
-const apiKey = Bun.env.LLM_API_KEY
-if (!apiKey) {
-  throw new Error('LLM_API_KEY environment variable is required')
+export interface LLMConfig {
+  provider: LLMProviderType
+  apiKey: string
+  apiBase?: string
+  model?: string
 }
 
 const DEFAULT_MODELS: Record<LLMProviderType, string> = {
-  openai: 'gpt-4o',
-  anthropic: 'claude-sonnet-4-20250514',
+  openai: 'kimi-k2.5',
+  anthropic: 'claude-opus-4.6',
 }
 
-export const DEFAULT_MODEL = Bun.env.LLM_MODEL || DEFAULT_MODELS[providerType]
+let _config: LLMConfig | null = null
 
 /**
- * 根据 LLM_PROVIDER 创建对应的模型实例
+ * 注入 LLM 配置（CLI 启动时调用）
+ * 若未调用，则 fallback 到 Bun.env（dev 模式兼容）
  */
-export function createLLMModel(modelId: string = DEFAULT_MODEL): LanguageModel {
-  switch (providerType) {
+export function setLLMConfig(config: LLMConfig): void {
+  _config = config
+}
+
+function getConfig(): LLMConfig {
+  if (_config)
+    return _config
+  const apiKey = Bun.env.LLM_API_KEY
+  if (!apiKey) {
+    throw new Error('LLM_API_KEY is not configured. Run `locus-agent config` to set up.')
+  }
+  return {
+    provider: (Bun.env.LLM_PROVIDER || 'openai') as LLMProviderType,
+    apiKey,
+    apiBase: Bun.env.LLM_API_BASE,
+    model: Bun.env.LLM_MODEL,
+  }
+}
+
+export function getDefaultModel(): string {
+  const cfg = getConfig()
+  return cfg.model || DEFAULT_MODELS[cfg.provider]
+}
+
+/**
+ * 根据配置创建对应的模型实例
+ */
+export function createLLMModel(modelId: string = getDefaultModel()): LanguageModel {
+  const cfg = getConfig()
+
+  switch (cfg.provider) {
     case 'anthropic': {
       const anthropic = createAnthropic({
-        apiKey,
-        ...(Bun.env.LLM_API_BASE ? { baseURL: Bun.env.LLM_API_BASE } : {}),
+        apiKey: cfg.apiKey,
+        ...(cfg.apiBase ? { baseURL: cfg.apiBase } : {}),
       })
       return anthropic(modelId)
     }
     case 'openai':
     default: {
       // 自定义 baseURL 时使用 openai-compatible，避免 OpenAI 专有的 Responses API 和 thinking 验证
-      if (Bun.env.LLM_API_BASE) {
+      if (cfg.apiBase) {
         const provider = createOpenAICompatible({
           name: 'custom-openai',
-          apiKey,
-          baseURL: Bun.env.LLM_API_BASE,
+          apiKey: cfg.apiKey,
+          baseURL: cfg.apiBase,
         })
         return provider.chatModel(modelId)
       }
-      const openai = createOpenAI({ apiKey })
+      const openai = createOpenAI({ apiKey: cfg.apiKey })
       return openai(modelId)
     }
   }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
 import { computed, watch } from 'vue'
-import ShikiCode from './ShikiCode.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -118,7 +117,7 @@ const statusLabel = computed(() => {
               <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 参数
               </h3>
-              <ShikiCode :code="formattedArgs" lang="json" />
+              <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedArgs }}</pre>
             </section>
 
             <!-- Results -->

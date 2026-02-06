@@ -3,6 +3,28 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "dev": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./db": {
+      "bun": "./src/db/index.ts",
+      "dev": "./src/db/index.ts",
+      "default": "./dist/db/index.js"
+    },
+    "./config": {
+      "bun": "./src/config.ts",
+      "dev": "./src/config.ts",
+      "default": "./dist/config.js"
+    },
+    "./providers": {
+      "bun": "./src/agent/providers/index.ts",
+      "dev": "./src/agent/providers/index.ts",
+      "default": "./dist/agent/providers/index.js"
+    }
+  },
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",

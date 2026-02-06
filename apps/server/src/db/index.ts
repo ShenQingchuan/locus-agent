@@ -3,61 +3,72 @@ import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from './schema.js'
 
-// 数据库文件路径
-const DB_PATH = resolve(process.cwd(), './data/locus.db')
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
+let _migrationsFolder: string | null = null
 
-// 确保数据目录存在
-function ensureDataDir(): void {
-  const dataDir = dirname(DB_PATH)
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true })
+function getDefaultDbPath(): string {
+  return resolve(process.cwd(), './data/locus.db')
+}
+
+function getDefaultMigrationsFolder(): string {
+  // dev 模式：相对于 server 包的 drizzle/ 目录
+  return resolve(import.meta.dirname, '../../drizzle')
+}
+
+function ensureDir(dirPath: string): void {
+  if (!existsSync(dirPath)) {
+    mkdirSync(dirPath, { recursive: true })
   }
 }
 
-// 初始化数据库
-ensureDataDir()
-const sqlite = new Database(DB_PATH, { create: true })
-
-// 启用外键约束
-sqlite.exec('PRAGMA foreign_keys = ON;')
-
-export const db = drizzle(sqlite, { schema })
-
-// 初始化数据库表（如果不存在）
-export function initDatabase(): void {
-  // 创建 conversations 表
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `)
-
-  // 创建 messages 表
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
-      content TEXT NOT NULL,
-      tool_calls TEXT,
-      tool_results TEXT,
-      created_at INTEGER NOT NULL
-    );
-  `)
-
-  // 创建索引以加速查询
-  sqlite.exec(`
-    CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
-    CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);
-  `)
+export interface InitDBOptions {
+  dbPath?: string
+  migrationsFolder?: string
 }
 
-// 自动初始化数据库
-initDatabase()
+/**
+ * 初始化数据库，运行 Drizzle migrations
+ * 可多次调用，后续调用为 no-op
+ */
+export function initDB(options?: InitDBOptions): void {
+  if (_db) return
+
+  const dbPath = options?.dbPath ?? getDefaultDbPath()
+  _migrationsFolder = options?.migrationsFolder ?? getDefaultMigrationsFolder()
+
+  ensureDir(dirname(dbPath))
+
+  const sqlite = new Database(dbPath, { create: true })
+  sqlite.run('PRAGMA foreign_keys = ON;')
+
+  _db = drizzle(sqlite, { schema })
+
+  // 运行迁移（自动跳过已执行的）
+  migrate(_db, { migrationsFolder: _migrationsFolder })
+}
+
+/**
+ * 获取 Drizzle 实例
+ * 若未初始化则使用默认路径自动初始化（dev 模式兼容）
+ */
+export function getDb() {
+  if (!_db) initDB()
+  return _db!
+}
+
+// 向后兼容：现有代码 `import { db } from '../db'` 继续工作
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getDb(), prop, receiver)
+  },
+})
+
+/** @deprecated 使用 initDB() 代替 */
+export function initDatabase(): void {
+  getDb()
+}
 
 export * from './schema.js'

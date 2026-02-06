@@ -1,0 +1,26 @@
+{
+  "name": "locus-agent",
+  "type": "module",
+  "version": "0.1.0",
+  "bin": {
+    "locus-agent": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun && cp -r ../web/dist dist/web && cp -r ../server/drizzle dist/drizzle",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "@locus-agent/server": "workspace:*",
+    "@locus-agent/shared": "workspace:*",
+    "hono": "catalog:hono-family"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:bun-family",
+    "typescript": "catalog:dev-tools"
+  }
+}

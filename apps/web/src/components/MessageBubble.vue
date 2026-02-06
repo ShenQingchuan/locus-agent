@@ -208,21 +208,15 @@ function isLastTextPart(partIndex: number): boolean {
             :typewriter="isLastTextPart(partIdx) && message.isStreaming"
             :code-block-stream="isLastTextPart(partIdx) && message.isStreaming"
           />
-          <div
-            v-if="isLastTextPart(partIdx) && message.isStreaming"
-            class="inline-block mt-2 ml-0.5"
-          >
-            <div class="i-svg-spinners:bars-fade mt-4 text-foreground/70" />
-          </div>
         </div>
       </template>
 
-      <!-- Empty streaming placeholder -->
+      <!-- Streaming spinner: always at the bottom -->
       <div
-        v-if="message.isStreaming && displayParts.length === 0"
-        class="flex items-center gap-1"
+        v-if="message.isStreaming"
+        class="inline-block mt-2 ml-0.5"
       >
-        <div class="i-svg-spinners:bars-fade mt-4 text-muted-foreground/70" />
+        <div class="i-svg-spinners:bars-fade mt-4 text-foreground/70" />
       </div>
     </div>
   </article>

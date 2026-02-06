@@ -9,7 +9,7 @@ import type {
   ToolResult,
 } from '@locus-agent/shared'
 
-const API_BASE = 'http://localhost:3000'
+const API_BASE = import.meta.env.DEV ? 'http://localhost:3000' : ''
 
 export interface PendingApproval {
   toolCallId: string

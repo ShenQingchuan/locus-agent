@@ -16,6 +16,7 @@ const { y, arrivedState } = useScroll(containerRef, { behavior: 'smooth' })
 // Track if user has manually scrolled up
 const userScrolledUp = ref(false)
 const lastScrollTop = ref(0)
+const previousMessagesLength = ref(0)
 
 // Watch for scroll position to detect manual scrolling
 watch(() => y.value, (currentY) => {
@@ -40,19 +41,50 @@ watch(() => y.value, (currentY) => {
 watch(
   () => [props.messages.length, props.messages[props.messages.length - 1]?.content],
   async () => {
+    // 重置 previousMessagesLength 当消息被清空时（会话切换）
+    if (props.messages.length === 0) {
+      previousMessagesLength.value = 0
+      return
+    }
+
     // Only auto-scroll if user hasn't manually scrolled up
     if (!userScrolledUp.value || props.isStreaming) {
       await nextTick()
-      scrollToBottom()
+      // 首次加载（从 0 变为有消息）时立即滚动，其他情况平滑滚动
+      const isInitialLoad = previousMessagesLength.value === 0 && props.messages.length > 0
+      if (isInitialLoad)
+        scrollToBottom(false)
+      else
+        scrollToBottom(true)
+
+      previousMessagesLength.value = props.messages.length
     }
   },
   { deep: true },
 )
 
-function scrollToBottom() {
-  if (containerRef.value) {
-    y.value = containerRef.value.scrollHeight
+function scrollToBottom(smooth = true) {
+  const container = containerRef.value
+  if (!container)
+    return
+
+  if (smooth) {
+    y.value = container.scrollHeight
+    return
   }
+
+  const scrollNow = () => {
+    const current = containerRef.value
+    if (!current)
+      return
+
+    current.scrollTop = current.scrollHeight - current.clientHeight
+  }
+
+  scrollNow()
+  ;[50, 150, 300].forEach((delay) => {
+    setTimeout(scrollNow, delay)
+  })
 }
 
 // Expose scroll to bottom for external use
@@ -121,7 +153,7 @@ defineExpose({ scrollToBottom })
             v-if="!arrivedState.bottom && messages.length > 0"
             class="pointer-events-auto absolute bottom-3 -right-14 z-50 h-9 w-9 rounded-full border border-border bg-background text-foreground shadow-md flex items-center justify-center hover:bg-muted transition-all duration-200"
             title="滚动到底部"
-            @click="scrollToBottom(); userScrolledUp = false"
+            @click="scrollToBottom(true); userScrolledUp = false"
           >
             <div class="i-carbon-arrow-down h-4 w-4" />
           </button>

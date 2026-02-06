@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm'
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const conversations = sqliteTable('conversations', {
   id: text('id').primaryKey(),
@@ -10,7 +10,9 @@ export const conversations = sqliteTable('conversations', {
   updatedAt: integer('updated_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
-})
+}, t => [
+  index('idx_conversations_updated_at').on(t.updatedAt),
+])
 
 export const messages = sqliteTable('messages', {
   id: text('id').primaryKey(),
@@ -24,6 +26,17 @@ export const messages = sqliteTable('messages', {
   toolCalls: text('tool_calls', { mode: 'json' }).$type<unknown[] | null>(),
   toolResults: text('tool_results', { mode: 'json' }).$type<unknown[] | null>(),
   createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_messages_conversation_id').on(t.conversationId),
+])
+
+/** CLI 配置存储 */
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
 })
