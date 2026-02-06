@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
-import { useToast } from '@/composables/useToast'
+import { useToast } from '../composables/useToast'
 
 const { toasts, confirmState, remove, removeAll, resolveConfirm } = useToast()
 

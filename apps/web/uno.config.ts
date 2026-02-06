@@ -3,6 +3,14 @@ import presetUno from '@unocss/preset-uno'
 import { defineConfig, presetIcons } from 'unocss'
 
 export default defineConfig({
+  content: {
+    pipeline: {
+      include: [
+        'src/**/*.{vue,ts,tsx}',
+        '../../packages/ui/src/**/*.{vue,ts}',
+      ],
+    },
+  },
   presets: [
     presetUno(),
     presetIcons({

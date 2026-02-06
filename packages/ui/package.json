@@ -1,0 +1,31 @@
+{
+  "name": "@locus-agent/ui",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "dev": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vue-tsc --declaration --emitDeclarationOnly --outDir dist",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0",
+    "@vueuse/core": "^14.0.0"
+  },
+  "devDependencies": {
+    "@vue/tsconfig": "catalog:vue-family",
+    "@vueuse/core": "catalog:vue-family",
+    "typescript": "catalog:dev-tools",
+    "vue": "catalog:vue-family",
+    "vue-tsc": "catalog:vue-family"
+  }
+}

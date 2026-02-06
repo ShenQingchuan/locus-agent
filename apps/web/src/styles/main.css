@@ -98,7 +98,7 @@
 
   /* Border, Input, Ring - extremely subtle, barely visible */
   /* Using lower contrast for that "quiet, refined" look */
-  --border: 0deg 91.41% 8.59%;
+  --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
 

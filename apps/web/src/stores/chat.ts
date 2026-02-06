@@ -1,5 +1,6 @@
 import type { Conversation, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
+import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
@@ -72,7 +73,10 @@ export const useChatStore = defineStore('chat', () => {
   const sidebarWidth = ref(getStoredSidebarWidth())
 
   // Yolo mode state
-  const yoloMode = ref(false)
+  const [yoloMode, toggleYoloMode] = useToggle(false)
+
+  // Think mode state
+  const [thinkMode, toggleThinkMode] = useToggle(true)
 
   // Edit message state
   const editingMessageId = ref<string | null>(null)
@@ -205,10 +209,6 @@ export const useChatStore = defineStore('chat', () => {
         console.warn('[chat store] Failed to save sidebar width to localStorage:', error)
       }
     }
-  }
-
-  function toggleYoloMode() {
-    yoloMode.value = !yoloMode.value
   }
 
   function addMessage(message: Omit<Message, 'id' | 'timestamp'>) {
@@ -383,6 +383,7 @@ export const useChatStore = defineStore('chat', () => {
         message: content,
         messages: historyMessages,
         confirmMode: !yoloMode.value,
+        thinkingMode: thinkMode.value,
         onTextDelta: (delta) => {
           appendToMessage(assistantMessageId, delta)
         },
@@ -635,6 +636,7 @@ export const useChatStore = defineStore('chat', () => {
     isSidebarCollapsed,
     sidebarWidth,
     yoloMode,
+    thinkMode,
 
     // Current conversation state
     messages,
@@ -660,6 +662,7 @@ export const useChatStore = defineStore('chat', () => {
     toggleSidebar,
     setSidebarWidth,
     toggleYoloMode,
+    toggleThinkMode,
 
     // Message actions
     addMessage,

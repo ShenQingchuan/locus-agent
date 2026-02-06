@@ -86,6 +86,25 @@ function handleKeydown(event: KeyboardEvent) {
             </div>
             <span>Yolo 模式</span>
           </label>
+
+          <label class="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">
+            <input
+              type="checkbox"
+              :checked="chatStore.thinkMode"
+              class="sr-only"
+              @change="chatStore.toggleThinkMode()"
+            >
+            <div
+              class="relative h-5 w-9 rounded-full transition-colors duration-150"
+              :class="chatStore.thinkMode ? 'bg-primary' : 'bg-muted'"
+            >
+              <div
+                class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform duration-150"
+                :class="chatStore.thinkMode ? 'translate-x-4' : 'translate-x-0'"
+              />
+            </div>
+            <span>Think 模式</span>
+          </label>
         </div>
 
         <!-- Send/stop button -->

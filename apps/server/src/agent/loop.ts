@@ -28,6 +28,8 @@ export interface AgentLoopOptions {
   abortSignal?: AbortSignal
   /** 确认模式：true = 需要确认，false = yolo 模式 */
   confirmMode?: boolean
+  /** 是否启用思考模式（默认 true） */
+  thinkingMode?: boolean
   /** 获取工具确认结果的函数（确认模式下使用） */
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
 }
@@ -77,6 +79,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     maxIterations = 10,
     abortSignal,
     confirmMode = false,
+    thinkingMode = true,
     getToolApproval,
   } = options
 
@@ -110,6 +113,15 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           messages,
           tools,
           abortSignal,
+          ...(thinkingMode
+            ? {
+                providerOptions: {
+                  anthropic: {
+                    thinking: { type: 'enabled', budgetTokens: 10000 },
+                  },
+                },
+              }
+            : {}),
         })
         break
       }

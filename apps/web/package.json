@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-sdk/vue": "catalog:vue-family",
     "@locus-agent/shared": "workspace:*",
+    "@locus-agent/ui": "workspace:*",
     "@pinia/colada": "catalog:vue-family",
     "@vueuse/core": "catalog:vue-family",
     "markstream-vue": "catalog:vue-family",

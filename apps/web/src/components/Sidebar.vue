@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useDark, useToggle } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
-import { useToast } from '@/composables/useToast'
+import { useToast } from '@locus-agent/ui'
 import { useChatStore } from '@/stores/chat'
 import ConversationItem from './ConversationItem.vue'
 

@@ -9,6 +9,7 @@ export default defineConfig({
     UnoCSS(),
   ],
   resolve: {
+    conditions: ['dev'],
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
