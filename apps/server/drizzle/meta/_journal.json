@@ -8,6 +8,13 @@
       "when": 1770373005171,
       "tag": "0000_true_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1770375919220,
+      "tag": "0001_handy_dexter_bennett",
+      "breakpoints": true
     }
   ]
 }

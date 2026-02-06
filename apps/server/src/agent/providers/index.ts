@@ -1,9 +1,10 @@
 import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 
-export type LLMProviderType = 'openai' | 'anthropic'
+export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai'
 
 export interface LLMConfig {
   provider: LLMProviderType
@@ -13,8 +14,9 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<LLMProviderType, string> = {
-  openai: 'kimi-k2.5',
+  openai: 'gpt-5.3',
   anthropic: 'claude-opus-4.6',
+  moonshotai: 'kimi-k2.5',
 }
 
 let _config: LLMConfig | null = null
@@ -60,6 +62,13 @@ export function createLLMModel(modelId: string = getDefaultModel()): LanguageMod
         ...(cfg.apiBase ? { baseURL: cfg.apiBase } : {}),
       })
       return anthropic(modelId)
+    }
+    case 'moonshotai': {
+      const moonshot = createMoonshotAI({
+        apiKey: cfg.apiKey,
+        ...(cfg.apiBase ? { baseURL: cfg.apiBase } : {}),
+      })
+      return moonshot(modelId)
     }
     case 'openai':
     default: {

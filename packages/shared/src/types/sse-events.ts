@@ -64,6 +64,16 @@ export interface ErrorEvent {
 }
 
 /**
+ * 思考过程增量事件
+ * 当 AI 进行推理思考时逐步发送
+ */
+export interface ReasoningDeltaEvent {
+  type: 'reasoning-delta'
+  /** 思考过程增量内容 */
+  reasoningDelta: string
+}
+
+/**
  * 工具执行等待确认事件
  * 当确认模式下工具需要用户确认时发送
  */
@@ -82,6 +92,7 @@ export interface ToolPendingApprovalEvent {
  */
 export type SSEEvent
   = | TextDeltaEvent
+    | ReasoningDeltaEvent
     | ToolCallStartEvent
     | ToolCallResultEvent
     | DoneEvent

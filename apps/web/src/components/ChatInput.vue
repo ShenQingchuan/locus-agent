@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTextareaAutosize } from '@vueuse/core'
-import { watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 
 defineProps<{
@@ -17,6 +17,8 @@ const chatStore = useChatStore()
 
 const { textarea, input } = useTextareaAutosize()
 
+const isEditing = computed(() => chatStore.editingMessageId !== null)
+
 // Reset height when input is cleared
 watch(input, (newValue) => {
   if (!newValue && textarea.value) {
@@ -24,11 +26,32 @@ watch(input, (newValue) => {
   }
 })
 
+// When entering edit mode, populate the input with the editing content
+watch(() => chatStore.editingMessageId, async (newId) => {
+  if (newId) {
+    input.value = chatStore.editingContent
+    await nextTick()
+    textarea.value?.focus()
+  }
+})
+
 function handleSubmit() {
   if (!input.value.trim())
     return
 
+  if (isEditing.value) {
+    // Edit mode: save the edited message and re-send
+    chatStore.saveEditMessage(chatStore.editingMessageId!, input.value)
+    input.value = ''
+    return
+  }
+
   emit('send', input.value)
+  input.value = ''
+}
+
+function handleCancelEdit() {
+  chatStore.cancelEditMessage()
   input.value = ''
 }
 
@@ -40,6 +63,11 @@ function handleKeydown(event: KeyboardEvent) {
   // 输入法组合输入时不触发发送
   if (event.isComposing)
     return
+
+  if (event.key === 'Escape' && isEditing.value) {
+    handleCancelEdit()
+    return
+  }
 
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
@@ -58,7 +86,7 @@ function handleKeydown(event: KeyboardEvent) {
         ref="textarea"
         v-model="input"
         class="w-full resize-none bg-transparent px-4 pt-4 min-h-[80px] pb-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        placeholder="输入消息..."
+        :placeholder="isEditing ? '编辑消息...' : '输入消息...'"
         rows="1"
         :disabled="disabled"
         @keydown="handleKeydown"
@@ -108,7 +136,18 @@ function handleKeydown(event: KeyboardEvent) {
         </div>
 
         <!-- Send/stop button -->
-        <div class="flex items-center">
+        <div class="flex items-center gap-1.5">
+          <!-- Cancel edit button -->
+          <button
+            v-if="isEditing"
+            class="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
+            title="取消编辑"
+            @click="handleCancelEdit"
+          >
+            <div class="i-carbon-close h-3.5 w-3.5" />
+            <span>取消编辑</span>
+          </button>
+
           <button
             v-if="isStreaming"
             class="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/90 text-destructive-foreground hover:bg-destructive transition-colors duration-150"
@@ -127,7 +166,7 @@ function handleKeydown(event: KeyboardEvent) {
                 : 'bg-muted text-muted-foreground cursor-not-allowed',
             ]"
             :disabled="!input.trim() || disabled"
-            title="发送消息"
+            :title="isEditing ? '保存并发送' : '发送消息'"
             @click="handleSubmit"
           >
             <div class="i-material-symbols:send-rounded h-5 w-5" />

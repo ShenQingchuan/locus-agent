@@ -79,7 +79,7 @@ export async function listConversations(): Promise<Conversation[]> {
  */
 export async function updateConversation(
   id: string,
-  data: { title?: string },
+  data: { title?: string, confirmMode?: boolean },
 ): Promise<Conversation | null> {
   const existing = await getConversation(id)
 
@@ -87,12 +87,15 @@ export async function updateConversation(
     return null
   }
 
+  const updates: Partial<NewConversation> & { updatedAt: Date } = { updatedAt: new Date() }
+  if (data.title !== undefined)
+    updates.title = data.title
+  if (data.confirmMode !== undefined)
+    updates.confirmMode = data.confirmMode
+
   await db
     .update(conversations)
-    .set({
-      title: data.title ?? existing.title,
-      updatedAt: new Date(),
-    })
+    .set(updates)
     .where(eq(conversations.id, id))
 
   return getConversation(id)

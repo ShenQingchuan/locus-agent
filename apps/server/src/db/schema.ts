@@ -4,6 +4,8 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 export const conversations = sqliteTable('conversations', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
+  /** 是否需要确认工具执行（true=需要确认，false=yolo 模式） */
+  confirmMode: integer('confirm_mode', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

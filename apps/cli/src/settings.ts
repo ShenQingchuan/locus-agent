@@ -57,7 +57,7 @@ export function isSetupComplete(): boolean {
 }
 
 export interface LLMSettings {
-  provider: 'openai' | 'anthropic'
+  provider: 'openai' | 'anthropic' | 'moonshotai'
   apiKey: string
   apiBase?: string
   model?: string

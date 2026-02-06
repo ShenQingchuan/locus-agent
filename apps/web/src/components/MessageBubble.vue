@@ -2,7 +2,7 @@
 import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
 import { Tooltip } from '@locus-agent/ui'
 import MarkdownRender from 'markstream-vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
 import ToolCallItem from './ToolCallItem.vue'
@@ -12,26 +12,12 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
-const editTextareaRef = ref<HTMLTextAreaElement>()
 
 const isUser = computed(() => props.message.role === 'user')
 const isEditing = computed(() => chatStore.editingMessageId === props.message.id)
 const { relative: relativeTime, absolute: absoluteTime } = useRelativeTime(
   () => props.message.timestamp,
 )
-
-// Auto-focus and auto-resize textarea when entering edit mode
-watch(isEditing, async (editing) => {
-  if (editing) {
-    await nextTick()
-    const textarea = editTextareaRef.value
-    if (textarea) {
-      textarea.focus()
-      textarea.style.height = 'auto'
-      textarea.style.height = `${textarea.scrollHeight}px`
-    }
-  }
-})
 
 async function handleApprove(toolCallId: string) {
   await chatStore.approveToolExecution(toolCallId)
@@ -47,30 +33,6 @@ async function handleRetry() {
 
 function handleEdit() {
   chatStore.startEditMessage(props.message.id)
-}
-
-async function handleEditSave() {
-  await chatStore.saveEditMessage(props.message.id, chatStore.editingContent)
-}
-
-function handleEditCancel() {
-  chatStore.cancelEditMessage()
-}
-
-function handleEditKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    handleEditCancel()
-  }
-  else if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    handleEditSave()
-  }
-}
-
-function handleEditInput(e: Event) {
-  const textarea = e.target as HTMLTextAreaElement
-  textarea.style.height = 'auto'
-  textarea.style.height = `${textarea.scrollHeight}px`
 }
 
 const displayParts = computed<MessagePart[]>(() => {
@@ -110,7 +72,10 @@ function isLastTextPart(partIndex: number): boolean {
   >
     <!-- User message: right aligned -->
     <template v-if="isUser">
-      <div class="max-w-[90%] text-right group">
+      <div
+        class="max-w-[90%] text-right group rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors duration-200"
+        :class="isEditing ? 'bg-yellow-400/15 dark:bg-yellow-500/20' : ''"
+      >
         <div class="flex items-center gap-1 justify-end">
           <!-- 编辑按钮 -->
           <button
@@ -137,35 +102,8 @@ function isLastTextPart(partIndex: number): boolean {
           <div class="i-carbon-user text-xs text-muted-foreground" />
         </div>
 
-        <!-- 编辑模式 -->
-        <div v-if="isEditing" class="mt-1 text-left">
-          <textarea
-            ref="editTextareaRef"
-            v-model="chatStore.editingContent"
-            class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-            rows="1"
-            @input="handleEditInput"
-            @keydown="handleEditKeydown"
-          />
-          <div class="flex items-center justify-end gap-2 mt-1.5">
-            <button
-              class="px-2.5 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted transition-colors"
-              @click="handleEditCancel"
-            >
-              取消
-            </button>
-            <button
-              class="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="!chatStore.editingContent.trim()"
-              @click="handleEditSave"
-            >
-              保存并发送
-            </button>
-          </div>
-        </div>
-
         <!-- 正常显示 -->
-        <div v-else class="prose prose-sm dark:prose-invert max-w-none text-right w-full">
+        <div class="prose prose-sm dark:prose-invert max-w-none text-right w-full">
           <MarkdownRender
             :content="message.content"
             custom-id="locus"
@@ -184,10 +122,25 @@ function isLastTextPart(partIndex: number): boolean {
         </Tooltip>
       </div>
 
-      <!-- Ordered parts: text and tool calls interleaved -->
+      <!-- Ordered parts: reasoning, text and tool calls interleaved -->
       <template v-for="(part, partIdx) in displayParts" :key="partIdx">
+        <!-- Reasoning/Thinking part -->
+        <details
+          v-if="part.type === 'reasoning' && part.content"
+          class="my-2"
+          :open="message.isStreaming"
+        >
+          <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1">
+            <div class="i-carbon-idea h-3 w-3" />
+            <span>思考过程</span>
+          </summary>
+          <div class="mt-1 pl-4.5 border-l border-border/40 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+            {{ part.content }}
+          </div>
+        </details>
+
         <!-- Tool call part -->
-        <template v-if="part.type === 'tool-call'">
+        <template v-else-if="part.type === 'tool-call'">
           <ToolCallItem
             v-for="tool in getToolCallSlice(part.toolCallIndex)"
             :key="tool.toolCall.toolCallId"

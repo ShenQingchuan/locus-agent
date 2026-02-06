@@ -46,9 +46,9 @@ conversationsRoutes.get('/:id', async (c) => {
 conversationsRoutes.patch('/:id', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
-  const { title } = body
+  const { title, confirmMode } = body
 
-  const updated = await updateConversation(id, { title })
+  const updated = await updateConversation(id, { title, confirmMode })
 
   if (!updated) {
     return c.json({ error: 'Conversation not found' }, 404)

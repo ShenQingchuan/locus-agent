@@ -1,7 +1,6 @@
 import type {
   Conversation,
   CoreMessage,
-  GetConversationResponse,
   ListConversationsResponse,
   Message,
   SSEEvent,
@@ -23,6 +22,7 @@ export interface ChatStreamOptions {
   messages?: CoreMessage[]
   confirmMode?: boolean
   thinkingMode?: boolean
+  onReasoningDelta?: (delta: string) => void
   onTextDelta?: (delta: string) => void
   onToolCallStart?: (toolCall: ToolCall) => void
   onToolCallResult?: (toolResult: ToolResult) => void
@@ -64,6 +64,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     messages = [],
     confirmMode = true,
     thinkingMode,
+    onReasoningDelta,
     onTextDelta,
     onToolCallStart,
     onToolCallResult,
@@ -139,6 +140,9 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
           continue
 
         switch (event.type) {
+          case 'reasoning-delta':
+            onReasoningDelta?.(event.reasoningDelta)
+            break
           case 'text-delta':
             onTextDelta?.(event.textDelta)
             break
@@ -170,6 +174,9 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
       const event = parseSSELine(buffer.trim())
       if (event) {
         switch (event.type) {
+          case 'reasoning-delta':
+            onReasoningDelta?.(event.reasoningDelta)
+            break
           case 'text-delta':
             onTextDelta?.(event.textDelta)
             break
@@ -314,10 +321,12 @@ export async function fetchConversation(
       return null
     }
 
-    const data: GetConversationResponse = await response.json()
+    // Server returns flat: { id, title, confirmMode, createdAt, updatedAt, messages }
+    const data = await response.json()
+    const { messages: msgs, ...conversation } = data
     return {
-      conversation: data.conversation,
-      messages: data.messages,
+      conversation: conversation as Conversation,
+      messages: msgs as Message[],
     }
   }
   catch (error) {
@@ -383,6 +392,35 @@ export async function truncateMessages(
   catch (error) {
     console.error('Failed to truncate messages:', error)
     return false
+  }
+}
+
+/**
+ * Update a conversation (title, confirmMode, etc.)
+ */
+export async function updateConversation(
+  conversationId: string,
+  data: { title?: string, confirmMode?: boolean },
+): Promise<Conversation | null> {
+  try {
+    const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      console.error('Failed to update conversation:', response.statusText)
+      return null
+    }
+
+    return await response.json()
+  }
+  catch (error) {
+    console.error('Failed to update conversation:', error)
+    return null
   }
 }
 

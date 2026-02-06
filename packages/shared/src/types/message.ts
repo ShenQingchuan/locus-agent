@@ -19,6 +19,8 @@ export interface Message {
   role: MessageRole
   /** 消息文本内容 */
   content: string
+  /** 思考过程内容 */
+  reasoning?: string | null
   /** 工具调用列表（assistant 消息可能包含） */
   toolCalls?: ToolCall[]
   /** 工具执行结果列表（tool 消息包含） */

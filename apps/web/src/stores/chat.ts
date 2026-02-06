@@ -11,6 +11,7 @@ import {
   fetchConversations,
   streamChat,
   truncateMessages,
+  updateConversation,
 } from '@/api/chat'
 
 export interface ToolCallState {
@@ -20,6 +21,7 @@ export interface ToolCallState {
 }
 
 export type MessagePart =
+  | { type: 'reasoning', content: string }
   | { type: 'text', content: string }
   | { type: 'tool-call', toolCallIndex: number }
 
@@ -30,6 +32,8 @@ export interface Message {
   timestamp: number
   toolCalls?: ToolCallState[]
   isStreaming?: boolean
+  /** 思考过程内容 */
+  reasoning?: string
   /** 有序内容部分，保持文本与工具调用的交错顺序 */
   parts?: MessagePart[]
 }
@@ -72,8 +76,8 @@ export const useChatStore = defineStore('chat', () => {
   const isSidebarCollapsed = ref(false)
   const sidebarWidth = ref(getStoredSidebarWidth())
 
-  // Yolo mode state
-  const [yoloMode, toggleYoloMode] = useToggle(false)
+  // Yolo mode state (persisted per conversation)
+  const yoloMode = ref(false)
 
   // Think mode state
   const [thinkMode, toggleThinkMode] = useToggle(true)
@@ -113,6 +117,9 @@ export const useChatStore = defineStore('chat', () => {
     // Load conversation messages
     const data = await fetchConversation(id)
     if (data) {
+      // Restore yolo mode from conversation settings
+      yoloMode.value = data.conversation?.confirmMode === false
+
       // Convert API messages to local Message format
       // We need to merge tool results from tool messages into assistant messages
       const convertedMessages: Message[] = []
@@ -126,6 +133,11 @@ export const useChatStore = defineStore('chat', () => {
 
         const parts: MessagePart[] = []
         let toolCallStates: ToolCallState[] | undefined
+
+        // If this assistant message has reasoning, add it as the first part
+        if (m.role === 'assistant' && m.reasoning) {
+          parts.push({ type: 'reasoning', content: m.reasoning })
+        }
 
         // If this is an assistant message with tool calls
         if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
@@ -162,6 +174,7 @@ export const useChatStore = defineStore('chat', () => {
           id: m.id,
           role: m.role as 'user' | 'assistant',
           content: m.content,
+          reasoning: m.reasoning || undefined,
           timestamp: new Date(m.createdAt).getTime(),
           toolCalls: toolCallStates,
           parts: parts.length > 0 ? parts : undefined,
@@ -250,6 +263,28 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+
+  function appendReasoningToMessage(id: string, content: string) {
+    const index = messages.value.findIndex(m => m.id === id)
+    if (index !== -1) {
+      const message = messages.value[index]
+      const parts = [...(message.parts || [])]
+      const lastPart = parts[parts.length - 1]
+
+      if (lastPart && lastPart.type === 'reasoning') {
+        parts[parts.length - 1] = { type: 'reasoning', content: lastPart.content + content }
+      }
+      else {
+        parts.push({ type: 'reasoning', content })
+      }
+
+      messages.value[index] = {
+        ...message,
+        reasoning: (message.reasoning || '') + content,
+        parts,
+      }
+    }
+  }
 
   function addToolCallToMessage(id: string, toolCall: ToolCall) {
     const index = messages.value.findIndex(m => m.id === id)
@@ -347,7 +382,18 @@ export const useChatStore = defineStore('chat', () => {
   function newConversation() {
     // 不立即生成 ID，发消息时再创建
     currentConversationId.value = null
+    yoloMode.value = false
     clearMessages()
+  }
+
+  async function toggleYoloMode() {
+    yoloMode.value = !yoloMode.value
+    // Persist to DB if we have a conversation
+    if (currentConversationId.value) {
+      await updateConversation(currentConversationId.value, {
+        confirmMode: !yoloMode.value,
+      })
+    }
   }
 
   async function sendMessage(content: string, historyMessages?: any[]) {
@@ -384,6 +430,9 @@ export const useChatStore = defineStore('chat', () => {
         messages: historyMessages,
         confirmMode: !yoloMode.value,
         thinkingMode: thinkMode.value,
+        onReasoningDelta: (delta) => {
+          appendReasoningToMessage(assistantMessageId, delta)
+        },
         onTextDelta: (delta) => {
           appendToMessage(assistantMessageId, delta)
         },

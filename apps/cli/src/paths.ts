@@ -53,6 +53,20 @@ export function getMigrationsFolder(): string {
 }
 
 /**
+ * PID 文件路径
+ */
+export function getPidPath(): string {
+  return join(getDataDir(), 'locus.pid')
+}
+
+/**
+ * 日志文件路径
+ */
+export function getLogPath(): string {
+  return join(getDataDir(), 'locus.log')
+}
+
+/**
  * 确保所需目录存在
  */
 export function ensureDirs(): void {

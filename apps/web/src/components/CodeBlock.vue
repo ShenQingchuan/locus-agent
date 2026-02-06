@@ -16,7 +16,7 @@ const codeBlockRef = ref<HTMLElement | null>(null)
 
 const highlighter = createHighlighter({
   themes: ['github-dark-default', 'min-light'],
-  langs: ['javascript', 'typescript', 'json', 'bash', 'shell', 'python', 'html', 'css', 'vue', 'jsx', 'tsx', 'markdown', 'yaml', 'sql', 'rust', 'go', 'java', 'c', 'cpp', 'text'],
+  langs: ['text'],
 })
 
 const resolvedLang = computed(() => {
@@ -32,8 +32,15 @@ watchEffect(async () => {
   const targetLang = resolvedLang.value
 
   const hl = await highlighter
-  const langs = hl.getLoadedLanguages()
-  const lang = langs.includes(targetLang) ? targetLang : 'text'
+  let lang = targetLang
+  if (!hl.getLoadedLanguages().includes(lang)) {
+    try {
+      await hl.loadLanguage(lang as any)
+    }
+    catch {
+      lang = 'text'
+    }
+  }
 
   html.value = hl.codeToHtml(code, {
     lang,

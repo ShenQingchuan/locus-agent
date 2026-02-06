@@ -14,15 +14,24 @@ const codeBlockRef = ref<HTMLElement | null>(null)
 
 const highlighter = createHighlighter({
   themes: ['github-dark', 'github-light'],
-  langs: ['json', 'bash', 'text'],
+  langs: ['text'],
 })
 
 watchEffect(async () => {
   // 在 await 之前读取响应式依赖，确保数据更新时能重新触发
   const code = props.code
-  const lang = props.lang
+  let lang = props.lang
 
   const hl = await highlighter
+  if (!hl.getLoadedLanguages().includes(lang)) {
+    try {
+      await hl.loadLanguage(lang as any)
+    }
+    catch {
+      lang = 'text'
+    }
+  }
+
   html.value = hl.codeToHtml(code, {
     lang,
     themes: {

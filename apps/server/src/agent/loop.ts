@@ -18,6 +18,8 @@ export interface AgentLoopOptions {
   onToolCallStart?: (toolCallId: string, toolName: string, args: unknown) => void
   /** 工具调用结果回调 */
   onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void
+  /** 思考过程增量回调 */
+  onReasoningDelta?: (delta: string) => void
   /** 工具等待确认回调（确认模式下使用） */
   onToolPendingApproval?: (toolCallId: string, toolName: string, args: unknown) => void
   /** 完成回调 */
@@ -74,6 +76,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onTextDelta,
     onToolCallStart,
     onToolCallResult,
+    onReasoningDelta,
     onToolPendingApproval,
     onFinish,
     maxIterations = 10,
@@ -117,6 +120,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             ? {
                 providerOptions: {
                   anthropic: {
+                    thinking: { type: 'enabled', budgetTokens: 10000 },
+                  },
+                  moonshotai: {
                     thinking: { type: 'enabled', budgetTokens: 10000 },
                   },
                 },
@@ -165,6 +171,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       }
 
       switch (part.type) {
+        case 'reasoning-delta':
+          onReasoningDelta?.((part as any).text)
+          break
+
         case 'text-delta':
           iterationText += part.text
           onTextDelta?.(part.text)

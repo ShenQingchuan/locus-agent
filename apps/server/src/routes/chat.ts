@@ -131,6 +131,7 @@ chatRoutes.post('/', async (c) => {
 
     // 收集 AI 响应数据以便保存
     let assistantText = ''
+    let assistantReasoning = ''
     const collectedToolCalls: ToolCall[] = []
     const collectedToolResults: ToolResult[] = []
 
@@ -149,6 +150,15 @@ chatRoutes.post('/', async (c) => {
         abortSignal: abortController.signal,
         confirmMode: confirmMode ?? config.confirmMode,
         thinkingMode: thinkingMode ?? true,
+
+        // 思考过程增量回调
+        onReasoningDelta: async (delta) => {
+          assistantReasoning += delta
+          await stream.writeSSE(createSSEEvent({
+            type: 'reasoning-delta',
+            reasoningDelta: delta,
+          }))
+        },
 
         // 文本增量回调
         onTextDelta: async (delta) => {
@@ -225,6 +235,7 @@ chatRoutes.post('/', async (c) => {
           await addMessage(conversationId, {
             role: 'assistant',
             content: assistantText || '',
+            reasoning: assistantReasoning || undefined,
             toolCalls: collectedToolCalls,
           })
 
@@ -242,6 +253,7 @@ chatRoutes.post('/', async (c) => {
           await addMessage(conversationId, {
             role: 'assistant',
             content: assistantText,
+            reasoning: assistantReasoning || undefined,
           })
         }
 

@@ -6,6 +6,8 @@ export interface Conversation {
   id: string
   /** 会话标题 */
   title: string
+  /** 是否需要确认工具执行（true=需要确认，false=yolo 模式） */
+  confirmMode: boolean
   /** 创建时间 */
   createdAt: Date
   /** 更新时间 */
@@ -24,4 +26,5 @@ export interface CreateConversationInput {
  */
 export interface UpdateConversationInput {
   title?: string
+  confirmMode?: boolean
 }
