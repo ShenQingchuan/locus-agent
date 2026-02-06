@@ -21,6 +21,7 @@ export interface ChatStreamOptions {
   conversationId: string
   message: string
   messages?: CoreMessage[]
+  confirmMode?: boolean
   onTextDelta?: (delta: string) => void
   onToolCallStart?: (toolCall: ToolCall) => void
   onToolCallResult?: (toolResult: ToolResult) => void
@@ -60,6 +61,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     conversationId,
     message,
     messages = [],
+    confirmMode = true,
     onTextDelta,
     onToolCallStart,
     onToolCallResult,
@@ -88,6 +90,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         conversationId,
         message,
         messages,
+        confirmMode,
       }),
       signal: controller.signal,
     })

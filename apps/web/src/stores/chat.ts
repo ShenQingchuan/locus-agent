@@ -74,6 +74,10 @@ export const useChatStore = defineStore('chat', () => {
   // Yolo mode state
   const yoloMode = ref(false)
 
+  // Edit message state
+  const editingMessageId = ref<string | null>(null)
+  const editingContent = ref<string>('')
+
   const hasError = computed(() => error.value !== null)
   const isStreaming = computed(() => currentStreamingMessageId.value !== null)
   const hasPendingApprovals = computed(() => pendingApprovals.value.size > 0)
@@ -378,6 +382,7 @@ export const useChatStore = defineStore('chat', () => {
         conversationId: currentConversationId.value,
         message: content,
         messages: historyMessages,
+        confirmMode: !yoloMode.value,
         onTextDelta: (delta) => {
           appendToMessage(assistantMessageId, delta)
         },
@@ -443,6 +448,106 @@ export const useChatStore = defineStore('chat', () => {
 
   async function rejectToolExecution(toolCallId: string) {
     return handleToolApproval(toolCallId, false)
+  }
+
+  /**
+   * 开始编辑消息
+   */
+  function startEditMessage(messageId: string) {
+    const message = messages.value.find(m => m.id === messageId)
+    if (!message || message.role !== 'user') {
+      console.warn('[startEditMessage] 只能编辑用户消息')
+      return
+    }
+    editingMessageId.value = messageId
+    editingContent.value = message.content
+  }
+
+  /**
+   * 取消编辑消息
+   */
+  function cancelEditMessage() {
+    editingMessageId.value = null
+    editingContent.value = ''
+  }
+
+  /**
+   * 保存编辑后的消息并重新发送
+   */
+  async function saveEditMessage(messageId: string, newContent: string) {
+    const messageIndex = messages.value.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) {
+      console.warn('[saveEditMessage] 未找到消息:', messageId)
+      return
+    }
+
+    const message = messages.value[messageIndex]
+    if (message.role !== 'user') {
+      console.warn('[saveEditMessage] 只能编辑用户消息')
+      return
+    }
+
+    // 清除编辑状态
+    editingMessageId.value = null
+    editingContent.value = ''
+
+    // 如果内容没变，不需要重新发送
+    if (newContent.trim() === message.content.trim()) {
+      return
+    }
+
+    // 保存之前的历史
+    const historyBeforeEdit = messages.value.slice(0, messageIndex)
+
+    // 计算后端需要保留的消息数量
+    let backendKeepCount = 0
+    for (const m of historyBeforeEdit) {
+      backendKeepCount++
+      if (m.role === 'assistant' && m.toolCalls && m.toolCalls.some(tc => tc.result)) {
+        backendKeepCount++
+      }
+    }
+
+    // 通知后端截断消息
+    if (currentConversationId.value) {
+      await truncateMessages(currentConversationId.value, backendKeepCount)
+    }
+
+    // 删除前端的本地消息
+    messages.value = historyBeforeEdit
+
+    // 构建要发送给 API 的消息历史
+    const coreMessages: any[] = []
+    for (const m of historyBeforeEdit) {
+      if (m.role === 'user') {
+        coreMessages.push({ role: 'user' as const, content: m.content })
+      }
+      else {
+        const assistantMsg: any = { role: 'assistant' as const, content: m.content }
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          assistantMsg.toolCalls = m.toolCalls.map(tc => tc.toolCall)
+          coreMessages.push(assistantMsg)
+
+          const toolResults = m.toolCalls
+            .filter(tc => tc.result)
+            .map(tc => tc.result!)
+
+          if (toolResults.length > 0) {
+            coreMessages.push({
+              role: 'tool' as const,
+              content: '',
+              toolResults,
+            })
+          }
+        }
+        else {
+          coreMessages.push(assistantMsg)
+        }
+      }
+    }
+
+    // 发送编辑后的新内容
+    await sendMessage(newContent.trim(), coreMessages)
   }
 
   /**
@@ -538,6 +643,10 @@ export const useChatStore = defineStore('chat', () => {
     currentStreamingMessageId,
     pendingApprovals,
 
+    // Edit message state
+    editingMessageId,
+    editingContent,
+
     // Computed
     hasError,
     isStreaming,
@@ -573,5 +682,8 @@ export const useChatStore = defineStore('chat', () => {
     approveToolExecution,
     rejectToolExecution,
     retryFromMessage,
+    startEditMessage,
+    cancelEditMessage,
+    saveEditMessage,
   }
 })

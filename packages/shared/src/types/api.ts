@@ -13,6 +13,8 @@ export interface ChatRequest {
   messages?: CoreMessage[]
   /** 是否启用思考模式（默认 true） */
   thinkingMode?: boolean
+  /** 是否需要确认工具执行（false = yolo 模式，默认 true） */
+  confirmMode?: boolean
 }
 
 /**

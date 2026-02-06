@@ -84,7 +84,7 @@ function convertToModelMessage(msg: SharedCoreMessage): ModelMessage {
 // POST /api/chat - Stream chat response
 chatRoutes.post('/', async (c) => {
   const body = await c.req.json<ChatRequest>()
-  const { conversationId, message, messages: historyMessages } = body
+  const { conversationId, message, messages: historyMessages, confirmMode } = body
 
   // 验证请求
   if (!conversationId || !message) {
@@ -147,7 +147,7 @@ chatRoutes.post('/', async (c) => {
         model: createLLMModel(),
         messages,
         abortSignal: abortController.signal,
-        confirmMode: config.confirmMode,
+        confirmMode: confirmMode ?? config.confirmMode,
 
         // 文本增量回调
         onTextDelta: async (delta) => {
