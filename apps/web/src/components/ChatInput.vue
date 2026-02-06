@@ -8,12 +8,12 @@ defineProps<{
   isStreaming?: boolean
 }>()
 
-const chatStore = useChatStore()
-
 const emit = defineEmits<{
   send: [content: string]
   stop: []
 }>()
+
+const chatStore = useChatStore()
 
 const { textarea, input } = useTextareaAutosize()
 
@@ -51,7 +51,7 @@ function handleKeydown(event: KeyboardEvent) {
 <template>
   <div class="w-full max-w-3xl mx-auto">
     <div
-      class="relative flex flex-col rounded-2xl border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50 overflow-hidden"
+      class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50 overflow-hidden"
     >
       <!-- Textarea -->
       <textarea

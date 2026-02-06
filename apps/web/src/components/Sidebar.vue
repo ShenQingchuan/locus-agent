@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDark, useToggle } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { useChatStore } from '@/stores/chat'
@@ -6,6 +7,8 @@ import ConversationItem from './ConversationItem.vue'
 
 const chatStore = useChatStore()
 const toast = useToast()
+const isDark = useDark()
+const toggleDark = useToggle(isDark)
 
 const isResizing = ref(false)
 const startX = ref(0)
@@ -111,57 +114,64 @@ async function handleDeleteConversation(id: string) {
       ]"
       :style="chatStore.isSidebarCollapsed ? {} : { width: `${chatStore.sidebarWidth}px`, willChange: isResizing ? 'width' : 'auto' }"
     >
-    <!-- Header -->
-    <div class="flex-shrink-0 p-3 border-b border-sidebar-border">
-      <button
-        class="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-sidebar-border bg-sidebar-background text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 whitespace-nowrap flex-shrink-0"
-        @click="handleNewChat"
-      >
-        <div class="i-carbon-add h-4 w-4" />
-        <span class="text-sm font-medium">新对话</span>
-      </button>
-    </div>
-
-    <!-- Conversation List -->
-    <div class="flex-1 overflow-y-auto p-2">
-      <!-- Loading state -->
-      <div
-        v-if="chatStore.isLoadingConversations"
-        class="flex-col-center py-8 text-muted-foreground"
-      >
-        <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
-        <span class="text-xs mt-2 opacity-70">加载中...</span>
+      <!-- Header -->
+      <div class="flex-shrink-0 p-3 border-b border-sidebar-border">
+        <button
+          class="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-sidebar-border bg-sidebar-background text-sidebar-foreground hover:bg-sidebar-accent transition-colors duration-150 whitespace-nowrap flex-shrink-0"
+          @click="handleNewChat"
+        >
+          <div class="i-carbon-add h-4 w-4" />
+          <span class="text-sm font-medium">新对话</span>
+        </button>
       </div>
 
-      <!-- Empty state -->
-      <div
-        v-else-if="chatStore.conversations.length === 0"
-        class="flex-col-center py-8 text-muted-foreground"
-      >
-        <div class="i-carbon-chat h-8 w-8 opacity-30" />
-        <span class="text-xs mt-2 opacity-70">暂无对话</span>
+      <!-- Conversation List -->
+      <div class="flex-1 overflow-y-auto p-2">
+        <!-- Loading state -->
+        <div
+          v-if="chatStore.isLoadingConversations"
+          class="flex-col-center py-8 text-muted-foreground"
+        >
+          <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
+          <span class="text-xs mt-2 opacity-70">加载中...</span>
+        </div>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="chatStore.conversations.length === 0"
+          class="flex-col-center py-8 text-muted-foreground"
+        >
+          <div class="i-carbon-chat h-8 w-8 opacity-30" />
+          <span class="text-xs mt-2 opacity-70">暂无对话</span>
+        </div>
+
+        <!-- Conversation items -->
+        <div v-else class="space-y-1">
+          <ConversationItem
+            v-for="conversation in chatStore.conversations"
+            :key="conversation.id"
+            :conversation="conversation"
+            :is-active="conversation.id === chatStore.currentConversationId"
+            @select="handleSelectConversation"
+            @delete="handleDeleteConversation"
+          />
+        </div>
       </div>
 
-      <!-- Conversation items -->
-      <div v-else class="space-y-1">
-        <ConversationItem
-          v-for="conversation in chatStore.conversations"
-          :key="conversation.id"
-          :conversation="conversation"
-          :is-active="conversation.id === chatStore.currentConversationId"
-          @select="handleSelectConversation"
-          @delete="handleDeleteConversation"
-        />
+      <!-- Footer -->
+      <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
+        <div class="flex items-center justify-between text-xs text-muted-foreground opacity-70">
+          <span>Locus Agent</span>
+          <button
+            class="p-1 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors duration-150"
+            title="切换深色模式"
+            @click="toggleDark()"
+          >
+            <div v-if="isDark" class="i-carbon-sun h-3.5 w-3.5" />
+            <div v-else class="i-carbon-moon h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
-    </div>
-
-    <!-- Footer (optional: settings, user info, etc.) -->
-    <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
-      <div class="flex items-center gap-2 text-xs text-muted-foreground opacity-70">
-        <div class="i-carbon-bot h-4 w-4" />
-        <span>Locus Agent</span>
-      </div>
-    </div>
     </aside>
 
     <!-- Resizer -->

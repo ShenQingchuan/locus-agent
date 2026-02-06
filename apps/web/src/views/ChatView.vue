@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useDark, useToggle } from '@vueuse/core'
 import ChatInput from '@/components/ChatInput.vue'
 import MessageList from '@/components/MessageList.vue'
 import Sidebar from '@/components/Sidebar.vue'
@@ -10,9 +9,6 @@ import { useChatStore } from '@/stores/chat'
 const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
-
 // 标记是否正在同步，避免 watch 循环
 const isSyncingFromUrl = ref(false)
 const isSyncingToUrl = ref(false)
@@ -31,7 +27,7 @@ onMounted(async () => {
     router.replace({ query: { session: chatStore.currentConversationId } })
     isSyncingToUrl.value = false
   }
-  
+
   // 加载会话列表
   await chatStore.loadConversations()
 })
@@ -42,7 +38,7 @@ watch(
   (newId) => {
     if (isSyncingFromUrl.value)
       return
-    
+
     const urlId = route.query.session as string | undefined
     if (newId !== urlId) {
       isSyncingToUrl.value = true
@@ -63,7 +59,7 @@ watch(
   async (newSessionId) => {
     if (isSyncingToUrl.value)
       return
-    
+
     const sessionId = typeof newSessionId === 'string' ? newSessionId : undefined
     if (sessionId && sessionId !== chatStore.currentConversationId) {
       isSyncingFromUrl.value = true
@@ -127,16 +123,6 @@ function handleNewChat() {
         </div>
 
         <div class="flex items-center gap-1">
-          <!-- Dark mode toggle -->
-          <button
-            class="btn-ghost btn-icon"
-            title="切换深色模式"
-            @click="toggleDark()"
-          >
-            <div v-if="isDark" class="i-carbon-sun h-4 w-4" />
-            <div v-else class="i-carbon-moon h-4 w-4" />
-          </button>
-
           <!-- New chat button (mobile) -->
           <button
             class="btn-ghost btn-icon sm:hidden"

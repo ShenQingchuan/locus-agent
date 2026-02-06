@@ -15,7 +15,7 @@ const html = ref('')
 const codeBlockRef = ref<HTMLElement | null>(null)
 
 const highlighter = createHighlighter({
-  themes: ['github-dark-default', 'github-light-default'],
+  themes: ['github-dark-default', 'min-light'],
   langs: ['javascript', 'typescript', 'json', 'bash', 'shell', 'python', 'html', 'css', 'vue', 'jsx', 'tsx', 'markdown', 'yaml', 'sql', 'rust', 'go', 'java', 'c', 'cpp', 'text'],
 })
 
@@ -39,7 +39,7 @@ watchEffect(async () => {
     lang,
     themes: {
       dark: 'github-dark-default',
-      light: 'github-light-default',
+      light: 'min-light',
     },
   })
 })
@@ -64,12 +64,12 @@ async function handleCopy() {
 </script>
 
 <template>
-  <div class="code-block-wrapper relative group my-3 overflow-hidden border border-border">
+  <div class="code-block-wrapper relative group my-3 overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b border-border text-xs text-muted-foreground">
+    <div class="flex items-center justify-between px-3 py-1.5 bg-muted/50 text-xs text-muted-foreground">
       <span class="font-mono">{{ node.language || 'text' }}</span>
       <button
-        class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted"
+        class="transition-opacity duration-150 p-1 rounded hover:bg-muted"
         title="复制"
         @click="handleCopy"
       >

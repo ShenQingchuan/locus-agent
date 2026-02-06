@@ -2,8 +2,10 @@
 import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
 import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
+import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
 import ShikiCode from './ShikiCode.vue'
+import Tooltip from './Tooltip.vue'
 
 const props = defineProps<{
   message: Message
@@ -12,6 +14,9 @@ const props = defineProps<{
 const chatStore = useChatStore()
 
 const isUser = computed(() => props.message.role === 'user')
+const { relative: relativeTime, absolute: absoluteTime } = useRelativeTime(
+  () => props.message.timestamp,
+)
 
 function formatToolArgs(args: Record<string, unknown>): string {
   try {
@@ -124,7 +129,10 @@ function isLastTextPart(partIndex: number): boolean {
           >
             <div class="i-carbon-restart h-3 w-3" />
           </button>
-          <span class="text-xs text-muted-foreground mb-0.5 block">用户</span>
+          <Tooltip :content="absoluteTime">
+            <span class="text-xs text-muted-foreground/60 mr-2">{{ relativeTime }}</span>
+          </Tooltip>
+          <span class="text-xs text-muted-foreground block">用户</span>
           <div class="i-carbon-user text-xs text-muted-foreground" />
         </div>
         <div class="prose prose-sm dark:prose-invert max-w-none text-left w-full">
@@ -140,7 +148,10 @@ function isLastTextPart(partIndex: number): boolean {
     <div v-else class="max-w-full">
       <div class="flex items-center gap-1">
         <div class="i-carbon-bot text-xs text-muted-foreground" />
-        <span class="text-xs text-muted-foreground mb-0.5 block">助手</span>
+        <span class="text-xs text-muted-foreground block">助手</span>
+        <Tooltip :content="absoluteTime">
+          <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
+        </Tooltip>
       </div>
 
       <!-- Ordered parts: text and tool calls interleaved -->

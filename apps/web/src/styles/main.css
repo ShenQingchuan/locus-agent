@@ -47,15 +47,19 @@
   --chart-4: 43 74% 66%;
   --chart-5: 27 87% 67%;
 
-  /* Sidebar */
-  --sidebar-background: 0 0% 98%;
-  --sidebar-foreground: 240 5.3% 26.1%;
+  /* Tooltip */
+  --tooltip: 240 10% 3.9%;
+  --tooltip-foreground: 0 0% 98%;
+
+  /* Sidebar - unified with main area */
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 240 10% 3.9%;
   --sidebar-primary: 240 5.9% 10%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 240 4.8% 95.9%;
   --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 217.2 91.2% 59.8%;
+  --sidebar-border: 240 5.9% 92%;
+  --sidebar-ring: 240 5% 65%;
 }
 
 /* Dark mode - shadcn official style: quiet, refined, barely-visible borders */
@@ -94,7 +98,7 @@
 
   /* Border, Input, Ring - extremely subtle, barely visible */
   /* Using lower contrast for that "quiet, refined" look */
-  --border: 240 3.7% 15.9%;
+  --border: 0deg 91.41% 8.59%;
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
 
@@ -105,15 +109,44 @@
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
 
-  /* Sidebar - darker than main background */
-  --sidebar-background: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
+  /* Tooltip - subtle gray in dark mode, not jarring white */
+  --tooltip: 240 5% 26%;
+  --tooltip-foreground: 0 0% 98%;
+
+  /* Sidebar - unified with main area */
+  --sidebar-background: 240 10% 3.9%;
+  --sidebar-foreground: 0 0% 98%;
   --sidebar-primary: 0 0% 98%;
   --sidebar-primary-foreground: 240 5.9% 10%;
   --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 0 0% 98%;
   --sidebar-border: 240 3.7% 15.9%;
   --sidebar-ring: 240 4.9% 83.9%;
+}
+
+/* Ripple animation for theme switching */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+  animation: ripple-expand 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes ripple-expand {
+  from {
+    clip-path: circle(0px at var(--ripple-x, 50%) var(--ripple-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--ripple-end-radius, 100vmax) at var(--ripple-x, 50%) var(--ripple-y, 50%));
+  }
 }
 
 /* Base styles */
@@ -208,7 +241,7 @@ select,
 /* Code block styling - minimal, no heavy borders */
 .markstream-vue pre {
   background-color: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
+  border: none;
   padding: 1rem;
   overflow-x: auto;
 }
@@ -252,6 +285,7 @@ select,
 .markstream-vue .hr-node {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
+  border-color: hsl(var(--border));
 }
 
 .markstream-vue .blockquote {

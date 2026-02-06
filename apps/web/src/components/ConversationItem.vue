@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Conversation } from '@locus-agent/shared'
 import { computed } from 'vue'
+import { useRelativeTime } from '@/composables/useRelativeTime'
 
 const props = defineProps<{
   conversation: Conversation
@@ -12,25 +13,9 @@ const emit = defineEmits<{
   delete: [id: string]
 }>()
 
-const formattedTime = computed(() => {
-  const date = new Date(props.conversation.updatedAt)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  // Less than 24 hours
-  if (diff < 24 * 60 * 60 * 1000) {
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  // Less than 7 days
-  if (diff < 7 * 24 * 60 * 60 * 1000) {
-    const days = Math.floor(diff / (24 * 60 * 60 * 1000))
-    return `${days}天前`
-  }
-
-  // More than 7 days
-  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-})
+const { relative: formattedTime } = useRelativeTime(
+  () => new Date(props.conversation.updatedAt).getTime(),
+)
 
 const truncatedTitle = computed(() => {
   const title = props.conversation.title || '新对话'
@@ -52,10 +37,9 @@ const truncatedTitle = computed(() => {
       @click="emit('select', conversation.id)"
     >
       <div class="flex items-center gap-2">
-        <div class="i-carbon-chat h-4 w-4 flex-shrink-0 opacity-60" />
         <span class="text-sm truncate">{{ truncatedTitle }}</span>
       </div>
-      <div class="mt-0.5 ml-6 text-xs text-muted-foreground opacity-70">
+      <div class="mt-0.5 text-xs text-muted-foreground opacity-70">
         {{ formattedTime }}
       </div>
     </button>
