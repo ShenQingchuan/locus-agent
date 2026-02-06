@@ -1,0 +1,23 @@
+{
+  "name": "@locus-agent/shared",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "dev": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:dev-tools"
+  }
+}

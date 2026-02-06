@@ -1,0 +1,21 @@
+{
+  "name": "locus-agent",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:server": "pnpm -F @locus-agent/server dev",
+    "dev:web": "pnpm -F @locus-agent/web dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:dev-tools",
+    "@types/node": "catalog:dev-tools",
+    "eslint": "catalog:dev-tools",
+    "typescript": "catalog:dev-tools"
+  }
+}

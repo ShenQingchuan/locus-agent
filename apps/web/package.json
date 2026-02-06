@@ -1,0 +1,34 @@
+{
+  "name": "@locus-agent/web",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/vue": "catalog:vue-family",
+    "@locus-agent/shared": "workspace:*",
+    "@pinia/colada": "catalog:vue-family",
+    "@vueuse/core": "catalog:vue-family",
+    "markstream-vue": "catalog:vue-family",
+    "pinia": "catalog:vue-family",
+    "shiki": "^3.22.0",
+    "vue": "catalog:vue-family",
+    "vue-router": "catalog:vue-family"
+  },
+  "devDependencies": {
+    "@iconify/json": "catalog:unocss-family",
+    "@unocss/preset-typography": "catalog:unocss-family",
+    "@unocss/preset-uno": "catalog:unocss-family",
+    "@unocss/reset": "catalog:unocss-family",
+    "@vitejs/plugin-vue": "catalog:vite-family",
+    "@vue/tsconfig": "catalog:vue-family",
+    "unocss": "catalog:unocss-family",
+    "vite": "catalog:vite-family",
+    "vue-tsc": "catalog:vue-family"
+  }
+}

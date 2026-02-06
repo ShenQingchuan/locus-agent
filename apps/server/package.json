@@ -1,0 +1,29 @@
+{
+  "name": "@locus-agent/server",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "catalog:ai-sdk",
+    "@ai-sdk/openai": "catalog:ai-sdk",
+    "@ai-sdk/openai-compatible": "^2.0.27",
+    "@locus-agent/shared": "workspace:*",
+    "ai": "catalog:ai-sdk",
+    "drizzle-orm": "catalog:database",
+    "hono": "catalog:hono-family",
+    "zod": "catalog:ai-sdk"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:bun-family",
+    "drizzle-kit": "catalog:database",
+    "typescript": "catalog:dev-tools"
+  }
+}
