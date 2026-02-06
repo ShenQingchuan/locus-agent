@@ -134,7 +134,7 @@ function isLastTextPart(partIndex: number): boolean {
             <div class="i-carbon-idea h-3 w-3" />
             <span>思考过程</span>
           </summary>
-          <div class="mt-1 pl-4.5 border-l border-border/40 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+          <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
             {{ part.content }}
           </div>
         </details>
