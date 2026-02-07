@@ -8,8 +8,6 @@ import type {
   ToolResult,
 } from '@locus-agent/shared'
 
-const API_BASE = import.meta.env.DEV ? 'http://localhost:3000' : ''
-
 export interface PendingApproval {
   toolCallId: string
   toolName: string
@@ -84,7 +82,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
   abortControllers.set(conversationId, controller)
 
   try {
-    const response = await fetch(`${API_BASE}/api/chat`, {
+    const response = await fetch(`/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -228,7 +226,7 @@ export async function abortChat(conversationId: string): Promise<void> {
 
   // Notify server to abort
   try {
-    await fetch(`${API_BASE}/api/chat/abort`, {
+    await fetch(`/api/chat/abort`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -250,7 +248,7 @@ export async function approveToolCall(
   approved: boolean,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/api/chat/approve`, {
+    const response = await fetch(`/api/chat/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -281,7 +279,7 @@ export async function approveToolCall(
  */
 export async function fetchConversations(): Promise<Conversation[]> {
   try {
-    const response = await fetch(`${API_BASE}/api/conversations`, {
+    const response = await fetch(`/api/conversations`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -309,7 +307,7 @@ export async function fetchConversation(
   conversationId: string,
 ): Promise<{ conversation: Conversation, messages: Message[] } | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
+    const response = await fetch(`/api/conversations/${conversationId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -340,7 +338,7 @@ export async function fetchConversation(
  */
 export async function createConversation(title?: string): Promise<Conversation | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/conversations`, {
+    const response = await fetch(`/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -371,7 +369,7 @@ export async function truncateMessages(
 ): Promise<boolean> {
   try {
     const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}/truncate`,
+      `/api/conversations/${conversationId}/truncate`,
       {
         method: 'POST',
         headers: {
@@ -403,7 +401,7 @@ export async function updateConversation(
   data: { title?: string, confirmMode?: boolean },
 ): Promise<Conversation | null> {
   try {
-    const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
+    const response = await fetch(`/api/conversations/${conversationId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -429,7 +427,7 @@ export async function updateConversation(
  */
 export async function deleteConversation(conversationId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
+    const response = await fetch(`/api/conversations/${conversationId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

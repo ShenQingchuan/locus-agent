@@ -23,6 +23,11 @@
       "bun": "./src/agent/providers/index.ts",
       "dev": "./src/agent/providers/index.ts",
       "default": "./dist/agent/providers/index.js"
+    },
+    "./settings": {
+      "bun": "./src/settings/index.ts",
+      "dev": "./src/settings/index.ts",
+      "default": "./dist/settings/index.js"
     }
   },
   "scripts": {

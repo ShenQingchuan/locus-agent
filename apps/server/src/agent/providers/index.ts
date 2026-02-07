@@ -22,8 +22,7 @@ const DEFAULT_MODELS: Record<LLMProviderType, string> = {
 let _config: LLMConfig | null = null
 
 /**
- * 注入 LLM 配置（CLI 启动时调用）
- * 若未调用，则 fallback 到 Bun.env（dev 模式兼容）
+ * Inject LLM config (called at startup by both CLI and dev mode)
  */
 export function setLLMConfig(config: LLMConfig): void {
   _config = config
@@ -32,16 +31,7 @@ export function setLLMConfig(config: LLMConfig): void {
 function getConfig(): LLMConfig {
   if (_config)
     return _config
-  const apiKey = Bun.env.LLM_API_KEY
-  if (!apiKey) {
-    throw new Error('LLM_API_KEY is not configured. Run `locus-agent config` to set up.')
-  }
-  return {
-    provider: (Bun.env.LLM_PROVIDER || 'openai') as LLMProviderType,
-    apiKey,
-    apiBase: Bun.env.LLM_API_BASE,
-    model: Bun.env.LLM_MODEL,
-  }
+  throw new Error('LLM config not initialized. Run `locus-agent config` to set up.')
 }
 
 export function getDefaultModel(): string {

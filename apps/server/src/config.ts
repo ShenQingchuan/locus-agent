@@ -1,20 +1,19 @@
 /**
- * 服务器配置
- * 支持外部注入（CLI 模式）或从环境变量读取（dev 模式）
+ * Server configuration.
+ * Must be injected via setServerConfig() before use (both CLI and dev mode).
  */
 
 export interface ServerConfig {
-  /** 确认模式：true = 需要确认，false = yolo 模式 */
+  /** Confirm mode: true = require approval, false = yolo mode */
   confirmMode: boolean
-  /** 服务端口 */
+  /** Server port */
   port: number
 }
 
 let _config: ServerConfig | null = null
 
 /**
- * 注入服务器配置（CLI 启动时调用）
- * 若未调用，则 fallback 到 Bun.env（dev 模式兼容）
+ * Inject server config (called at startup by both CLI and dev mode)
  */
 export function setServerConfig(cfg: Partial<ServerConfig>): void {
   _config = {
@@ -25,11 +24,7 @@ export function setServerConfig(cfg: Partial<ServerConfig>): void {
 
 function resolveConfig(): ServerConfig {
   if (_config) return _config
-  _config = {
-    confirmMode: Bun.env.YOLO_MODE !== 'true',
-    port: Number(Bun.env.PORT) || 3000,
-  }
-  return _config
+  throw new Error('Server config not initialized. Run `locus-agent config` to set up.')
 }
 
 export const config = new Proxy({} as ServerConfig, {

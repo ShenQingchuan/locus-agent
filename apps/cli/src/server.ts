@@ -4,7 +4,7 @@ import { createApp } from '@locus-agent/server'
 import { initDB } from '@locus-agent/server/db'
 import { setServerConfig } from '@locus-agent/server/config'
 import { setLLMConfig } from '@locus-agent/server/providers'
-import type { LLMSettings } from './settings.js'
+import type { LLMSettings } from '@locus-agent/server/settings'
 
 export interface StartOptions {
   dbPath: string

@@ -1,4 +1,4 @@
-import type { LLMSettings } from '../settings.js'
+import type { LLMSettings } from '@locus-agent/server/settings'
 import { exit } from 'node:process'
 import * as p from '@clack/prompts'
 

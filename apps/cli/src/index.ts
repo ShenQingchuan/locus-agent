@@ -2,18 +2,20 @@
 import { spawn } from 'node:child_process'
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
-import { ensureDirs, getDbPath, getLogPath, getMigrationsFolder, getPidPath, getWebDistDir } from './paths.js'
-import { startServer } from './server.js'
 import {
   closeSettingsDb,
+  ensureDataDir,
   getLLMSettings,
   getServerPort,
+  getSettingsDbPath,
   isSetupComplete,
   isYoloMode,
   openSettingsDb,
   saveLLMSettings,
   setSetting,
-} from './settings.js'
+} from '@locus-agent/server/settings'
+import { getLogPath, getMigrationsFolder, getPidPath, getWebDistDir } from './paths.js'
+import { startServer } from './server.js'
 import { runSetup } from './setup/interactive.js'
 
 const args = process.argv.slice(2)
@@ -79,8 +81,8 @@ async function main(): Promise<void> {
  * 前台模式：用于 detached 子进程实际运行服务器
  */
 async function handleDaemon(): Promise<void> {
-  ensureDirs()
-  const dbPath = getDbPath()
+  ensureDataDir()
+  const dbPath = getSettingsDbPath()
   openSettingsDb(dbPath)
 
   const llmSettings = getLLMSettings()
@@ -107,8 +109,8 @@ async function handleDaemon(): Promise<void> {
  * 默认命令 / start：后台启动服务
  */
 async function handleStart(): Promise<void> {
-  ensureDirs()
-  const dbPath = getDbPath()
+  ensureDataDir()
+  const dbPath = getSettingsDbPath()
   openSettingsDb(dbPath)
 
   // 首次运行：交互式配置
@@ -164,7 +166,7 @@ async function handleStart(): Promise<void> {
  * stop：停止后台服务
  */
 function handleStop(): void {
-  ensureDirs()
+  ensureDataDir()
   const pidPath = getPidPath()
 
   if (!existsSync(pidPath)) {
@@ -191,8 +193,8 @@ function handleStop(): void {
 }
 
 async function handleConfig(): Promise<void> {
-  ensureDirs()
-  openSettingsDb(getDbPath())
+  ensureDataDir()
+  openSettingsDb(getSettingsDbPath())
 
   const existing = getLLMSettings()
   const existingPort = getServerPort()

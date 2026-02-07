@@ -2,10 +2,12 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
 
+export { ensureDataDir, getDataDir, getSettingsDbPath } from './paths.js'
+
 let _sqlite: Database | null = null
 
 /**
- * 打开 settings 数据库
+ * Open the settings database
  */
 export function openSettingsDb(dbPath: string): void {
   const dir = dirname(dbPath)
@@ -24,7 +26,7 @@ export function openSettingsDb(dbPath: string): void {
 }
 
 /**
- * 关闭 settings 数据库
+ * Close the settings database
  */
 export function closeSettingsDb(): void {
   if (_sqlite) {
