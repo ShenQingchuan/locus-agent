@@ -84,8 +84,12 @@ function handleNewChat() {
   chatStore.newConversation()
 }
 
-function handleSelectConversation(id: string) {
-  chatStore.switchConversation(id)
+async function handleSelectConversation(id: string) {
+  const success = await chatStore.switchConversation(id)
+  // If conversation not found, refresh the list to sync state
+  if (!success) {
+    await chatStore.loadConversations()
+  }
 }
 
 async function handleDeleteConversation(id: string) {

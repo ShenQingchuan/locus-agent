@@ -18,8 +18,15 @@ onMounted(async () => {
   const conversationId = route.query.session as string | undefined
   if (conversationId && conversationId !== chatStore.currentConversationId) {
     isSyncingFromUrl.value = true
-    await chatStore.switchConversation(conversationId)
+    const success = await chatStore.switchConversation(conversationId)
     isSyncingFromUrl.value = false
+    
+    // If conversation not found, clear query to restore empty state
+    if (!success) {
+      isSyncingToUrl.value = true
+      router.replace({ query: {} })
+      isSyncingToUrl.value = false
+    }
   }
   else if (!conversationId && chatStore.currentConversationId) {
     // 如果 URL 没有会话 ID 但 store 有，同步到 URL
@@ -63,8 +70,15 @@ watch(
     const sessionId = typeof newSessionId === 'string' ? newSessionId : undefined
     if (sessionId && sessionId !== chatStore.currentConversationId) {
       isSyncingFromUrl.value = true
-      await chatStore.switchConversation(sessionId)
+      const success = await chatStore.switchConversation(sessionId)
       isSyncingFromUrl.value = false
+      
+      // If conversation not found, clear query to restore empty state
+      if (!success) {
+        isSyncingToUrl.value = true
+        router.replace({ query: {} })
+        isSyncingToUrl.value = false
+      }
     }
     else if (!sessionId && chatStore.currentConversationId) {
       isSyncingFromUrl.value = true

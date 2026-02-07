@@ -1,38 +1,46 @@
 import type { BashResult } from './bash.js'
+import type { ReadFileResult } from './read.js'
 import { bashTool, executeBash, formatBashResult } from './bash.js'
+import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 
 /**
- * 导出所有工具定义
+ * All tool definitions exposed to the LLM.
  */
 export const tools = {
   bash: bashTool,
+  read_file: readFileTool,
 }
 
 /**
- * 工具名称类型
+ * Tool name union type derived from the registry.
  */
 export type ToolName = keyof typeof tools
 
 /**
- * 工具执行器类型
+ * Generic executor signature.
  */
 type ToolExecutor<T = unknown, R = unknown> = (args: T) => Promise<R>
 
 /**
- * 工具执行函数映射
+ * Executors that return a formatted string (fed back to the LLM).
  */
 const toolExecutors: Record<ToolName, ToolExecutor> = {
   bash: async (args) => {
     const result = await executeBash(args as { command: string, timeout?: number })
     return formatBashResult(result)
   },
+  read_file: async (args) => {
+    const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
+    return formatReadResult(result)
+  },
 }
 
 /**
- * 工具原始结果执行器（返回结构化结果）
+ * Executors that return raw structured objects (for programmatic use).
  */
 const toolRawExecutors: Record<ToolName, ToolExecutor> = {
   bash: executeBash as ToolExecutor,
+  read_file: executeReadFile as ToolExecutor,
 }
 
 /**
@@ -78,5 +86,5 @@ export function getAvailableTools(): ToolName[] {
   return Object.keys(tools) as ToolName[]
 }
 
-// 导出类型
-export type { BashResult }
+// Re-export types for external consumers
+export type { BashResult, ReadFileResult }

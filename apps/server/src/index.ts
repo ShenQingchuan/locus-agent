@@ -66,9 +66,16 @@ function startDev() {
   // 3. Create app
   const app = createApp()
 
-  // 4. Dev proxy: forward non-API requests to Vite dev server for HMR support
+  // 4. Dev proxy: forward non-API requests to Vite dev server for HMR support.
+  //    Uses middleware + next() so API routes are tried first;
+  //    only unmatched requests (pages, assets) are proxied to Vite.
   const VITE_DEV_ORIGIN = 'http://localhost:5173'
-  app.all('*', async (c) => {
+  app.use('*', async (c, next) => {
+    // Let Hono routes handle API and health requests
+    if (c.req.path.startsWith('/api/') || c.req.path === '/health') {
+      return next()
+    }
+    // Proxy everything else to Vite dev server
     const url = new URL(c.req.url)
     url.host = 'localhost'
     url.port = '5173'

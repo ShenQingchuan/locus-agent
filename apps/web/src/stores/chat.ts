@@ -105,9 +105,9 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function switchConversation(id: string) {
+  async function switchConversation(id: string): Promise<boolean> {
     if (id === currentConversationId.value)
-      return
+      return true
 
     // Save current state if needed
     currentConversationId.value = id
@@ -116,73 +116,78 @@ export const useChatStore = defineStore('chat', () => {
 
     // Load conversation messages
     const data = await fetchConversation(id)
-    if (data) {
-      // Restore yolo mode from conversation settings
-      yoloMode.value = data.conversation?.confirmMode === false
+    if (!data) {
+      // Conversation not found, reset to empty state
+      newConversation()
+      return false
+    }
 
-      // Convert API messages to local Message format
-      // We need to merge tool results from tool messages into assistant messages
-      const convertedMessages: Message[] = []
+    // Restore yolo mode from conversation settings
+    yoloMode.value = data.conversation?.confirmMode === false
 
-      for (let i = 0; i < data.messages.length; i++) {
-        const m = data.messages[i]
+    // Convert API messages to local Message format
+    // We need to merge tool results from tool messages into assistant messages
+    const convertedMessages: Message[] = []
 
-        // Skip tool messages - they will be merged into assistant messages
-        if (m.role === 'tool')
-          continue
+    for (let i = 0; i < data.messages.length; i++) {
+      const m = data.messages[i]
 
-        const parts: MessagePart[] = []
-        let toolCallStates: ToolCallState[] | undefined
+      // Skip tool messages - they will be merged into assistant messages
+      if (m.role === 'tool')
+        continue
 
-        // If this assistant message has reasoning, add it as the first part
-        if (m.role === 'assistant' && m.reasoning) {
-          parts.push({ type: 'reasoning', content: m.reasoning })
-        }
+      const parts: MessagePart[] = []
+      let toolCallStates: ToolCallState[] | undefined
 
-        // If this is an assistant message with tool calls
-        if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
-          // Create tool call states
-          toolCallStates = m.toolCalls.map((tc, idx) => {
-            parts.push({ type: 'tool-call', toolCallIndex: idx })
-            return { toolCall: tc, status: 'completed' as const }
-          })
+      // If this assistant message has reasoning, add it as the first part
+      if (m.role === 'assistant' && m.reasoning) {
+        parts.push({ type: 'reasoning', content: m.reasoning })
+      }
 
-          // Look for the next tool message to get results
-          const nextMessage = data.messages[i + 1]
-          if (nextMessage && nextMessage.role === 'tool' && nextMessage.toolResults) {
-            // Match tool results to tool calls by toolCallId
-            for (const toolResult of nextMessage.toolResults) {
-              const toolCallIndex = toolCallStates.findIndex(
-                tc => tc.toolCall.toolCallId === toolResult.toolCallId,
-              )
-              if (toolCallIndex !== -1) {
-                toolCallStates[toolCallIndex] = {
-                  ...toolCallStates[toolCallIndex],
-                  result: toolResult,
-                  status: toolResult.isError ? 'error' : 'completed',
-                }
+      // If this is an assistant message with tool calls
+      if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+        // Create tool call states
+        toolCallStates = m.toolCalls.map((tc, idx) => {
+          parts.push({ type: 'tool-call', toolCallIndex: idx })
+          return { toolCall: tc, status: 'completed' as const }
+        })
+
+        // Look for the next tool message to get results
+        const nextMessage = data.messages[i + 1]
+        if (nextMessage && nextMessage.role === 'tool' && nextMessage.toolResults) {
+          // Match tool results to tool calls by toolCallId
+          for (const toolResult of nextMessage.toolResults) {
+            const toolCallIndex = toolCallStates.findIndex(
+              tc => tc.toolCall.toolCallId === toolResult.toolCallId,
+            )
+            if (toolCallIndex !== -1) {
+              toolCallStates[toolCallIndex] = {
+                ...toolCallStates[toolCallIndex],
+                result: toolResult,
+                status: toolResult.isError ? 'error' : 'completed',
               }
             }
           }
         }
-
-        if (m.content) {
-          parts.push({ type: 'text', content: m.content })
-        }
-
-        convertedMessages.push({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          reasoning: m.reasoning || undefined,
-          timestamp: new Date(m.createdAt).getTime(),
-          toolCalls: toolCallStates,
-          parts: parts.length > 0 ? parts : undefined,
-        })
       }
 
-      messages.value = convertedMessages
+      if (m.content) {
+        parts.push({ type: 'text', content: m.content })
+      }
+
+      convertedMessages.push({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        reasoning: m.reasoning || undefined,
+        timestamp: new Date(m.createdAt).getTime(),
+        toolCalls: toolCallStates,
+        parts: parts.length > 0 ? parts : undefined,
+      })
     }
+
+    messages.value = convertedMessages
+    return true
   }
 
   async function removeConversation(id: string) {
