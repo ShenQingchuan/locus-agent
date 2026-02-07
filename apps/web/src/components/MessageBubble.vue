@@ -63,31 +63,38 @@ function isLastTextPart(partIndex: number): boolean {
   return false
 }
 
-// Calculate token count for this message
-const messageTokens = computed(() => {
+function estimateTokensFromText(text: string): number {
+  return Math.ceil(text.length / 4)
+}
+
+// Calculate token count for this message (hide while streaming)
+const messageTokens = computed<number | null>(() => {
   const msg = props.message
+
+  if (msg.isStreaming)
+    return null
+
   if (msg.role === 'assistant') {
     if (msg.usage) {
-      // Use precise token count from API
+      // Use precise token count from API (includes thinking if provided by model)
       return msg.usage.totalTokens
     }
-    else {
-      // Estimate for assistant messages without usage info
-      let estimate = Math.ceil(msg.content.length / 4)
-      if (msg.reasoning) {
-        estimate += Math.ceil(msg.reasoning.length / 4)
-      }
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        // Rough estimate: ~100 tokens per tool call
-        estimate += msg.toolCalls.length * 100
-      }
-      return estimate
+
+    // Estimate for assistant messages without usage info
+    let estimate = estimateTokensFromText(msg.content)
+    if (msg.reasoning) {
+      estimate += estimateTokensFromText(msg.reasoning)
     }
+    if (msg.toolCalls && msg.toolCalls.length > 0) {
+      // Rough estimate: ~100 tokens per tool call
+      estimate += msg.toolCalls.length * 100
+    }
+    return estimate > 0 ? estimate : null
   }
-  else {
-    // Estimate for user messages (rough: 4 chars = 1 token)
-    return Math.ceil(msg.content.length / 4)
-  }
+
+  // Estimate for user messages (rough: 4 chars = 1 token)
+  const estimate = estimateTokensFromText(msg.content)
+  return estimate > 0 ? estimate : null
 })
 
 </script>
@@ -124,7 +131,10 @@ const messageTokens = computed(() => {
             <div class="i-carbon-restart h-3 w-3" />
           </button>
           <!-- Token count (hover only, left of timestamp) -->
-          <span class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 mr-1">
+          <span
+            v-if="messageTokens !== null"
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 mr-1"
+          >
             {{ messageTokens }} tokens
           </span>
           <Tooltip :content="absoluteTime">
@@ -154,7 +164,10 @@ const messageTokens = computed(() => {
             <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
           </Tooltip>
           <!-- Token count (hover only, right of timestamp) -->
-          <span class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1">
+          <span
+            v-if="messageTokens !== null"
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1"
+          >
             {{ messageTokens }} tokens
           </span>
         </div>

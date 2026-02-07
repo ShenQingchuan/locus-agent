@@ -524,7 +524,7 @@ export const useChatStore = defineStore('chat', () => {
         },
         onDone: (_messageId, usage) => {
           const updates: Partial<Message> = { isStreaming: false }
-          if (usage) {
+          if (usage && usage.totalTokens > 0) {
             updates.usage = usage
           }
           updateMessage(assistantMessageId, updates)

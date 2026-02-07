@@ -3,9 +3,9 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { setLLMConfig } from './agent/providers/index.js'
 import { setServerConfig } from './config.js'
+import { initDB } from './db/index.js'
 import { chatRoutes } from './routes/chat.js'
 import { conversationsRoutes } from './routes/conversations.js'
-import { settingsRoutes } from './routes/settings.js'
 import {
   closeSettingsDb,
   ensureDataDir,
@@ -41,7 +41,6 @@ export function createApp(): Hono {
   // Routes
   app.route('/api/chat', chatRoutes)
   app.route('/api/conversations', conversationsRoutes)
-  app.route('/api/settings', settingsRoutes)
 
   return app
 }
@@ -51,7 +50,8 @@ export function createApp(): Hono {
 function startDev() {
   // 1. Load config from settings DB (~/.local/share/locus-agent/locus.db)
   ensureDataDir()
-  openSettingsDb(getSettingsDbPath())
+  const dbPath = getSettingsDbPath()
+  openSettingsDb(dbPath)
 
   const llmSettings = getLLMSettings()
   if (!llmSettings) {
@@ -61,14 +61,17 @@ function startDev() {
   const yoloMode = isYoloMode()
   closeSettingsDb()
 
-  // 2. Inject configs (same as CLI mode)
+  // 2. Initialize main app DB using the same SQLite file as the CLI
+  initDB({ dbPath })
+
+  // 3. Inject configs (same as CLI mode)
   setLLMConfig(llmSettings)
   setServerConfig({ confirmMode: !yoloMode, port })
 
-  // 3. Create app
+  // 4. Create app
   const app = createApp()
 
-  // 4. Dev proxy: forward non-API requests to Vite dev server for HMR support.
+  // 5. Dev proxy: forward non-API requests to Vite dev server for HMR support.
   //    Uses middleware + next() so API routes are tried first;
   //    only unmatched requests (pages, assets) are proxied to Vite.
   const VITE_DEV_ORIGIN = 'http://localhost:5173'
@@ -93,9 +96,7 @@ function startDev() {
   })
 
   // eslint-disable-next-line no-console
-  console.log(`Started development server: http://localhost:${port}`)
-  // eslint-disable-next-line no-console
-  console.log(`  Vite dev server proxied from: ${VITE_DEV_ORIGIN}`)
+  console.log(`Dev proxy: frontend from ${VITE_DEV_ORIGIN}`)
 
   return { fetch: app.fetch, port, idleTimeout: 120 }
 }
