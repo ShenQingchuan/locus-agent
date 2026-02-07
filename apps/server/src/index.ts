@@ -5,6 +5,7 @@ import { setLLMConfig } from './agent/providers/index.js'
 import { setServerConfig } from './config.js'
 import { chatRoutes } from './routes/chat.js'
 import { conversationsRoutes } from './routes/conversations.js'
+import { settingsRoutes } from './routes/settings.js'
 import {
   closeSettingsDb,
   ensureDataDir,
@@ -40,6 +41,7 @@ export function createApp(): Hono {
   // Routes
   app.route('/api/chat', chatRoutes)
   app.route('/api/conversations', conversationsRoutes)
+  app.route('/api/settings', settingsRoutes)
 
   return app
 }

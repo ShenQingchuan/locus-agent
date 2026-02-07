@@ -447,3 +447,32 @@ export async function deleteConversation(conversationId: string): Promise<boolea
     return false
   }
 }
+
+/**
+ * Fetch current LLM settings including model context window
+ */
+export async function fetchSettings(): Promise<{
+  provider: string
+  model: string
+  contextWindow: number
+} | null> {
+  try {
+    const response = await fetch(`/api/settings`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error('Failed to fetch settings:', response.statusText)
+      return null
+    }
+
+    return await response.json()
+  }
+  catch (error) {
+    console.error('Failed to fetch settings:', error)
+    return null
+  }
+}

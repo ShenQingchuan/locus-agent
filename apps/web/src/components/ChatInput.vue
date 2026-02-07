@@ -2,6 +2,7 @@
 import { useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import ContextUsageRing from './ContextUsageRing.vue'
 
 defineProps<{
   disabled?: boolean
@@ -136,7 +137,12 @@ function handleKeydown(event: KeyboardEvent) {
         </div>
 
         <!-- Send/stop button -->
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-4">
+          <!-- Context usage ring -->
+          <ContextUsageRing
+            :used="chatStore.contextTokensUsed"
+            :total="chatStore.MAX_CONTEXT_TOKENS"
+          />
           <!-- Cancel edit button -->
           <button
             v-if="isEditing"

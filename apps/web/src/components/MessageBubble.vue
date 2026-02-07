@@ -62,6 +62,34 @@ function isLastTextPart(partIndex: number): boolean {
   }
   return false
 }
+
+// Calculate token count for this message
+const messageTokens = computed(() => {
+  const msg = props.message
+  if (msg.role === 'assistant') {
+    if (msg.usage) {
+      // Use precise token count from API
+      return msg.usage.totalTokens
+    }
+    else {
+      // Estimate for assistant messages without usage info
+      let estimate = Math.ceil(msg.content.length / 4)
+      if (msg.reasoning) {
+        estimate += Math.ceil(msg.reasoning.length / 4)
+      }
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        // Rough estimate: ~100 tokens per tool call
+        estimate += msg.toolCalls.length * 100
+      }
+      return estimate
+    }
+  }
+  else {
+    // Estimate for user messages (rough: 4 chars = 1 token)
+    return Math.ceil(msg.content.length / 4)
+  }
+})
+
 </script>
 
 <template>
@@ -95,6 +123,10 @@ function isLastTextPart(partIndex: number): boolean {
           >
             <div class="i-carbon-restart h-3 w-3" />
           </button>
+          <!-- Token count (hover only, left of timestamp) -->
+          <span class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 mr-1">
+            {{ messageTokens }} tokens
+          </span>
           <Tooltip :content="absoluteTime">
             <span class="text-xs text-muted-foreground/60 mr-2">{{ relativeTime }}</span>
           </Tooltip>
@@ -113,14 +145,19 @@ function isLastTextPart(partIndex: number): boolean {
     </template>
 
     <!-- Assistant message: left aligned -->
-    <div v-else class="max-w-full">
-      <div class="flex items-center gap-1">
-        <div class="i-carbon-bot text-xs text-muted-foreground" />
-        <span class="text-xs text-muted-foreground block">助手</span>
-        <Tooltip :content="absoluteTime">
-          <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
-        </Tooltip>
-      </div>
+    <template v-else>
+      <div class="max-w-full group">
+        <div class="flex items-center gap-1">
+          <div class="i-carbon-bot text-xs text-muted-foreground" />
+          <span class="text-xs text-muted-foreground block">助手</span>
+          <Tooltip :content="absoluteTime">
+            <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
+          </Tooltip>
+          <!-- Token count (hover only, right of timestamp) -->
+          <span class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1">
+            {{ messageTokens }} tokens
+          </span>
+        </div>
 
       <!-- Ordered parts: reasoning, text and tool calls interleaved -->
       <template v-for="(part, partIdx) in displayParts" :key="partIdx">
@@ -171,7 +208,8 @@ function isLastTextPart(partIndex: number): boolean {
       >
         <div class="i-svg-spinners:bars-fade mt-4 text-foreground/70" />
       </div>
-    </div>
+      </div>
+    </template>
   </article>
 </template>
 

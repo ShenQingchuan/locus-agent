@@ -9,6 +9,7 @@ import {
   deleteConversation,
   fetchConversation,
   fetchConversations,
+  fetchSettings,
   streamChat,
   truncateMessages,
   updateConversation,
@@ -20,10 +21,10 @@ export interface ToolCallState {
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
 }
 
-export type MessagePart =
-  | { type: 'reasoning', content: string }
-  | { type: 'text', content: string }
-  | { type: 'tool-call', toolCallIndex: number }
+export type MessagePart
+  = | { type: 'reasoning', content: string }
+    | { type: 'text', content: string }
+    | { type: 'tool-call', toolCallIndex: number }
 
 export interface Message {
   id: string
@@ -36,6 +37,12 @@ export interface Message {
   reasoning?: string
   /** 有序内容部分，保持文本与工具调用的交错顺序 */
   parts?: MessagePart[]
+  /** Token 消耗统计信息 */
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -53,12 +60,12 @@ export const useChatStore = defineStore('chat', () => {
 
   // Sidebar state
   const STORAGE_KEY_SIDEBAR_WIDTH = 'locus-agent:sidebar-width'
-  
+
   // Load sidebar width from localStorage
   const getStoredSidebarWidth = (): number => {
     if (typeof window === 'undefined')
       return 220
-    
+
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SIDEBAR_WIDTH)
       if (stored) {
@@ -94,11 +101,72 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value.find(c => c.id === currentConversationId.value),
   )
 
+  // 模型上下文窗口配置（动态从 API 获取，默认：128K）
+  const MAX_CONTEXT_TOKENS = ref(128_000)
+
+  // 计算当前会话中使用的总 token 数
+  const contextTokensUsed = computed(() => {
+    let total = 0
+    // 系统提示词估算
+    total += 500
+
+    for (const message of messages.value) {
+      if (message.role === 'assistant') {
+        if (message.usage) {
+          // 使用 API 响应返回的精确 token 数
+          total += message.usage.totalTokens
+        }
+        else {
+          // 估算历史消息中没有 usage 信息的 assistant 消息 token 数
+          // 包括内容、思考过程和工具调用的估算
+          let estimate = Math.ceil(message.content.length / 4)
+          if (message.reasoning) {
+            estimate += Math.ceil(message.reasoning.length / 4)
+          }
+          if (message.toolCalls && message.toolCalls.length > 0) {
+            // 粗略估算：每个工具调用约 100 tokens
+            estimate += message.toolCalls.length * 100
+          }
+          total += estimate
+        }
+      }
+      else if (message.role === 'user') {
+        // 估算用户消息 token 数（粗略估算：4 个字符 = 1 token）
+        total += Math.ceil(message.content.length / 4)
+      }
+    }
+
+    return total
+  })
+
+  // 计算上下文使用百分比
+  const contextUsagePercentage = computed(() => {
+    return Math.min(100, (contextTokensUsed.value / MAX_CONTEXT_TOKENS.value) * 100)
+  })
+
+  // Load model settings from API
+  async function loadModelSettings() {
+    try {
+      const settings = await fetchSettings()
+      if (settings?.contextWindow) {
+        MAX_CONTEXT_TOKENS.value = settings.contextWindow
+      }
+    }
+    catch (error) {
+      console.warn('[chat store] Failed to load model settings:', error)
+      // Keep default value
+    }
+  }
+
   // Conversation management actions
   async function loadConversations() {
     isLoadingConversations.value = true
     try {
       conversations.value = await fetchConversations()
+      // Load model settings when loading conversations (only once)
+      if (MAX_CONTEXT_TOKENS.value === 128_000) {
+        await loadModelSettings()
+      }
     }
     finally {
       isLoadingConversations.value = false
@@ -130,7 +198,7 @@ export const useChatStore = defineStore('chat', () => {
     const convertedMessages: Message[] = []
 
     for (let i = 0; i < data.messages.length; i++) {
-      const m = data.messages[i]
+      const m = data.messages[i]!
 
       // Skip tool messages - they will be merged into assistant messages
       if (m.role === 'tool')
@@ -160,9 +228,10 @@ export const useChatStore = defineStore('chat', () => {
             const toolCallIndex = toolCallStates.findIndex(
               tc => tc.toolCall.toolCallId === toolResult.toolCallId,
             )
-            if (toolCallIndex !== -1) {
+            const existingTc = toolCallIndex !== -1 ? toolCallStates[toolCallIndex] : undefined
+            if (existingTc) {
               toolCallStates[toolCallIndex] = {
-                ...toolCallStates[toolCallIndex],
+                ...existingTc,
                 result: toolResult,
                 status: toolResult.isError ? 'error' : 'completed',
               }
@@ -196,8 +265,9 @@ export const useChatStore = defineStore('chat', () => {
       conversations.value = conversations.value.filter(c => c.id !== id)
       if (currentConversationId.value === id) {
         // Switch to first available conversation or start fresh
-        if (conversations.value.length > 0) {
-          await switchConversation(conversations.value[0].id)
+        const firstConversation = conversations.value[0]
+        if (firstConversation) {
+          await switchConversation(firstConversation.id)
         }
         else {
           // 不自动创建，只清空当前状态，发消息时再创建
@@ -217,7 +287,7 @@ export const useChatStore = defineStore('chat', () => {
     const maxWidth = 400
     const clampedWidth = Math.max(minWidth, Math.min(maxWidth, width))
     sidebarWidth.value = clampedWidth
-    
+
     // Save to localStorage
     if (typeof window !== 'undefined') {
       try {
@@ -241,92 +311,94 @@ export const useChatStore = defineStore('chat', () => {
 
   function updateMessage(id: string, updates: Partial<Message>) {
     const index = messages.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      messages.value[index] = { ...messages.value[index], ...updates }
+    const existing = index !== -1 ? messages.value[index] : undefined
+    if (existing) {
+      messages.value[index] = { ...existing, ...updates } as Message
     }
   }
 
   function appendToMessage(id: string, content: string) {
     const index = messages.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      const message = messages.value[index]
-      const parts = [...(message.parts || [])]
-      const lastPart = parts[parts.length - 1]
+    const message = index !== -1 ? messages.value[index] : undefined
+    if (!message)
+      return
 
-      if (lastPart && lastPart.type === 'text') {
-        parts[parts.length - 1] = { type: 'text', content: lastPart.content + content }
-      }
-      else {
-        parts.push({ type: 'text', content })
-      }
+    const parts = [...(message.parts || [])]
+    const lastPart = parts[parts.length - 1]
 
-      messages.value[index] = {
-        ...message,
-        content: message.content + content,
-        parts,
-      }
+    if (lastPart && lastPart.type === 'text') {
+      parts[parts.length - 1] = { type: 'text', content: lastPart.content + content }
+    }
+    else {
+      parts.push({ type: 'text', content })
+    }
+
+    messages.value[index] = {
+      ...message,
+      content: message.content + content,
+      parts,
     }
   }
 
-
   function appendReasoningToMessage(id: string, content: string) {
     const index = messages.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      const message = messages.value[index]
-      const parts = [...(message.parts || [])]
-      const lastPart = parts[parts.length - 1]
+    const message = index !== -1 ? messages.value[index] : undefined
+    if (!message)
+      return
 
-      if (lastPart && lastPart.type === 'reasoning') {
-        parts[parts.length - 1] = { type: 'reasoning', content: lastPart.content + content }
-      }
-      else {
-        parts.push({ type: 'reasoning', content })
-      }
+    const parts = [...(message.parts || [])]
+    const lastPart = parts[parts.length - 1]
 
-      messages.value[index] = {
-        ...message,
-        reasoning: (message.reasoning || '') + content,
-        parts,
-      }
+    if (lastPart && lastPart.type === 'reasoning') {
+      parts[parts.length - 1] = { type: 'reasoning', content: lastPart.content + content }
+    }
+    else {
+      parts.push({ type: 'reasoning', content })
+    }
+
+    messages.value[index] = {
+      ...message,
+      reasoning: (message.reasoning || '') + content,
+      parts,
     }
   }
 
   function addToolCallToMessage(id: string, toolCall: ToolCall) {
     const index = messages.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      const message = messages.value[index]
-      const toolCalls = [...(message.toolCalls || [])]
-      const toolCallIndex = toolCalls.length
-      toolCalls.push({ toolCall, status: 'pending' })
+    const message = index !== -1 ? messages.value[index] : undefined
+    if (!message)
+      return
 
-      const parts = [...(message.parts || [])]
-      parts.push({ type: 'tool-call', toolCallIndex })
+    const toolCalls = [...(message.toolCalls || [])]
+    const toolCallIndex = toolCalls.length
+    toolCalls.push({ toolCall, status: 'pending' })
 
-      messages.value[index] = {
-        ...message,
-        toolCalls,
-        parts,
-      }
+    const parts = [...(message.parts || [])]
+    parts.push({ type: 'tool-call', toolCallIndex })
+
+    messages.value[index] = {
+      ...message,
+      toolCalls,
+      parts,
     }
   }
 
   function updateToolCallResult(messageId: string, toolResult: ToolResult) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    if (messageIndex !== -1) {
-      const message = messages.value[messageIndex]
-      if (message.toolCalls) {
-        const toolCallIndex = message.toolCalls.findIndex(
-          tc => tc.toolCall.toolCallId === toolResult.toolCallId,
-        )
-        if (toolCallIndex !== -1) {
-          const newToolCalls = [...message.toolCalls]
-          newToolCalls[toolCallIndex] = {
-            ...newToolCalls[toolCallIndex],
-            result: toolResult,
-            status: toolResult.isError ? 'error' : 'completed',
-          }
-          messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    if (message?.toolCalls) {
+      const toolCallIndex = message.toolCalls.findIndex(
+        tc => tc.toolCall.toolCallId === toolResult.toolCallId,
+      )
+      const existing = toolCallIndex !== -1 ? message.toolCalls[toolCallIndex] : undefined
+      if (existing) {
+        const newToolCalls = [...message.toolCalls]
+        newToolCalls[toolCallIndex] = {
+          ...existing,
+          result: toolResult,
+          status: toolResult.isError ? 'error' : 'completed',
         }
+        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
     // Clear pending approval
@@ -335,20 +407,19 @@ export const useChatStore = defineStore('chat', () => {
 
   function setToolCallAwaitingApproval(messageId: string, toolCallId: string) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    if (messageIndex !== -1) {
-      const message = messages.value[messageIndex]
-      if (message.toolCalls) {
-        const toolCallIndex = message.toolCalls.findIndex(
-          tc => tc.toolCall.toolCallId === toolCallId,
-        )
-        if (toolCallIndex !== -1) {
-          const newToolCalls = [...message.toolCalls]
-          newToolCalls[toolCallIndex] = {
-            ...newToolCalls[toolCallIndex],
-            status: 'awaiting-approval',
-          }
-          messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    if (message?.toolCalls) {
+      const toolCallIndex = message.toolCalls.findIndex(
+        tc => tc.toolCall.toolCallId === toolCallId,
+      )
+      const existing = toolCallIndex !== -1 ? message.toolCalls[toolCallIndex] : undefined
+      if (existing) {
+        const newToolCalls = [...message.toolCalls]
+        newToolCalls[toolCallIndex] = {
+          ...existing,
+          status: 'awaiting-approval',
         }
+        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
   }
@@ -451,8 +522,12 @@ export const useChatStore = defineStore('chat', () => {
           addPendingApproval(approval)
           setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId)
         },
-        onDone: (_messageId, _usage) => {
-          updateMessage(assistantMessageId, { isStreaming: false })
+        onDone: (_messageId, usage) => {
+          const updates: Partial<Message> = { isStreaming: false }
+          if (usage) {
+            updates.usage = usage
+          }
+          updateMessage(assistantMessageId, updates)
           currentStreamingMessageId.value = null
           setLoading(false)
           // Refresh conversations list to update title/time
@@ -531,12 +606,12 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function saveEditMessage(messageId: string, newContent: string) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    if (messageIndex === -1) {
+    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    if (!message) {
       console.warn('[saveEditMessage] 未找到消息:', messageId)
       return
     }
 
-    const message = messages.value[messageIndex]
     if (message.role !== 'user') {
       console.warn('[saveEditMessage] 只能编辑用户消息')
       return
@@ -611,12 +686,12 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function retryFromMessage(messageId: string) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    if (messageIndex === -1) {
+    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    if (!message) {
       console.warn('[retryFromMessage] 未找到消息:', messageId)
       return
     }
 
-    const message = messages.value[messageIndex]
     if (message.role !== 'user') {
       console.warn('[retryFromMessage] 只能重试用户消息')
       return
@@ -708,9 +783,13 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     hasPendingApprovals,
     currentConversation,
+    contextTokensUsed,
+    contextUsagePercentage,
+    MAX_CONTEXT_TOKENS,
 
     // Conversation management actions
     loadConversations,
+    loadModelSettings,
     switchConversation,
     removeConversation,
     toggleSidebar,

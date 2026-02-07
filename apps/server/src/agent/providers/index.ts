@@ -19,6 +19,40 @@ const DEFAULT_MODELS: Record<LLMProviderType, string> = {
   moonshotai: 'kimi-k2.5',
 }
 
+/**
+ * Model context window sizes (in tokens)
+ * Maps model ID to maximum context window size
+ */
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  // OpenAI models
+  'gpt-5.3': 200_000,
+  'gpt-5': 200_000,
+  'gpt-4': 128_000,
+  'gpt-4-turbo': 128_000,
+  'gpt-3.5-turbo': 16_385,
+  // Anthropic models
+  'claude-opus-4.6': 200_000,
+  'claude-sonnet-4': 200_000,
+  'claude-sonnet-4.5': 200_000,
+  'claude-haiku-4.5': 200_000,
+  'claude-opus': 200_000,
+  'claude-sonnet': 200_000,
+  'claude-haiku': 200_000,
+  // Moonshot AI models
+  'kimi-k2.5': 128_000,
+  'moonshot-v1-8k': 8_192,
+  'moonshot-v1-32k': 32_768,
+  'moonshot-v1-128k': 128_000,
+}
+
+/**
+ * Get context window size for a model
+ * Returns default value if model not found in mapping
+ */
+export function getModelContextWindow(modelId: string): number {
+  return MODEL_CONTEXT_WINDOWS[modelId.toLowerCase()] ?? 128_000
+}
+
 let _config: LLMConfig | null = null
 
 /**
@@ -37,6 +71,23 @@ function getConfig(): LLMConfig {
 export function getDefaultModel(): string {
   const cfg = getConfig()
   return cfg.model || DEFAULT_MODELS[cfg.provider]
+}
+
+/**
+ * Get current model information including context window size
+ */
+export function getCurrentModelInfo(): {
+  provider: LLMProviderType
+  model: string
+  contextWindow: number
+} {
+  const cfg = getConfig()
+  const model = cfg.model || DEFAULT_MODELS[cfg.provider]
+  return {
+    provider: cfg.provider,
+    model,
+    contextWindow: getModelContextWindow(model),
+  }
 }
 
 /**
