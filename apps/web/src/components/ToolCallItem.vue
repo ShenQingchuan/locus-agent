@@ -51,6 +51,7 @@ const statusIconClass = computed(() => {
 const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => string> = {
   bash: args => String(args.command ?? ''),
   read_file: args => String(args.file_path ?? ''),
+  edit_file: args => String(args.file_path ?? ''),
 }
 
 const defaultSummary = computed(() => {

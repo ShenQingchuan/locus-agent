@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
 import { computed, watch } from 'vue'
+import DiffViewer from './DiffViewer.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -10,6 +11,21 @@ const props = defineProps<{
   isError?: boolean
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
 }>()
+
+/** Whether this tool call is an edit_file with a patch */
+const isEditFilePatch = computed(() =>
+  props.toolName === 'edit_file' && typeof props.args.patch === 'string',
+)
+
+/** File path for edit_file tool */
+const editFilePath = computed(() =>
+  isEditFilePatch.value ? String(props.args.file_path ?? '') : '',
+)
+
+/** Patch string for edit_file tool */
+const editFilePatch = computed(() =>
+  isEditFilePatch.value ? String(props.args.patch) : '',
+)
 
 const emit = defineEmits<{
   close: []
@@ -112,13 +128,34 @@ const statusLabel = computed(() => {
 
           <!-- Content -->
           <div class="overflow-y-auto flex-1 p-4 space-y-4">
-            <!-- Parameters -->
-            <section>
-              <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                参数
-              </h3>
-              <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedArgs }}</pre>
-            </section>
+            <!-- edit_file: render patch with DiffViewer -->
+            <template v-if="isEditFilePatch">
+              <section v-if="editFilePath">
+                <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  文件
+                </h3>
+                <code class="text-xs font-mono text-foreground">{{ editFilePath }}</code>
+              </section>
+
+              <section>
+                <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  变更
+                </h3>
+                <div class="rounded-md overflow-hidden border border-border">
+                  <DiffViewer :patch="editFilePatch" :file-path="editFilePath" />
+                </div>
+              </section>
+            </template>
+
+            <!-- Generic tool: raw JSON parameters -->
+            <template v-else>
+              <section>
+                <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  参数
+                </h3>
+                <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedArgs }}</pre>
+              </section>
+            </template>
 
             <!-- Results -->
             <section v-if="result !== undefined">

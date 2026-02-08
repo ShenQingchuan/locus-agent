@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { createHighlighter } from 'shiki'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
+import DiffViewer from './DiffViewer.vue'
 
 const props = defineProps<{
   node: {
@@ -10,6 +11,12 @@ const props = defineProps<{
     raw: string
   }
 }>()
+
+/** Whether this code block contains a unified diff */
+const isDiff = computed(() => {
+  const lang = props.node.language?.toLowerCase()
+  return lang === 'diff' || lang === 'patch'
+})
 
 const html = ref('')
 const codeBlockRef = ref<HTMLElement | null>(null)
@@ -71,7 +78,13 @@ async function handleCopy() {
 </script>
 
 <template>
-  <div class="code-block-wrapper relative group my-3 overflow-hidden">
+  <!-- Diff rendering via @pierre/diffs -->
+  <div v-if="isDiff" class="code-block-wrapper relative group my-3 overflow-hidden">
+    <DiffViewer :patch="node.code" />
+  </div>
+
+  <!-- Normal code block -->
+  <div v-else class="code-block-wrapper relative group my-3 overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-1.5 bg-muted/50 text-xs text-muted-foreground">
       <span class="font-mono">{{ node.language || 'text' }}</span>

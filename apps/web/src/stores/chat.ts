@@ -1,4 +1,4 @@
-import type { Conversation, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { Conversation, CoreMessage, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
@@ -480,7 +480,34 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessage(content: string, historyMessages?: any[]) {
+  /** Convert store messages to CoreMessage[] for API (shared with edit/retry logic) */
+  function messagesToCoreMessages(msgs: Message[]): CoreMessage[] {
+    const out: CoreMessage[] = []
+    for (const m of msgs) {
+      if (m.role === 'user') {
+        out.push({ role: 'user', content: m.content })
+      }
+      else {
+        const assistantMsg: CoreMessage = { role: 'assistant', content: m.content }
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          (assistantMsg as { toolCalls: ToolCall[] }).toolCalls = m.toolCalls.map(tc => tc.toolCall)
+          out.push(assistantMsg)
+          const toolResults = m.toolCalls
+            .filter(tc => tc.result)
+            .map(tc => tc.result!)
+          if (toolResults.length > 0) {
+            out.push({ role: 'tool', content: '', toolResults })
+          }
+        }
+        else {
+          out.push(assistantMsg)
+        }
+      }
+    }
+    return out
+  }
+
+  async function sendMessage(content: string, historyMessages?: CoreMessage[]) {
     if (!content.trim() || isLoading.value)
       return
 
@@ -490,6 +517,9 @@ export const useChatStore = defineStore('chat', () => {
     if (!currentConversationId.value) {
       currentConversationId.value = crypto.randomUUID()
     }
+
+    // Build history from current messages when not explicitly provided (normal send)
+    const historyToSend = historyMessages ?? messagesToCoreMessages(messages.value)
 
     // Add user message
     addMessage({
@@ -511,7 +541,7 @@ export const useChatStore = defineStore('chat', () => {
       await streamChat({
         conversationId: currentConversationId.value,
         message: content,
-        messages: historyMessages,
+        messages: historyToSend,
         confirmMode: !yoloMode.value,
         thinkingMode: thinkMode.value,
         onReasoningDelta: (delta) => {
@@ -654,38 +684,8 @@ export const useChatStore = defineStore('chat', () => {
     // 删除前端的本地消息
     messages.value = historyBeforeEdit
 
-    // 构建要发送给 API 的消息历史
-    const coreMessages: any[] = []
-    for (const m of historyBeforeEdit) {
-      if (m.role === 'user') {
-        coreMessages.push({ role: 'user' as const, content: m.content })
-      }
-      else {
-        const assistantMsg: any = { role: 'assistant' as const, content: m.content }
-        if (m.toolCalls && m.toolCalls.length > 0) {
-          assistantMsg.toolCalls = m.toolCalls.map(tc => tc.toolCall)
-          coreMessages.push(assistantMsg)
-
-          const toolResults = m.toolCalls
-            .filter(tc => tc.result)
-            .map(tc => tc.result!)
-
-          if (toolResults.length > 0) {
-            coreMessages.push({
-              role: 'tool' as const,
-              content: '',
-              toolResults,
-            })
-          }
-        }
-        else {
-          coreMessages.push(assistantMsg)
-        }
-      }
-    }
-
-    // 发送编辑后的新内容
-    await sendMessage(newContent.trim(), coreMessages)
+    // 发送编辑后的新内容（带历史）
+    await sendMessage(newContent.trim(), messagesToCoreMessages(historyBeforeEdit))
   }
 
   /**
@@ -727,42 +727,8 @@ export const useChatStore = defineStore('chat', () => {
     // 删除前端的本地消息
     messages.value = historyBeforeRetry
 
-    // 构建要发送给 API 的消息历史（转换为 CoreMessage 格式）
-    const coreMessages: any[] = []
-
-    for (const m of historyBeforeRetry) {
-      if (m.role === 'user') {
-        coreMessages.push({ role: 'user' as const, content: m.content })
-      }
-      else {
-        // assistant 消息
-        const assistantMsg: any = { role: 'assistant' as const, content: m.content }
-
-        if (m.toolCalls && m.toolCalls.length > 0) {
-          assistantMsg.toolCalls = m.toolCalls.map(tc => tc.toolCall)
-          coreMessages.push(assistantMsg)
-
-          // 如果有工具调用结果，添加 tool 消息
-          const toolResults = m.toolCalls
-            .filter(tc => tc.result)
-            .map(tc => tc.result!)
-
-          if (toolResults.length > 0) {
-            coreMessages.push({
-              role: 'tool' as const,
-              content: '',
-              toolResults,
-            })
-          }
-        }
-        else {
-          coreMessages.push(assistantMsg)
-        }
-      }
-    }
-
     // 重新发送消息，带上历史
-    await sendMessage(content, coreMessages)
+    await sendMessage(content, messagesToCoreMessages(historyBeforeRetry))
   }
 
   return {

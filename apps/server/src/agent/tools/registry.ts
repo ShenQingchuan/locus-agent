@@ -1,6 +1,8 @@
 import type { BashResult } from './bash.js'
+import type { EditFileResult } from './edit.js'
 import type { ReadFileResult } from './read.js'
 import { bashTool, executeBash, formatBashResult } from './bash.js'
+import { editFileTool, executeEditFile, formatEditResult } from './edit.js'
 import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 
 /**
@@ -9,6 +11,7 @@ import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 export const tools = {
   bash: bashTool,
   read_file: readFileTool,
+  edit_file: editFileTool,
 }
 
 /**
@@ -33,6 +36,10 @@ const toolExecutors: Record<ToolName, ToolExecutor> = {
     const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
     return formatReadResult(result)
   },
+  edit_file: async (args) => {
+    const result = await executeEditFile(args as Parameters<typeof executeEditFile>[0])
+    return formatEditResult(result)
+  },
 }
 
 /**
@@ -41,6 +48,7 @@ const toolExecutors: Record<ToolName, ToolExecutor> = {
 const toolRawExecutors: Record<ToolName, ToolExecutor> = {
   bash: executeBash as ToolExecutor,
   read_file: executeReadFile as ToolExecutor,
+  edit_file: executeEditFile as ToolExecutor,
 }
 
 /**
@@ -87,4 +95,4 @@ export function getAvailableTools(): ToolName[] {
 }
 
 // Re-export types for external consumers
-export type { BashResult, ReadFileResult }
+export type { BashResult, EditFileResult, ReadFileResult }

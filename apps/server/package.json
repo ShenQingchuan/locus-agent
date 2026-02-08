@@ -45,6 +45,7 @@
     "@ai-sdk/openai-compatible": "^2.0.27",
     "@locus-agent/shared": "workspace:*",
     "ai": "catalog:ai-sdk",
+    "diff": "catalog:ai-sdk",
     "drizzle-orm": "catalog:database",
     "hono": "catalog:hono-family",
     "zod": "catalog:ai-sdk"
