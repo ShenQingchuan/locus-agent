@@ -20,7 +20,7 @@ onMounted(async () => {
     isSyncingFromUrl.value = true
     const success = await chatStore.switchConversation(conversationId)
     isSyncingFromUrl.value = false
-    
+
     // If conversation not found, clear query to restore empty state
     if (!success) {
       isSyncingToUrl.value = true
@@ -72,7 +72,7 @@ watch(
       isSyncingFromUrl.value = true
       const success = await chatStore.switchConversation(sessionId)
       isSyncingFromUrl.value = false
-      
+
       // If conversation not found, clear query to restore empty state
       if (!success) {
         isSyncingToUrl.value = true

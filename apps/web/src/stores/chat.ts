@@ -107,33 +107,41 @@ export const useChatStore = defineStore('chat', () => {
   // 计算当前会话中使用的总 token 数
   const contextTokensUsed = computed(() => {
     let total = 0
-    // 系统提示词估算
-    total += 500
-
+    
+    // Only count system prompt tokens when there are messages (after first interaction)
+    const hasMessages = messages.value.length > 0
+    
+    // Calculate message tokens first
     for (const message of messages.value) {
       if (message.role === 'assistant') {
         if (message.usage) {
-          // 使用 API 响应返回的精确 token 数
+          // Use exact token count from API response
           total += message.usage.totalTokens
         }
         else {
-          // 估算历史消息中没有 usage 信息的 assistant 消息 token 数
-          // 包括内容、思考过程和工具调用的估算
+          // Estimate tokens for historical messages without usage info
+          // Includes content, reasoning, and tool calls
           let estimate = Math.ceil(message.content.length / 4)
           if (message.reasoning) {
             estimate += Math.ceil(message.reasoning.length / 4)
           }
           if (message.toolCalls && message.toolCalls.length > 0) {
-            // 粗略估算：每个工具调用约 100 tokens
+            // Rough estimate: ~100 tokens per tool call
             estimate += message.toolCalls.length * 100
           }
           total += estimate
         }
       }
       else if (message.role === 'user') {
-        // 估算用户消息 token 数（粗略估算：4 个字符 = 1 token）
+        // Estimate user message tokens (rough: 4 chars = 1 token)
         total += Math.ceil(message.content.length / 4)
       }
+    }
+    
+    // Add system prompt and tool definitions estimation only after first interaction
+    // Includes: system prompt (~60 tokens) + tool schemas (~150 tokens) + overhead (~40 tokens)
+    if (hasMessages) {
+      total += 250
     }
 
     return total

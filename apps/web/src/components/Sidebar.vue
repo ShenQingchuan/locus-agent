@@ -1,14 +1,50 @@
 <script setup lang="ts">
+import type { DropdownItem } from '@locus-agent/ui'
+import { Dropdown, useToast } from '@locus-agent/ui'
 import { useDark, useToggle } from '@vueuse/core'
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useToast } from '@locus-agent/ui'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import ConversationItem from './ConversationItem.vue'
 
 const chatStore = useChatStore()
 const toast = useToast()
+const router = useRouter()
+const route = useRoute()
+
+/** Navigate back to chat page if currently on a different route */
+function ensureChatRoute() {
+  if (route.name !== 'chat') {
+    router.push({ name: 'chat' })
+  }
+}
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+
+const menuItems = computed<DropdownItem[]>(() => [
+  {
+    key: 'theme',
+    label: isDark.value ? '浅色模式' : '深色模式',
+    icon: isDark.value ? 'i-carbon-sun' : 'i-carbon-moon',
+  },
+  {
+    key: 'settings',
+    label: '设置',
+    icon: 'i-carbon-settings',
+    separator: true,
+  },
+])
+
+function handleMenuSelect(key: string) {
+  switch (key) {
+    case 'theme':
+      toggleDark()
+      break
+    case 'settings':
+      router.push({ name: 'settings' })
+      break
+  }
+}
 
 const isResizing = ref(false)
 const startX = ref(0)
@@ -82,14 +118,15 @@ onUnmounted(() => {
 
 function handleNewChat() {
   chatStore.newConversation()
+  ensureChatRoute()
 }
 
 async function handleSelectConversation(id: string) {
   const success = await chatStore.switchConversation(id)
-  // If conversation not found, refresh the list to sync state
   if (!success) {
     await chatStore.loadConversations()
   }
+  ensureChatRoute()
 }
 
 async function handleDeleteConversation(id: string) {
@@ -166,14 +203,16 @@ async function handleDeleteConversation(id: string) {
       <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
         <div class="flex items-center justify-between text-xs text-muted-foreground opacity-70">
           <span>Locus Agent</span>
-          <button
-            class="p-1 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors duration-150"
-            title="切换深色模式"
-            @click="toggleDark()"
-          >
-            <div v-if="isDark" class="i-carbon-sun h-3.5 w-3.5" />
-            <div v-else class="i-carbon-moon h-3.5 w-3.5" />
-          </button>
+          <Dropdown :items="menuItems" placement="top-end" @select="handleMenuSelect">
+            <template #trigger>
+              <button
+                class="p-1 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors duration-150"
+                title="菜单"
+              >
+                <div class="i-ic:baseline-menu h-3.5 w-3.5" />
+              </button>
+            </template>
+          </Dropdown>
         </div>
       </div>
     </aside>

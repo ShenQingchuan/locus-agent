@@ -476,3 +476,93 @@ export async function fetchSettings(): Promise<{
     return null
   }
 }
+
+export type LLMProvider = 'openai' | 'anthropic' | 'moonshotai'
+
+export interface SettingsConfigResponse {
+  setupCompleted: boolean
+  provider: LLMProvider
+  hasApiKey: boolean
+  apiKeyMasked: string | null
+  apiBase?: string
+  model?: string
+  port: number
+  runtime?: { provider: string, model: string, contextWindow: number }
+}
+
+export async function fetchSettingsConfig(): Promise<SettingsConfigResponse | null> {
+  try {
+    const response = await fetch(`/api/settings/config`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error('Failed to fetch settings config:', response.statusText)
+      return null
+    }
+
+    return await response.json()
+  }
+  catch (error) {
+    console.error('Failed to fetch settings config:', error)
+    return null
+  }
+}
+
+export interface UpdateSettingsConfigRequest {
+  provider: LLMProvider
+  apiKey?: string
+  apiBase: string
+  model: string
+  port: number
+}
+
+export async function updateSettingsConfig(
+  data: UpdateSettingsConfigRequest,
+): Promise<{
+  success: boolean
+  message?: string
+  requiresRestart?: boolean
+  config?: SettingsConfigResponse
+}> {
+  try {
+    const response = await fetch(`/api/settings/config`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    })
+
+    const json = await response.json().catch(() => null) as any
+
+    if (!response.ok) {
+      return {
+        success: false,
+        message: json?.message || response.statusText || 'Request failed',
+      }
+    }
+
+    if (json?.success === false) {
+      return {
+        success: false,
+        message: json?.message || 'Save failed',
+      }
+    }
+
+    return {
+      success: true,
+      requiresRestart: !!json?.requiresRestart,
+      config: json?.config as SettingsConfigResponse | undefined,
+    }
+  }
+  catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}

@@ -221,6 +221,13 @@ select,
   transition-property: background-color, border-color, color, opacity;
 }
 
+/* Remove native focus outline/ring globally (project preference). */
+:where(a, button, input, textarea, select, summary, [role="button"], [tabindex]):focus,
+:where(a, button, input, textarea, select, summary, [role="button"], [tabindex]):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* markstream-vue overrides */
 .markstream-vue {
   --table-border: hsl(var(--border));

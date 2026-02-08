@@ -132,7 +132,7 @@ export default defineConfig({
     'flex-col-center': 'flex flex-col items-center justify-center',
 
     // Button base - shadcn v2: no shadow, subtle transitions
-    'btn-base': 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50',
+    'btn-base': 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 focus:outline-none focus-visible:outline-none',
 
     // Button variants - shadcn official dark mode style
     // Primary: white bg + black text in dark mode (auto via CSS vars)
@@ -151,10 +151,10 @@ export default defineConfig({
 
     // Input - shadcn v2: subtle border, slightly brighter bg in dark mode
     // Using bg-transparent lets the muted background show through naturally
-    'input-field': 'flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+    'input-field': 'flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:outline-none',
 
     // Textarea - shadcn v2: subtle border, focus uses ring
-    'textarea-field': 'flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+    'textarea-field': 'flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:outline-none',
 
     // Card - shadcn v2: border-dominant, no shadow, extremely subtle border
     'card': 'rounded-lg border border-border bg-card text-card-foreground',
