@@ -23,7 +23,8 @@ export function setServerConfig(cfg: Partial<ServerConfig>): void {
 }
 
 function resolveConfig(): ServerConfig {
-  if (_config) return _config
+  if (_config)
+    return _config
   throw new Error('Server config not initialized. Run `locus-agent config` to set up.')
 }
 

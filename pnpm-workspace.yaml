@@ -5,9 +5,14 @@ packages:
   - packages/*
   - apps/*
 
+catalog:
+  '@ai-sdk/openai-compatible': ^2.0.27
+  '@clack/prompts': ^0.10.0
+  shiki: ^3.22.0
 catalogs:
   ai-sdk:
     '@ai-sdk/anthropic': ^3.0.37
+    '@ai-sdk/mcp': ^1.0.19
     '@ai-sdk/moonshotai': ^2.0.1
     '@ai-sdk/openai': ^3.0.25
     '@openrouter/ai-sdk-provider': ^2.1.1

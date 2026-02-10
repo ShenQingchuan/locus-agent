@@ -3,6 +3,7 @@ export { default as Dropdown } from './components/Dropdown.vue'
 // Re-export component prop types
 export type { DropdownItem } from './components/Dropdown.vue'
 export { default as Select } from './components/Select.vue'
+export { default as Switch } from './components/Switch.vue'
 export type { SelectOption } from './components/Select.vue'
 export { default as ToastContainer } from './components/ToastContainer.vue'
 

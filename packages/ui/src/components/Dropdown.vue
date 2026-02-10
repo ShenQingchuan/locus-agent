@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import Switch from './Switch.vue'
 
 export interface DropdownItem {
   /** Unique key */
@@ -195,15 +196,8 @@ onBeforeUnmount(() => {
           >
             <div v-if="item.icon" :class="item.icon" class="h-3.5 w-3.5 flex-shrink-0 opacity-70" />
             <span class="flex-1 text-left whitespace-nowrap">{{ item.label }}</span>
-            <div
-              v-if="item.active !== undefined"
-              class="relative h-3.5 w-6 flex-shrink-0 rounded-full transition-colors duration-150"
-              :class="item.active ? 'bg-primary' : 'bg-muted-foreground/25'"
-            >
-              <div
-                class="absolute top-0.5 left-0.5 h-2.5 w-2.5 rounded-full bg-background transition-transform duration-150"
-                :class="item.active ? 'translate-x-2.5' : 'translate-x-0'"
-              />
+            <div v-if="item.active !== undefined" class="flex-shrink-0" @click.stop>
+              <Switch :model-value="!!item.active" @update:model-value="handleSelect(item.key)" />
             </div>
           </button>
         </template>

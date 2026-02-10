@@ -1,6 +1,6 @@
 import type { LanguageModel, ModelMessage, ToolResultPart } from 'ai'
 import { streamText } from 'ai'
-import { executeToolCall, hasToolExecutor, tools } from './tools/registry.js'
+import { executeToolCall, getMergedTools, hasToolExecutor } from './tools/registry.js'
 
 /**
  * Agent Loop 配置选项
@@ -118,7 +118,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           model,
           system: systemPrompt,
           messages,
-          tools,
+          tools: getMergedTools(),
           abortSignal,
           timeout: {
             totalMs: 600_000,

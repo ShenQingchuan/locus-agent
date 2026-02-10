@@ -96,7 +96,6 @@ const messageTokens = computed<number | null>(() => {
   const estimate = estimateTokensFromText(msg.content)
   return estimate > 0 ? estimate : null
 })
-
 </script>
 
 <template>
@@ -172,55 +171,55 @@ const messageTokens = computed<number | null>(() => {
           </span>
         </div>
 
-      <!-- Ordered parts: reasoning, text and tool calls interleaved -->
-      <template v-for="(part, partIdx) in displayParts" :key="partIdx">
-        <!-- Reasoning/Thinking part -->
-        <details
-          v-if="part.type === 'reasoning' && part.content"
-          class="my-2"
-          :open="message.isStreaming"
-        >
-          <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1">
-            <div class="i-carbon-idea h-3 w-3" />
-            <span>思考过程</span>
-          </summary>
-          <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
-            {{ part.content }}
-          </div>
-        </details>
+        <!-- Ordered parts: reasoning, text and tool calls interleaved -->
+        <template v-for="(part, partIdx) in displayParts" :key="partIdx">
+          <!-- Reasoning/Thinking part -->
+          <details
+            v-if="part.type === 'reasoning' && part.content"
+            class="my-2"
+            :open="message.isStreaming"
+          >
+            <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1">
+              <div class="i-carbon-idea h-3 w-3" />
+              <span>思考过程</span>
+            </summary>
+            <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+              {{ part.content }}
+            </div>
+          </details>
 
-        <!-- Tool call part -->
-        <template v-else-if="part.type === 'tool-call'">
-          <ToolCallItem
-            v-for="tool in getToolCallSlice(part.toolCallIndex)"
-            :key="tool.toolCall.toolCallId"
-            :tool="tool"
-            @approve="handleApprove"
-            @reject="handleReject"
-          />
+          <!-- Tool call part -->
+          <template v-else-if="part.type === 'tool-call'">
+            <ToolCallItem
+              v-for="tool in getToolCallSlice(part.toolCallIndex)"
+              :key="tool.toolCall.toolCallId"
+              :tool="tool"
+              @approve="handleApprove"
+              @reject="handleReject"
+            />
+          </template>
+
+          <!-- Text part -->
+          <div
+            v-else-if="part.type === 'text' && part.content"
+            class="prose prose-sm dark:prose-invert max-w-none w-full"
+          >
+            <MarkdownRender
+              :content="part.content"
+              custom-id="locus"
+              :typewriter="isLastTextPart(partIdx) && message.isStreaming"
+              :code-block-stream="isLastTextPart(partIdx) && message.isStreaming"
+            />
+          </div>
         </template>
 
-        <!-- Text part -->
+        <!-- Streaming spinner: always at the bottom -->
         <div
-          v-else-if="part.type === 'text' && part.content"
-          class="prose prose-sm dark:prose-invert max-w-none w-full"
+          v-if="message.isStreaming"
+          class="inline-block mt-2 ml-0.5"
         >
-          <MarkdownRender
-            :content="part.content"
-            custom-id="locus"
-            :typewriter="isLastTextPart(partIdx) && message.isStreaming"
-            :code-block-stream="isLastTextPart(partIdx) && message.isStreaming"
-          />
+          <div class="i-svg-spinners:bars-fade mt-4 text-foreground/70" />
         </div>
-      </template>
-
-      <!-- Streaming spinner: always at the bottom -->
-      <div
-        v-if="message.isStreaming"
-        class="inline-block mt-2 ml-0.5"
-      >
-        <div class="i-svg-spinners:bars-fade mt-4 text-foreground/70" />
-      </div>
       </div>
     </template>
   </article>

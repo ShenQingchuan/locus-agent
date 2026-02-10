@@ -17,8 +17,9 @@
     "@pinia/colada": "catalog:vue-family",
     "@vueuse/core": "catalog:vue-family",
     "markstream-vue": "catalog:vue-family",
+    "modern-monaco": "^0.3.7",
     "pinia": "catalog:vue-family",
-    "shiki": "^3.22.0",
+    "shiki": "catalog:",
     "vue": "catalog:vue-family",
     "vue-router": "catalog:vue-family"
   },

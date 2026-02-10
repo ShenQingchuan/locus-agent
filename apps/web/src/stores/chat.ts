@@ -450,6 +450,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function setToolCallExecuting(toolCallId: string) {
+    for (let i = 0; i < messages.value.length; i++) {
+      const message = messages.value[i]
+      const toolCallIndex = message.toolCalls?.findIndex(
+        tc => tc.toolCall.toolCallId === toolCallId,
+      )
+      if (toolCallIndex !== undefined && toolCallIndex >= 0) {
+        const existing = message.toolCalls![toolCallIndex]
+        if (existing.status === 'awaiting-approval') {
+          const newToolCalls = [...message.toolCalls!]
+          newToolCalls[toolCallIndex] = { ...existing, status: 'pending' }
+          messages.value[i] = { ...message, toolCalls: newToolCalls }
+        }
+        return
+      }
+    }
+  }
+
   function addPendingApproval(approval: PendingApproval) {
     pendingApprovals.value.set(approval.toolCallId, approval)
   }
@@ -619,12 +637,14 @@ export const useChatStore = defineStore('chat', () => {
   async function handleToolApproval(toolCallId: string, approved: boolean) {
     if (!currentConversationId.value)
       return false
-    // 若当前已开启 yoloMode，通知后端将运行中 loop 切换为免确认
+
+    // Immediately update UI before awaiting the API call
+    removePendingApproval(toolCallId)
+    if (approved)
+      setToolCallExecuting(toolCallId)
+
     const switchToYolo = approved && yoloMode.value ? true : undefined
     const success = await approveToolCall(currentConversationId.value, toolCallId, approved, switchToYolo)
-    if (success) {
-      removePendingApproval(toolCallId)
-    }
     return success
   }
 

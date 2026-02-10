@@ -1,10 +1,10 @@
-import { resolve } from 'node:path'
-import { serveStatic } from 'hono/bun'
-import { createApp } from '@locus-agent/server'
-import { initDB } from '@locus-agent/server/db'
-import { setServerConfig } from '@locus-agent/server/config'
-import { setLLMConfig } from '@locus-agent/server/providers'
 import type { LLMSettings } from '@locus-agent/server/settings'
+import { resolve } from 'node:path'
+import { createApp } from '@locus-agent/server'
+import { setServerConfig } from '@locus-agent/server/config'
+import { initDB } from '@locus-agent/server/db'
+import { setLLMConfig } from '@locus-agent/server/providers'
+import { serveStatic } from 'hono/bun'
 
 export interface StartOptions {
   dbPath: string
@@ -59,6 +59,5 @@ export function startServer(options: StartOptions): void {
     idleTimeout: 255,
   })
 
-  // eslint-disable-next-line no-console
   console.log(`\nLocus Agent is running at http://localhost:${port}\n`)
 }

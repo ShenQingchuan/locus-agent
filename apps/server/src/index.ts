@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { mcpManager } from './agent/mcp/manager.js'
 import { setLLMConfig } from './agent/providers/index.js'
 import { setServerConfig } from './config.js'
 import { initDB } from './db/index.js'
 import { chatRoutes } from './routes/chat.js'
 import { conversationsRoutes } from './routes/conversations.js'
+import { mcpRoutes } from './routes/mcp.js'
 import { settingsRoutes } from './routes/settings.js'
 import {
   closeSettingsDb,
@@ -43,6 +45,7 @@ export function createApp(): Hono {
   app.route('/api/chat', chatRoutes)
   app.route('/api/conversations', conversationsRoutes)
   app.route('/api/settings', settingsRoutes)
+  app.route('/api/mcp', mcpRoutes)
 
   return app
 }
@@ -75,10 +78,15 @@ function startDev() {
   setLLMConfig(llmSettings)
   setServerConfig({ confirmMode: !yoloMode, port })
 
-  // 4. Create app
+  // 4. Initialize MCP servers (non-blocking — errors are logged, not thrown)
+  mcpManager.initialize().catch((err) => {
+    console.error('MCP initialization failed:', err)
+  })
+
+  // 5. Create app
   const app = createApp()
 
-  // 5. Dev proxy: forward non-API requests to Vite dev server for HMR support.
+  // 6. Dev proxy: forward non-API requests to Vite dev server for HMR support.
   //    Uses middleware + next() so API routes are tried first;
   //    only unmatched requests (pages, assets) are proxied to Vite.
   app.use('*', async (c, next) => {

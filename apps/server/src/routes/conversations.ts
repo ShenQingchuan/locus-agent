@@ -8,6 +8,7 @@ import {
   updateConversation,
 } from '../services/conversation.js'
 import { addMessage, getMessages, truncateMessages } from '../services/message.js'
+import { updateActiveConfirmMode } from './chat.js'
 
 export const conversationsRoutes = new Hono()
 
@@ -52,6 +53,11 @@ conversationsRoutes.patch('/:id', async (c) => {
 
   if (!updated) {
     return c.json({ error: 'Conversation not found' }, 404)
+  }
+
+  // Sync to the running agent loop (if any)
+  if (confirmMode !== undefined) {
+    updateActiveConfirmMode(id, confirmMode)
   }
 
   return c.json(updated)

@@ -37,7 +37,8 @@ export function closeSettingsDb(): void {
 }
 
 function getSqlite(): Database {
-  if (!_sqlite) throw new Error('Settings DB not initialized. Call openSettingsDb() first.')
+  if (!_sqlite)
+    throw new Error('Settings DB not initialized. Call openSettingsDb() first.')
   return _sqlite
 }
 
@@ -69,7 +70,8 @@ export interface LLMSettings {
 export function getLLMSettings(): LLMSettings | null {
   const provider = (getSetting('llm.provider') || 'openai') as LLMSettings['provider']
   const apiKey = getSetting(`llm.api_key.${provider}`)
-  if (!apiKey) return null
+  if (!apiKey)
+    return null
   return {
     provider,
     apiKey,

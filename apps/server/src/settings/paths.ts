@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 const APP_NAME = 'locus-agent'
 

@@ -8,7 +8,8 @@ onKeyStroke('Escape', (e) => {
   if (confirmState.value.visible) {
     e.preventDefault()
     resolveConfirm(false)
-  } else if (toasts.value.length > 0) {
+  }
+  else if (toasts.value.length > 0) {
     e.preventDefault()
     removeAll()
   }
@@ -91,9 +92,9 @@ function getToastClass(type: string): string {
             <div
               class="h-5 w-5 flex-shrink-0 mt-0.5"
               :class="[
-                confirmState.options.type === 'error' ? 'i-carbon-close-filled text-destructive' :
-                confirmState.options.type === 'success' ? 'i-carbon-checkmark-filled text-green-600 dark:text-green-500' :
-                'i-carbon-warning-filled text-orange-500'
+                confirmState.options.type === 'error' ? 'i-carbon-close-filled text-destructive'
+                : confirmState.options.type === 'success' ? 'i-carbon-checkmark-filled text-green-600 dark:text-green-500'
+                  : 'i-carbon-warning-filled text-orange-500',
               ]"
             />
             <div class="flex-1">
@@ -118,7 +119,7 @@ function getToastClass(type: string): string {
               :class="[
                 confirmState.options.type === 'error'
                   ? 'bg-destructive hover:bg-destructive/90'
-                  : 'bg-primary hover:bg-primary/90'
+                  : 'bg-primary hover:bg-primary/90',
               ]"
               @click="resolveConfirm(true)"
             >

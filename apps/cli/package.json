@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clack/prompts": "^0.10.0",
+    "@clack/prompts": "catalog:",
     "@locus-agent/server": "workspace:*",
     "@locus-agent/shared": "workspace:*",
     "hono": "catalog:hono-family"

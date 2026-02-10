@@ -34,7 +34,8 @@ export interface InitDBOptions {
  * 可多次调用，后续调用为 no-op
  */
 export function initDB(options?: InitDBOptions): void {
-  if (_db) return
+  if (_db)
+    return
 
   const dbPath = options?.dbPath ?? getDefaultDbPath()
   _migrationsFolder = options?.migrationsFolder ?? getDefaultMigrationsFolder()
@@ -55,7 +56,8 @@ export function initDB(options?: InitDBOptions): void {
  * 若未初始化则使用默认路径自动初始化（dev 模式兼容）
  */
 export function getDb() {
-  if (!_db) initDB()
+  if (!_db)
+    initDB()
   return _db!
 }
 

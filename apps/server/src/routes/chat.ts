@@ -26,9 +26,19 @@ const activeAbortControllers = new Map<string, AbortController>()
 
 /**
  * 活跃会话的可变 confirmMode 状态
- * key: conversationId, value: 可变引用，approve 端点可实时更新
+ * key: conversationId, value: 可变引用，可由 approve 端点或 conversation 更新实时变更
  */
 const activeConfirmModes = new Map<string, { value: boolean }>()
+
+/**
+ * 更新活跃会话的 confirmMode（供外部路由调用）
+ */
+export function updateActiveConfirmMode(conversationId: string, confirmMode: boolean): void {
+  const state = activeConfirmModes.get(conversationId)
+  if (state) {
+    state.value = confirmMode
+  }
+}
 
 /**
  * 发送 SSE 事件的辅助函数
