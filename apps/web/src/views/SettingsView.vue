@@ -647,26 +647,26 @@ async function saveConfig() {
 
                         <!-- 操作 -->
                         <div class="flex items-center gap-0.5 flex-shrink-0">
-                        <Switch
-                          :model-value="!cfg.disabled"
-                          :disabled="isMcpSaving"
-                          :title="cfg.disabled ? '启用' : '禁用'"
-                          @update:model-value="toggleDisabled(name as string)"
-                        />
-                        <button
-                          class="btn-ghost btn-icon"
-                          title="重启"
-                          @click="onRestartOne(name as string)"
-                        >
-                          <div class="i-carbon-renew h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          class="btn-ghost btn-icon text-red-400 hover:text-red-300 hover:bg-destructive/10"
-                          title="删除"
-                          @click="removeServer(name as string)"
-                        >
-                          <div class="i-carbon-trash-can h-3.5 w-3.5" />
-                        </button>
+                          <Switch
+                            :model-value="!cfg.disabled"
+                            :disabled="isMcpSaving"
+                            :title="cfg.disabled ? '启用' : '禁用'"
+                            @update:model-value="toggleDisabled(name as string)"
+                          />
+                          <button
+                            class="btn-ghost btn-icon ml-2"
+                            title="重启"
+                            @click="onRestartOne(name as string)"
+                          >
+                            <div class="i-carbon-renew h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            class="btn-ghost btn-icon text-red-400 hover:text-red-300 hover:bg-destructive/20"
+                            title="删除"
+                            @click="removeServer(name as string)"
+                          >
+                            <div class="i-carbon-trash-can h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
 

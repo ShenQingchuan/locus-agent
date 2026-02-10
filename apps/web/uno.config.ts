@@ -153,7 +153,7 @@ export default defineConfig({
     // Button sizes
     'btn-sm': 'h-9 rounded-md px-3',
     'btn-lg': 'h-11 rounded-md px-8',
-    'btn-icon': 'h-10 w-10 p-0',
+    'btn-icon': 'h-8 w-8 p-0',
 
     // Input - shadcn v2: subtle border, slightly brighter bg in dark mode
     // Using bg-transparent lets the muted background show through naturally
