@@ -87,11 +87,14 @@ async function deleteSetting(key: string): Promise<void> {
   await db.delete(settingsTable).where(eq(settingsTable.key, key))
 }
 
+const ALL_PROVIDERS: LLMProviderType[] = ['openai', 'anthropic', 'moonshotai', 'openrouter']
+
 async function buildConfigResponse(): Promise<{
   setupCompleted: boolean
   provider: LLMProviderType
   hasApiKey: boolean
   apiKeyMasked: string | null
+  apiKeys: Partial<Record<LLMProviderType, string | null>>
   apiBase?: string
   model?: string
   port: number
@@ -100,18 +103,25 @@ async function buildConfigResponse(): Promise<{
   const keys = [
     'setup.completed',
     'llm.provider',
-    'llm.api_key',
     'llm.api_base',
     'llm.model',
     'server.port',
+    ...ALL_PROVIDERS.map(p => `llm.api_key.${p}`),
   ]
   const map = await getSettingsMap(keys)
 
   const provider = (map['llm.provider'] || 'openai') as LLMProviderType
-  const apiKey = map['llm.api_key']
+  const apiKey = map[`llm.api_key.${provider}`]
   const apiBase = map['llm.api_base']
   const model = map['llm.model']
   const port = Number(map['server.port']) || 3000
+
+  // Build per-provider masked keys map
+  const apiKeys: Partial<Record<LLMProviderType, string | null>> = {}
+  for (const p of ALL_PROVIDERS) {
+    const key = map[`llm.api_key.${p}`]
+    apiKeys[p] = key ? maskApiKey(key) : null
+  }
 
   let runtime: { provider: string, model: string, contextWindow: number } | undefined
   try {
@@ -126,6 +136,7 @@ async function buildConfigResponse(): Promise<{
     provider,
     hasApiKey: !!apiKey,
     apiKeyMasked: apiKey ? maskApiKey(apiKey) : null,
+    apiKeys,
     apiBase: apiBase || undefined,
     model: model || undefined,
     port,
@@ -153,7 +164,7 @@ settingsRoutes.get('/config', async (c) => {
 })
 
 const updateConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'moonshotai']).optional(),
+  provider: z.enum(['openai', 'anthropic', 'moonshotai', 'openrouter']).optional(),
   apiKey: z.string().optional(),
   apiBase: z.union([z.string(), z.null()]).optional(),
   model: z.union([z.string(), z.null()]).optional(),
@@ -178,22 +189,29 @@ settingsRoutes.put('/config', async (c) => {
   }
 
   try {
-    const keys = ['llm.provider', 'llm.api_key', 'llm.api_base', 'llm.model', 'server.port']
+    const keys = [
+      'llm.provider',
+      'llm.api_base',
+      'llm.model',
+      'server.port',
+      ...ALL_PROVIDERS.map(p => `llm.api_key.${p}`),
+    ]
     const map = await getSettingsMap(keys)
 
     const currentProvider = (map['llm.provider'] || 'openai') as LLMProviderType
-    const currentApiKey = map['llm.api_key']
     const currentApiBase = map['llm.api_base']
     const currentModel = map['llm.model']
     const currentPort = Number(map['server.port']) || 3000
 
     const nextProvider = (parsed.data.provider || currentProvider) as LLMProviderType
 
+    const currentProviderKey = map[`llm.api_key.${nextProvider}`]
+
     const nextApiKey = (() => {
       if (parsed.data.apiKey === undefined)
-        return currentApiKey
+        return currentProviderKey
       const trimmed = parsed.data.apiKey.trim()
-      return trimmed.length > 0 ? trimmed : currentApiKey
+      return trimmed.length > 0 ? trimmed : currentProviderKey
     })()
 
     if (!nextApiKey) {
@@ -229,7 +247,7 @@ settingsRoutes.put('/config', async (c) => {
     // Persist settings
     await upsertSetting('setup.completed', 'true')
     await upsertSetting('llm.provider', nextProvider)
-    await upsertSetting('llm.api_key', nextApiKey)
+    await upsertSetting(`llm.api_key.${nextProvider}`, nextApiKey)
 
     if (parsed.data.apiBase !== undefined) {
       if (nextApiBase)

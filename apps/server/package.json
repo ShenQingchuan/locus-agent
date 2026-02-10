@@ -43,6 +43,7 @@
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "^2.0.27",
+    "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "@locus-agent/shared": "workspace:*",
     "ai": "catalog:ai-sdk",
     "diff": "catalog:ai-sdk",

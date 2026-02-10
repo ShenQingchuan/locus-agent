@@ -19,14 +19,20 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
           message: 'Select your LLM provider',
           initialValue: existing?.provider ?? 'openai',
           options: [
-            { value: 'openai' as const, label: 'OpenAI / Compatible', hint: 'GPT-5.3, DeepSeek, etc.' },
+            { value: 'openai' as const, label: 'OpenAI', hint: 'GPT-5.3, DeepSeek, etc.' },
             { value: 'anthropic' as const, label: 'Anthropic', hint: 'Claude Sonnet, etc.' },
             { value: 'moonshotai' as const, label: 'Moonshot AI', hint: 'Kimi' },
+            { value: 'openrouter' as const, label: 'OpenRouter', hint: '300+ models, unified API' },
           ],
         }),
 
       apiKey: ({ results }) => {
-        const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', moonshotai: 'Moonshot AI' } as const
+        const providerNames = {
+          openai: 'OpenAI',
+          anthropic: 'Anthropic',
+          moonshotai: 'Moonshot AI',
+          openrouter: 'OpenRouter',
+        } as const
         const providerName = providerNames[results.provider!]
         const maskedKey = existing?.apiKey
           ? `${existing.apiKey.slice(0, 6)}...${existing.apiKey.slice(-4)}`
@@ -43,7 +49,7 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
       },
 
       apiBase: ({ results }) => {
-        const names = { openai: 'OpenAI', anthropic: 'Anthropic', moonshotai: 'Moonshot AI' } as const
+        const names = { openai: 'OpenAI', anthropic: 'Anthropic', moonshotai: 'Moonshot AI', openrouter: 'OpenRouter' } as const
         return p.text({
           message: `Custom API base URL (leave empty for official ${names[results.provider!]})`,
           placeholder: 'https://api.example.com/v1',
@@ -52,7 +58,12 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
       },
 
       model: ({ results }) => {
-        const placeholders = { openai: 'gpt-4o', anthropic: 'claude-sonnet-4-20250514', moonshotai: 'kimi-k2.5' } as const
+        const placeholders = {
+          openai: 'gpt-4o',
+          anthropic: 'claude-sonnet-4-20250514',
+          moonshotai: 'kimi-k2.5',
+          openrouter: 'moonshotai/kimi-k2.5',
+        } as const
         return p.text({
           message: 'Model name (leave empty for default)',
           placeholder: placeholders[results.provider!],

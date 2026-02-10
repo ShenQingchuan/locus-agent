@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import type { LLMProviderType } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/chat'
 import Sidebar from '@/components/Sidebar.vue'
 import { useChatStore } from '@/stores/chat'
-
-type LLMProvider = 'openai' | 'anthropic' | 'moonshotai'
 
 const router = useRouter()
 const toast = useToast()
@@ -19,9 +18,10 @@ const requiresRestart = ref(false)
 
 const runtimeInfo = ref<{ provider: string, model: string, contextWindow: number } | null>(null)
 const currentApiKeyMasked = ref<string | null>(null)
+const apiKeysMasked = ref<Partial<Record<LLMProviderType, string | null>>>({})
 
 const form = ref({
-  provider: 'openai' as LLMProvider,
+  provider: 'openai' as LLMProviderType,
   apiKey: '',
   apiBase: '',
   model: '',
@@ -29,9 +29,10 @@ const form = ref({
 })
 
 const providerOptions = [
-  { value: 'openai' as const, label: 'OpenAI / 兼容接口' },
+  { value: 'openai' as const, label: 'OpenAI' },
   { value: 'anthropic' as const, label: 'Anthropic（Claude）' },
   { value: 'moonshotai' as const, label: 'Moonshot AI（Kimi）' },
+  { value: 'openrouter' as const, label: 'OpenRouter' },
 ]
 
 const hasExistingApiKey = computed(() => {
@@ -46,6 +47,32 @@ const apiKeyPlaceholder = computed(() => {
 
 const apiKeyHelperText = computed(() => {
   return hasExistingApiKey.value ? '' : '首次配置请填写 API Key'
+})
+
+const defaultModels: Record<LLMProviderType, string> = {
+  openai: 'gpt-5.3',
+  anthropic: 'claude-opus-4.6',
+  moonshotai: 'kimi-k2.5',
+  openrouter: 'moonshotai/kimi-k2.5',
+}
+
+const defaultApiBases: Record<LLMProviderType, string> = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com',
+  moonshotai: 'https://api.moonshot.cn/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+}
+
+const modelPlaceholder = computed(() => defaultModels[form.value.provider])
+const apiBasePlaceholder = computed(() => defaultApiBases[form.value.provider])
+
+watch(() => form.value.provider, (provider) => {
+  if (isLoading.value)
+    return
+  form.value.apiBase = defaultApiBases[provider] ?? ''
+  form.value.model = ''
+  form.value.apiKey = ''
+  currentApiKeyMasked.value = apiKeysMasked.value[provider] ?? null
 })
 
 onMounted(() => {
@@ -63,11 +90,12 @@ async function loadConfig() {
     }
 
     form.value.provider = config.provider
-    form.value.apiBase = config.apiBase ?? ''
+    form.value.apiBase = config.apiBase || defaultApiBases[config.provider] || ''
     form.value.model = config.model ?? ''
     form.value.port = config.port
 
-    currentApiKeyMasked.value = config.apiKeyMasked ?? null
+    apiKeysMasked.value = config.apiKeys ?? {}
+    currentApiKeyMasked.value = apiKeysMasked.value[config.provider] ?? config.apiKeyMasked ?? null
     runtimeInfo.value = config.runtime ?? null
     requiresRestart.value = false
   }
@@ -75,6 +103,7 @@ async function loadConfig() {
     loadError.value = error instanceof Error ? error.message : '加载配置失败'
   }
   finally {
+    await nextTick()
     isLoading.value = false
   }
 }
@@ -95,7 +124,7 @@ async function saveConfig() {
     const model = form.value.model.trim()
 
     const payload: {
-      provider: LLMProvider
+      provider: LLMProviderType
       apiKey?: string
       apiBase: string
       model: string
@@ -126,7 +155,8 @@ async function saveConfig() {
 
     form.value.apiKey = ''
     if (result.config) {
-      currentApiKeyMasked.value = result.config.apiKeyMasked ?? currentApiKeyMasked.value
+      apiKeysMasked.value = result.config.apiKeys ?? apiKeysMasked.value
+      currentApiKeyMasked.value = apiKeysMasked.value[form.value.provider] ?? result.config.apiKeyMasked ?? currentApiKeyMasked.value
       runtimeInfo.value = result.config.runtime ?? runtimeInfo.value
     }
 
@@ -199,7 +229,7 @@ async function saveConfig() {
               <div class="flex items-center justify-between">
                 <div>
                   <h2 class="text-sm font-medium text-foreground">
-                    大模型
+                    模型配置
                   </h2>
                   <p class="text-xs text-muted-foreground mt-1">
                     保存后会立即影响新的对话请求。
@@ -244,7 +274,7 @@ async function saveConfig() {
                     v-model="form.apiBase"
                     class="input-field"
                     type="text"
-                    placeholder="留空使用官方地址（例如 https://api.example.com/v1）"
+                    :placeholder="apiBasePlaceholder"
                   >
                 </div>
 
@@ -254,7 +284,7 @@ async function saveConfig() {
                     v-model="form.model"
                     class="input-field font-mono"
                     type="text"
-                    placeholder="留空使用默认模型"
+                    :placeholder="modelPlaceholder"
                   >
                 </div>
               </div>

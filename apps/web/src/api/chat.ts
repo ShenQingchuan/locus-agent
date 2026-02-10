@@ -2,6 +2,7 @@ import type {
   Conversation,
   CoreMessage,
   ListConversationsResponse,
+  LLMProviderType,
   Message,
   SSEEvent,
   ToolCall,
@@ -477,13 +478,12 @@ export async function fetchSettings(): Promise<{
   }
 }
 
-export type LLMProvider = 'openai' | 'anthropic' | 'moonshotai'
-
 export interface SettingsConfigResponse {
   setupCompleted: boolean
-  provider: LLMProvider
+  provider: LLMProviderType
   hasApiKey: boolean
   apiKeyMasked: string | null
+  apiKeys: Partial<Record<LLMProviderType, string | null>>
   apiBase?: string
   model?: string
   port: number
@@ -513,7 +513,7 @@ export async function fetchSettingsConfig(): Promise<SettingsConfigResponse | nu
 }
 
 export interface UpdateSettingsConfigRequest {
-  provider: LLMProvider
+  provider: LLMProviderType
   apiKey?: string
   apiBase: string
   model: string

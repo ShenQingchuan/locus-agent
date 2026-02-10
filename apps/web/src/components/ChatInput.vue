@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { DropdownItem } from '@locus-agent/ui'
+import { Dropdown } from '@locus-agent/ui'
 import { useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
@@ -19,6 +21,37 @@ const chatStore = useChatStore()
 const { textarea, input } = useTextareaAutosize()
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
+
+const modeItems = computed<DropdownItem[]>(() => [
+  {
+    key: 'think',
+    label: '思考模式',
+    icon: 'i-ri:brain-line',
+    active: chatStore.thinkMode,
+  },
+  {
+    key: 'yolo',
+    label: '自由执行',
+    icon: 'i-ic:sharp-cruelty-free',
+    active: chatStore.yoloMode,
+  },
+])
+
+const activeModeLabel = computed(() => {
+  const modes: string[] = []
+  if (chatStore.thinkMode)
+    modes.push('思考')
+  if (chatStore.yoloMode)
+    modes.push('自由执行')
+  return modes.length > 0 ? modes.join(' · ') : '标准'
+})
+
+function handleModeSelect(key: string) {
+  if (key === 'think')
+    chatStore.toggleThinkMode()
+  else if (key === 'yolo')
+    chatStore.toggleYoloMode()
+}
 
 // Reset height when input is cleared
 watch(input, (newValue) => {
@@ -87,7 +120,7 @@ function handleKeydown(event: KeyboardEvent) {
         ref="textarea"
         v-model="input"
         class="w-full resize-none bg-transparent px-4 pt-4 min-h-[80px] pb-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        :placeholder="isEditing ? '编辑消息...' : '输入消息...'"
+        :placeholder="isEditing ? '编辑消息…' : '输入消息…'"
         rows="1"
         :disabled="disabled"
         @keydown="handleKeydown"
@@ -95,46 +128,19 @@ function handleKeydown(event: KeyboardEvent) {
 
       <!-- Bottom toolbar -->
       <div class="flex items-center justify-between px-3 py-2">
-        <!-- Yolo mode toggle -->
-        <div class="flex items-center gap-2">
-          <label class="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <input
-              type="checkbox"
-              :checked="chatStore.yoloMode"
-              class="sr-only"
-              @change="chatStore.toggleYoloMode()"
+        <!-- Mode selector dropdown -->
+        <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
+          <template #trigger>
+            <button
+              class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
+              aria-label="切换模式"
             >
-            <div
-              class="relative h-5 w-9 rounded-full transition-colors duration-150"
-              :class="chatStore.yoloMode ? 'bg-primary' : 'bg-muted'"
-            >
-              <div
-                class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform duration-150"
-                :class="chatStore.yoloMode ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </div>
-            <span>Yolo 模式</span>
-          </label>
-
-          <label class="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <input
-              type="checkbox"
-              :checked="chatStore.thinkMode"
-              class="sr-only"
-              @change="chatStore.toggleThinkMode()"
-            >
-            <div
-              class="relative h-5 w-9 rounded-full transition-colors duration-150"
-              :class="chatStore.thinkMode ? 'bg-primary' : 'bg-muted'"
-            >
-              <div
-                class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform duration-150"
-                :class="chatStore.thinkMode ? 'translate-x-4' : 'translate-x-0'"
-              />
-            </div>
-            <span>Think 模式</span>
-          </label>
-        </div>
+              <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
+              <span>选项</span>
+              <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+            </button>
+          </template>
+        </Dropdown>
 
         <!-- Send/stop button -->
         <div class="flex items-center gap-4">

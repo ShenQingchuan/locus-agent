@@ -1,32 +1,62 @@
 <script setup lang="ts">
+import { useQueryCache } from '@pinia/colada'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ChatInput from '@/components/ChatInput.vue'
 import MessageList from '@/components/MessageList.vue'
 import Sidebar from '@/components/Sidebar.vue'
+import { useConversationQuery } from '@/composables/queries'
 import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
+const queryCache = useQueryCache()
+
 // 标记是否正在同步，避免 watch 循环
 const isSyncingFromUrl = ref(false)
 const isSyncingToUrl = ref(false)
+
+// 跟踪已修改的会话（发送过消息），切换时失效缓存
+const dirtyConversations = new Set<string>()
+
+// Pinia Colada 查询：缓存会话消息数据
+const { data: conversationData } = useConversationQuery(
+  () => chatStore.currentConversationId,
+)
+
+// 监听查询数据变化，应用到 store
+watch(conversationData, (data) => {
+  if (!chatStore.currentConversationId)
+    return
+
+  if (data) {
+    chatStore.applyConversationData(data)
+  }
+  else if (data === null) {
+    // 会话未找到，重置状态
+    chatStore.newConversation()
+    isSyncingToUrl.value = true
+    router.replace({ query: {} })
+    isSyncingToUrl.value = false
+  }
+})
+
+// 切换离开已修改的会话时，失效其缓存（下次访问重新获取最新数据）
+watch(() => chatStore.currentConversationId, (_newId, oldId) => {
+  if (oldId && dirtyConversations.has(oldId)) {
+    queryCache.invalidateQueries({ key: ['conversation', oldId] })
+    dirtyConversations.delete(oldId)
+  }
+})
 
 // 从 URL query 恢复会话
 onMounted(async () => {
   const conversationId = route.query.session as string | undefined
   if (conversationId && conversationId !== chatStore.currentConversationId) {
     isSyncingFromUrl.value = true
-    const success = await chatStore.switchConversation(conversationId)
+    chatStore.switchConversation(conversationId)
     isSyncingFromUrl.value = false
-
-    // If conversation not found, clear query to restore empty state
-    if (!success) {
-      isSyncingToUrl.value = true
-      router.replace({ query: {} })
-      isSyncingToUrl.value = false
-    }
   }
   else if (!conversationId && chatStore.currentConversationId) {
     // 如果 URL 没有会话 ID 但 store 有，同步到 URL
@@ -35,8 +65,8 @@ onMounted(async () => {
     isSyncingToUrl.value = false
   }
 
-  // 加载会话列表
-  await chatStore.loadConversations()
+  // 加载模型设置
+  await chatStore.loadModelSettings()
 })
 
 // 监听 store 中的会话 ID 变化，同步到 URL
@@ -63,22 +93,15 @@ watch(
 // 监听 URL query 变化，恢复会话
 watch(
   () => route.query.session,
-  async (newSessionId) => {
+  (newSessionId) => {
     if (isSyncingToUrl.value)
       return
 
     const sessionId = typeof newSessionId === 'string' ? newSessionId : undefined
     if (sessionId && sessionId !== chatStore.currentConversationId) {
       isSyncingFromUrl.value = true
-      const success = await chatStore.switchConversation(sessionId)
+      chatStore.switchConversation(sessionId)
       isSyncingFromUrl.value = false
-
-      // If conversation not found, clear query to restore empty state
-      if (!success) {
-        isSyncingToUrl.value = true
-        router.replace({ query: {} })
-        isSyncingToUrl.value = false
-      }
     }
     else if (!sessionId && chatStore.currentConversationId) {
       isSyncingFromUrl.value = true
@@ -93,6 +116,11 @@ async function handleSend(content: string) {
     return
 
   await chatStore.sendMessage(content)
+  // 标记会话为已修改，刷新会话列表
+  if (chatStore.currentConversationId) {
+    dirtyConversations.add(chatStore.currentConversationId)
+  }
+  queryCache.invalidateQueries({ key: ['conversations'] })
 }
 
 function handleStop() {

@@ -1,4 +1,4 @@
-import type { Conversation, CoreMessage, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { Conversation, CoreMessage, Message as ApiMessage, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
@@ -7,8 +7,6 @@ import {
   abortChat,
   approveToolCall,
   deleteConversation,
-  fetchConversation,
-  fetchConversations,
   fetchSettings,
   streamChat,
   truncateMessages,
@@ -49,7 +47,6 @@ export const useChatStore = defineStore('chat', () => {
   // Conversation management
   const conversations = ref<Conversation[]>([])
   const currentConversationId = ref<string | null>(null)
-  const isLoadingConversations = ref(false)
 
   // Current conversation state
   const messages = ref<Message[]>([])
@@ -167,37 +164,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // Conversation management actions
-  async function loadConversations() {
-    isLoadingConversations.value = true
-    try {
-      conversations.value = await fetchConversations()
-      // Load model settings when loading conversations (only once)
-      if (MAX_CONTEXT_TOKENS.value === 128_000) {
-        await loadModelSettings()
-      }
-    }
-    finally {
-      isLoadingConversations.value = false
-    }
-  }
-
-  async function switchConversation(id: string): Promise<boolean> {
+  function switchConversation(id: string) {
     if (id === currentConversationId.value)
-      return true
+      return
 
-    // Save current state if needed
     currentConversationId.value = id
     clearMessages()
     clearError()
+  }
 
-    // Load conversation messages
-    const data = await fetchConversation(id)
-    if (!data) {
-      // Conversation not found, reset to empty state
-      newConversation()
-      return false
-    }
-
+  function applyConversationData(data: { conversation: Conversation, messages: ApiMessage[] }) {
     // Restore yolo mode from conversation settings
     yoloMode.value = data.conversation?.confirmMode === false
 
@@ -264,7 +240,6 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     messages.value = convertedMessages
-    return true
   }
 
   async function removeConversation(id: string) {
@@ -568,8 +543,6 @@ export const useChatStore = defineStore('chat', () => {
           updateMessage(assistantMessageId, updates)
           currentStreamingMessageId.value = null
           setLoading(false)
-          // Refresh conversations list to update title/time
-          loadConversations()
         },
         onError: (code, message) => {
           setError({ code, message })
@@ -735,7 +708,6 @@ export const useChatStore = defineStore('chat', () => {
     // Conversation management state
     conversations,
     currentConversationId,
-    isLoadingConversations,
     isSidebarCollapsed,
     sidebarWidth,
     yoloMode,
@@ -762,9 +734,9 @@ export const useChatStore = defineStore('chat', () => {
     MAX_CONTEXT_TOKENS,
 
     // Conversation management actions
-    loadConversations,
     loadModelSettings,
     switchConversation,
+    applyConversationData,
     removeConversation,
     toggleSidebar,
     setSidebarWidth,

@@ -1,16 +1,32 @@
 <script setup lang="ts">
 import type { DropdownItem } from '@locus-agent/ui'
 import { Dropdown, useToast } from '@locus-agent/ui'
+import { useQueryCache } from '@pinia/colada'
 import { useDark, useToggle } from '@vueuse/core'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useConversationListQuery } from '@/composables/queries'
 import { useChatStore } from '@/stores/chat'
 import ConversationItem from './ConversationItem.vue'
+
+declare const __APP_VERSION__: string
+const appVersion = __APP_VERSION__
 
 const chatStore = useChatStore()
 const toast = useToast()
 const router = useRouter()
 const route = useRoute()
+const queryCache = useQueryCache()
+
+// Pinia Colada 查询：缓存会话列表
+const { data: conversationsData, isPending: isLoadingConversations } = useConversationListQuery()
+
+// 同步查询数据到 store
+watch(conversationsData, (data) => {
+  if (data) {
+    chatStore.conversations = data
+  }
+})
 
 /** Navigate back to chat page if currently on a different route */
 function ensureChatRoute() {
@@ -101,10 +117,9 @@ function handleMouseUp() {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   document.addEventListener('mousemove', handleMouseMove, { passive: false })
   document.addEventListener('mouseup', handleMouseUp)
-  await chatStore.loadConversations()
 })
 
 onUnmounted(() => {
@@ -121,11 +136,8 @@ function handleNewChat() {
   ensureChatRoute()
 }
 
-async function handleSelectConversation(id: string) {
-  const success = await chatStore.switchConversation(id)
-  if (!success) {
-    await chatStore.loadConversations()
-  }
+function handleSelectConversation(id: string) {
+  chatStore.switchConversation(id)
   ensureChatRoute()
 }
 
@@ -140,6 +152,7 @@ async function handleDeleteConversation(id: string) {
   if (confirmed) {
     await chatStore.removeConversation(id)
     toast.success('对话已删除')
+    queryCache.invalidateQueries({ key: ['conversations'] })
   }
 }
 </script>
@@ -170,7 +183,7 @@ async function handleDeleteConversation(id: string) {
       <div class="flex-1 overflow-y-auto p-2">
         <!-- Loading state -->
         <div
-          v-if="chatStore.isLoadingConversations"
+          v-if="isLoadingConversations"
           class="flex-col-center py-8 text-muted-foreground"
         >
           <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
@@ -202,7 +215,7 @@ async function handleDeleteConversation(id: string) {
       <!-- Footer -->
       <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
         <div class="flex items-center justify-between text-xs text-muted-foreground opacity-70">
-          <span>Locus Agent</span>
+          <span>Locus Agent <span class="opacity-50">v{{ appVersion }}</span></span>
           <Dropdown :items="menuItems" placement="top-end" @select="handleMenuSelect">
             <template #trigger>
               <button

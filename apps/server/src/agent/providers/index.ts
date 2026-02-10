@@ -1,10 +1,12 @@
+import type { LLMProviderType } from '@locus-agent/shared'
 import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
-export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai'
+export type { LLMProviderType }
 
 export interface LLMConfig {
   provider: LLMProviderType
@@ -17,6 +19,7 @@ const DEFAULT_MODELS: Record<LLMProviderType, string> = {
   openai: 'gpt-5.3',
   anthropic: 'claude-opus-4.6',
   moonshotai: 'kimi-k2.5',
+  openrouter: 'moonshotai/kimi-k2.5',
 }
 
 /**
@@ -91,34 +94,50 @@ export function getCurrentModelInfo(): {
 }
 
 /**
+ * SDK 内置默认地址与实际推荐地址不同的提供商，在此覆盖。
+ * 例如 @ai-sdk/moonshotai 默认 api.moonshot.ai，但国内 key 需要 api.moonshot.cn。
+ */
+const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
+  moonshotai: 'https://api.moonshot.cn/v1',
+}
+
+/**
  * 根据配置创建对应的模型实例
  */
 export function createLLMModel(modelId: string = getDefaultModel()): LanguageModel {
   const cfg = getConfig()
+  const baseURL = cfg.apiBase || PROVIDER_DEFAULT_BASE_URLS[cfg.provider]
 
   switch (cfg.provider) {
     case 'anthropic': {
       const anthropic = createAnthropic({
         apiKey: cfg.apiKey,
-        ...(cfg.apiBase ? { baseURL: cfg.apiBase } : {}),
+        ...(baseURL ? { baseURL } : {}),
       })
       return anthropic(modelId)
     }
     case 'moonshotai': {
       const moonshot = createMoonshotAI({
         apiKey: cfg.apiKey,
-        ...(cfg.apiBase ? { baseURL: cfg.apiBase } : {}),
+        ...(baseURL ? { baseURL } : {}),
       })
       return moonshot(modelId)
+    }
+    case 'openrouter': {
+      const openrouter = createOpenRouter({
+        apiKey: cfg.apiKey,
+        ...(baseURL ? { baseURL } : {}),
+      })
+      return openrouter(modelId)
     }
     case 'openai':
     default: {
       // 自定义 baseURL 时使用 openai-compatible，避免 OpenAI 专有的 Responses API 和 thinking 验证
-      if (cfg.apiBase) {
+      if (baseURL) {
         const provider = createOpenAICompatible({
           name: 'custom-openai',
           apiKey: cfg.apiKey,
-          baseURL: cfg.apiBase,
+          baseURL,
         })
         return provider.chatModel(modelId)
       }

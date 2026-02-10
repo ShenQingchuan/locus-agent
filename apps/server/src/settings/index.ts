@@ -1,3 +1,4 @@
+import type { LLMProviderType } from '@locus-agent/shared'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
@@ -59,17 +60,18 @@ export function isSetupComplete(): boolean {
 }
 
 export interface LLMSettings {
-  provider: 'openai' | 'anthropic' | 'moonshotai'
+  provider: LLMProviderType
   apiKey: string
   apiBase?: string
   model?: string
 }
 
 export function getLLMSettings(): LLMSettings | null {
-  const apiKey = getSetting('llm.api_key')
+  const provider = (getSetting('llm.provider') || 'openai') as LLMSettings['provider']
+  const apiKey = getSetting(`llm.api_key.${provider}`)
   if (!apiKey) return null
   return {
-    provider: (getSetting('llm.provider') || 'openai') as LLMSettings['provider'],
+    provider,
     apiKey,
     apiBase: getSetting('llm.api_base') || undefined,
     model: getSetting('llm.model') || undefined,
@@ -78,7 +80,7 @@ export function getLLMSettings(): LLMSettings | null {
 
 export function saveLLMSettings(settings: LLMSettings): void {
   setSetting('llm.provider', settings.provider)
-  setSetting('llm.api_key', settings.apiKey)
+  setSetting(`llm.api_key.${settings.provider}`, settings.apiKey)
   if (settings.apiBase)
     setSetting('llm.api_base', settings.apiBase)
   if (settings.model)

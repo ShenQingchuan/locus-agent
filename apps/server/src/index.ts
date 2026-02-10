@@ -63,6 +63,11 @@ function startDev() {
   const yoloMode = isYoloMode()
   closeSettingsDb()
 
+  const VITE_DEV_PORT = 5173
+  if (port === VITE_DEV_PORT) {
+    throw new Error(`Server port ${port} conflicts with Vite dev server. Change it via \`locus-agent config\`.`)
+  }
+
   // 2. Initialize main app DB using the same SQLite file as the CLI
   initDB({ dbPath })
 
@@ -76,7 +81,6 @@ function startDev() {
   // 5. Dev proxy: forward non-API requests to Vite dev server for HMR support.
   //    Uses middleware + next() so API routes are tried first;
   //    only unmatched requests (pages, assets) are proxied to Vite.
-  const VITE_DEV_ORIGIN = 'http://localhost:5173'
   app.use('*', async (c, next) => {
     // Let Hono routes handle API and health requests
     if (c.req.path.startsWith('/api/') || c.req.path === '/health') {
@@ -85,7 +89,7 @@ function startDev() {
     // Proxy everything else to Vite dev server
     const url = new URL(c.req.url)
     url.host = 'localhost'
-    url.port = '5173'
+    url.port = String(VITE_DEV_PORT)
     const proxied = await fetch(url.toString(), {
       method: c.req.method,
       headers: c.req.raw.headers,
@@ -96,9 +100,6 @@ function startDev() {
       headers: proxied.headers,
     })
   })
-
-  // eslint-disable-next-line no-console
-  console.log(`Dev proxy: frontend from ${VITE_DEV_ORIGIN}`)
 
   return { fetch: app.fetch, port, idleTimeout: 120 }
 }
