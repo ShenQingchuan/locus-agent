@@ -7,7 +7,7 @@ export default defineConfig({
     pipeline: {
       include: [
         'src/**/*.{vue,ts,tsx}',
-        '../../packages/ui/src/**/*.{vue,ts}',
+        '../../packages/**/src/**/*.{vue,ts}',
       ],
     },
   },
@@ -20,7 +20,6 @@ export default defineConfig({
     presetTypography({
       cssExtend: {
         // 覆盖默认样式，使用 CSS 变量
-        'color': 'hsl(var(--foreground))',
         'a': {
           'color': 'hsl(var(--primary))',
           'text-decoration': 'underline',

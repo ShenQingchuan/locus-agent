@@ -20,9 +20,12 @@ const props = withDefaults(defineProps<{
   placement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end'
   /** Keep menu open after selecting (useful for toggles) */
   persistent?: boolean
+  /** How the dropdown is triggered: click or hover */
+  trigger?: 'click' | 'hover'
 }>(), {
   placement: 'top-end',
   persistent: false,
+  trigger: 'click',
 })
 
 const emit = defineEmits<{
@@ -33,6 +36,7 @@ const isOpen = ref(false)
 const triggerRef = ref<HTMLElement | null>(null)
 const menuRef = ref<HTMLElement | null>(null)
 const focusedIndex = ref(-1)
+let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 const placementClasses = computed(() => {
   switch (props.placement) {
@@ -49,19 +53,51 @@ const placementClasses = computed(() => {
   }
 })
 
+function open() {
+  if (hoverCloseTimer) {
+    clearTimeout(hoverCloseTimer)
+    hoverCloseTimer = null
+  }
+  if (isOpen.value)
+    return
+  isOpen.value = true
+  focusedIndex.value = -1
+  nextTick(() => {
+    menuRef.value?.focus()
+  })
+}
+
 function toggle() {
-  isOpen.value = !isOpen.value
   if (isOpen.value) {
-    focusedIndex.value = -1
-    nextTick(() => {
-      menuRef.value?.focus()
-    })
+    close()
+  }
+  else {
+    open()
   }
 }
 
 function close() {
   isOpen.value = false
   focusedIndex.value = -1
+}
+
+function scheduleClose() {
+  hoverCloseTimer = setTimeout(close, 150)
+}
+
+function handleTriggerClick() {
+  if (props.trigger === 'click')
+    toggle()
+}
+
+function handleMouseEnter() {
+  if (props.trigger === 'hover')
+    open()
+}
+
+function handleMouseLeave() {
+  if (props.trigger === 'hover')
+    scheduleClose()
 }
 
 function handleSelect(key: string) {
@@ -116,13 +152,21 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onClickOutside)
+  if (hoverCloseTimer) {
+    clearTimeout(hoverCloseTimer)
+    hoverCloseTimer = null
+  }
 })
 </script>
 
 <template>
-  <div class="relative inline-flex">
+  <div
+    class="relative inline-flex"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
+  >
     <!-- Trigger -->
-    <div ref="triggerRef" class="inline-flex" @click="toggle">
+    <div ref="triggerRef" class="inline-flex" @click="handleTriggerClick">
       <slot name="trigger" />
     </div>
 
@@ -133,7 +177,7 @@ onBeforeUnmount(() => {
         ref="menuRef"
         role="menu"
         tabindex="-1"
-        class="dropdown-menu absolute z-50 min-w-[140px] rounded-lg border border-border bg-popover text-popover-foreground shadow-md py-0.5"
+        class="dropdown-menu absolute z-50 min-w-[140px] w-max rounded-lg border border-border bg-popover text-popover-foreground shadow-md py-0.5"
         :class="placementClasses"
         @keydown="handleKeydown"
       >
@@ -150,7 +194,7 @@ onBeforeUnmount(() => {
             @mouseenter="focusedIndex = index"
           >
             <div v-if="item.icon" :class="item.icon" class="h-3.5 w-3.5 flex-shrink-0 opacity-70" />
-            <span class="flex-1 text-left">{{ item.label }}</span>
+            <span class="flex-1 text-left whitespace-nowrap">{{ item.label }}</span>
             <div
               v-if="item.active !== undefined"
               class="relative h-3.5 w-6 flex-shrink-0 rounded-full transition-colors duration-150"

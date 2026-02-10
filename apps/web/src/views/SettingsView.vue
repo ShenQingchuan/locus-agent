@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import type { LLMProviderType } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, LLM_PROVIDERS } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/chat'
 import Sidebar from '@/components/Sidebar.vue'
-import { useChatStore } from '@/stores/chat'
 
 const router = useRouter()
 const toast = useToast()
-const chatStore = useChatStore()
 
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -24,16 +23,10 @@ const form = ref({
   provider: 'openai' as LLMProviderType,
   apiKey: '',
   apiBase: '',
-  model: '',
   port: 3000,
 })
 
-const providerOptions = [
-  { value: 'openai' as const, label: 'OpenAI' },
-  { value: 'anthropic' as const, label: 'Anthropic（Claude）' },
-  { value: 'moonshotai' as const, label: 'Moonshot AI（Kimi）' },
-  { value: 'openrouter' as const, label: 'OpenRouter' },
-]
+const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label }))
 
 const hasExistingApiKey = computed(() => {
   return !!currentApiKeyMasked.value
@@ -49,28 +42,12 @@ const apiKeyHelperText = computed(() => {
   return hasExistingApiKey.value ? '' : '首次配置请填写 API Key'
 })
 
-const defaultModels: Record<LLMProviderType, string> = {
-  openai: 'gpt-5.3',
-  anthropic: 'claude-opus-4.6',
-  moonshotai: 'kimi-k2.5',
-  openrouter: 'moonshotai/kimi-k2.5',
-}
-
-const defaultApiBases: Record<LLMProviderType, string> = {
-  openai: 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com',
-  moonshotai: 'https://api.moonshot.cn/v1',
-  openrouter: 'https://openrouter.ai/api/v1',
-}
-
-const modelPlaceholder = computed(() => defaultModels[form.value.provider])
-const apiBasePlaceholder = computed(() => defaultApiBases[form.value.provider])
+const apiBasePlaceholder = computed(() => DEFAULT_API_BASES[form.value.provider])
 
 watch(() => form.value.provider, (provider) => {
   if (isLoading.value)
     return
-  form.value.apiBase = defaultApiBases[provider] ?? ''
-  form.value.model = ''
+  form.value.apiBase = DEFAULT_API_BASES[provider] ?? ''
   form.value.apiKey = ''
   currentApiKeyMasked.value = apiKeysMasked.value[provider] ?? null
 })
@@ -90,8 +67,7 @@ async function loadConfig() {
     }
 
     form.value.provider = config.provider
-    form.value.apiBase = config.apiBase || defaultApiBases[config.provider] || ''
-    form.value.model = config.model ?? ''
+    form.value.apiBase = config.apiBase || DEFAULT_API_BASES[config.provider] || ''
     form.value.port = config.port
 
     apiKeysMasked.value = config.apiKeys ?? {}
@@ -121,18 +97,15 @@ async function saveConfig() {
     }
 
     const apiBase = form.value.apiBase.trim()
-    const model = form.value.model.trim()
 
     const payload: {
       provider: LLMProviderType
       apiKey?: string
       apiBase: string
-      model: string
       port: number
     } = {
       provider: form.value.provider,
       apiBase,
-      model,
       port,
     }
 
@@ -159,8 +132,6 @@ async function saveConfig() {
       currentApiKeyMasked.value = apiKeysMasked.value[form.value.provider] ?? result.config.apiKeyMasked ?? currentApiKeyMasked.value
       runtimeInfo.value = result.config.runtime ?? runtimeInfo.value
     }
-
-    await chatStore.loadModelSettings()
   }
   finally {
     isSaving.value = false
@@ -239,7 +210,10 @@ async function saveConfig() {
                   v-if="runtimeInfo"
                   class="text-xs text-gray-400 text-right"
                 >
-                  <div>运行中：{{ runtimeInfo.provider }} · {{ runtimeInfo.model }}</div>
+                  <div>
+                    运行中：
+                    <span class="font-mono">{{ runtimeInfo.provider }} · {{ runtimeInfo.model }}</span>
+                  </div>
                   <div>上下文窗口：{{ runtimeInfo.contextWindow }}</div>
                 </div>
               </div>
@@ -277,17 +251,10 @@ async function saveConfig() {
                     :placeholder="apiBasePlaceholder"
                   >
                 </div>
-
-                <div class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">模型名称</label>
-                  <input
-                    v-model="form.model"
-                    class="input-field font-mono"
-                    type="text"
-                    :placeholder="modelPlaceholder"
-                  >
-                </div>
               </div>
+              <p class="mt-3 text-xs text-muted-foreground/60">
+                模型名称可在对话界面底部直接切换。
+              </p>
             </section>
 
             <!-- Server -->

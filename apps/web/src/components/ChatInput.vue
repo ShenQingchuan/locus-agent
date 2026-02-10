@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import type { LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
-import { Dropdown } from '@locus-agent/ui'
-import { useTextareaAutosize } from '@vueuse/core'
-import { computed, nextTick, watch } from 'vue'
+import { DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
+import { Dropdown, Select } from '@locus-agent/ui'
+import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
 
@@ -37,20 +39,57 @@ const modeItems = computed<DropdownItem[]>(() => [
   },
 ])
 
-const activeModeLabel = computed(() => {
-  const modes: string[] = []
-  if (chatStore.thinkMode)
-    modes.push('思考')
-  if (chatStore.yoloMode)
-    modes.push('自由执行')
-  return modes.length > 0 ? modes.join(' · ') : '标准'
-})
-
 function handleModeSelect(key: string) {
   if (key === 'think')
     chatStore.toggleThinkMode()
   else if (key === 'yolo')
     chatStore.toggleYoloMode()
+}
+
+const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
+
+const localModel = ref('')
+
+// Remember custom model names per provider so switching away and back preserves the value
+const customModelPerProvider = ref<Partial<Record<LLMProviderType, string>>>({})
+
+watch(() => chatStore.modelName, (v) => {
+  localModel.value = v
+  // Seed the per-provider cache with the initial server value
+  if (v) {
+    customModelPerProvider.value[chatStore.provider] = v
+  }
+}, { immediate: true })
+
+const modelPlaceholder = computed(() => DEFAULT_MODELS[chatStore.provider] ?? '')
+
+// Auto-width: use the visible text (value or placeholder) to size the input in ch units
+const modelInputWidth = computed(() => {
+  const text = localModel.value || modelPlaceholder.value
+  // +1ch gives a little breathing room so the cursor doesn't feel cramped
+  return `${Math.max(3, text.length) + 1}ch`
+})
+
+const debouncedSaveModel = useDebounceFn(() => {
+  chatStore.saveModelSettings(chatStore.provider, localModel.value.trim())
+}, 800)
+
+function handleProviderChange(value: string) {
+  const p = value as LLMProviderType
+  // Save current model for the old provider before switching
+  if (localModel.value.trim()) {
+    customModelPerProvider.value[chatStore.provider] = localModel.value.trim()
+  }
+  // Restore previously remembered model for the new provider (or empty)
+  const remembered = customModelPerProvider.value[p] ?? ''
+  localModel.value = remembered
+  chatStore.saveModelSettings(p, remembered)
+}
+
+function handleModelInput() {
+  // Keep per-provider cache in sync as user types
+  customModelPerProvider.value[chatStore.provider] = localModel.value.trim()
+  debouncedSaveModel()
 }
 
 // Reset height when input is cleared
@@ -113,7 +152,7 @@ function handleKeydown(event: KeyboardEvent) {
 <template>
   <div class="w-full max-w-3xl mx-auto">
     <div
-      class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50 overflow-hidden"
+      class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50"
     >
       <!-- Textarea -->
       <textarea
@@ -128,19 +167,46 @@ function handleKeydown(event: KeyboardEvent) {
 
       <!-- Bottom toolbar -->
       <div class="flex items-center justify-between px-3 py-2">
-        <!-- Mode selector dropdown -->
-        <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
-          <template #trigger>
-            <button
-              class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
-              aria-label="切换模式"
-            >
-              <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
-              <span>选项</span>
-              <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
-            </button>
-          </template>
-        </Dropdown>
+        <div class="flex items-center gap-1.5">
+          <!-- Mode selector dropdown -->
+          <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
+            <template #trigger>
+              <button
+                class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+                aria-label="切换模式"
+              >
+                <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
+                <span>选项</span>
+                <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+              </button>
+            </template>
+          </Dropdown>
+
+          <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
+
+          <!-- Provider + model inline -->
+          <Select
+            :options="providerOptions"
+            :model-value="chatStore.provider"
+            placement="top-start"
+            size="sm"
+            arrow-direction="up"
+            @update:model-value="handleProviderChange"
+          />
+          <span class="text-muted-foreground/30 text-xs flex-shrink-0">/</span>
+          <input
+            id="model-name-input"
+            v-model="localModel"
+            class="bg-transparent border-b border-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:border-border focus:text-foreground focus:outline-none transition-colors duration-150 py-0.5 font-mono min-w-0"
+            :style="{ width: modelInputWidth }"
+            type="text"
+            :placeholder="modelPlaceholder"
+            spellcheck="false"
+            autocomplete="off"
+            @input="handleModelInput"
+          >
+          <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+        </div>
 
         <!-- Send/stop button -->
         <div class="flex items-center gap-4">

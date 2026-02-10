@@ -27,7 +27,7 @@ catalogs:
   hono-family:
     hono: ^4.11.7
   unocss-family:
-    '@iconify/json': ^2.2.435
+    '@iconify/json': ^2.2.437
     '@unocss/preset-typography': ^66.6.0
     '@unocss/preset-uno': ^66.6.0
     '@unocss/reset': ^66.6.0

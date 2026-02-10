@@ -513,11 +513,11 @@ export async function fetchSettingsConfig(): Promise<SettingsConfigResponse | nu
 }
 
 export interface UpdateSettingsConfigRequest {
-  provider: LLMProviderType
+  provider?: LLMProviderType
   apiKey?: string
-  apiBase: string
-  model: string
-  port: number
+  apiBase?: string
+  model?: string
+  port?: number
 }
 
 export async function updateSettingsConfig(

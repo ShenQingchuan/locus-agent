@@ -4,6 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 export type { LLMProviderType }
@@ -13,13 +14,6 @@ export interface LLMConfig {
   apiKey: string
   apiBase?: string
   model?: string
-}
-
-const DEFAULT_MODELS: Record<LLMProviderType, string> = {
-  openai: 'gpt-5.3',
-  anthropic: 'claude-opus-4.6',
-  moonshotai: 'kimi-k2.5',
-  openrouter: 'moonshotai/kimi-k2.5',
 }
 
 /**

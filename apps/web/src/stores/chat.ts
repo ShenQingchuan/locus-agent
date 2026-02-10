@@ -1,5 +1,6 @@
-import type { Conversation, CoreMessage, Message as ApiMessage, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
+import { DEFAULT_API_BASES } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -7,10 +8,11 @@ import {
   abortChat,
   approveToolCall,
   deleteConversation,
-  fetchSettings,
+  fetchSettingsConfig,
   streamChat,
   truncateMessages,
   updateConversation,
+  updateSettingsConfig,
 } from '@/api/chat'
 
 export interface ToolCallState {
@@ -86,6 +88,11 @@ export const useChatStore = defineStore('chat', () => {
   // Think mode state
   const [thinkMode, toggleThinkMode] = useToggle(true)
 
+  // Model provider & model name (synced with server settings)
+  const provider = ref<LLMProviderType>('anthropic')
+  const modelName = ref('')
+  const isSavingModelSettings = ref(false)
+
   // Edit message state
   const editingMessageId = ref<string | null>(null)
   const editingContent = ref<string>('')
@@ -104,10 +111,10 @@ export const useChatStore = defineStore('chat', () => {
   // 计算当前会话中使用的总 token 数
   const contextTokensUsed = computed(() => {
     let total = 0
-    
+
     // Only count system prompt tokens when there are messages (after first interaction)
     const hasMessages = messages.value.length > 0
-    
+
     // Calculate message tokens first
     for (const message of messages.value) {
       if (message.role === 'assistant') {
@@ -134,7 +141,7 @@ export const useChatStore = defineStore('chat', () => {
         total += Math.ceil(message.content.length / 4)
       }
     }
-    
+
     // Add system prompt and tool definitions estimation only after first interaction
     // Includes: system prompt (~60 tokens) + tool schemas (~150 tokens) + overhead (~40 tokens)
     if (hasMessages) {
@@ -149,17 +156,47 @@ export const useChatStore = defineStore('chat', () => {
     return Math.min(100, (contextTokensUsed.value / MAX_CONTEXT_TOKENS.value) * 100)
   })
 
-  // Load model settings from API
   async function loadModelSettings() {
     try {
-      const settings = await fetchSettings()
-      if (settings?.contextWindow) {
-        MAX_CONTEXT_TOKENS.value = settings.contextWindow
+      const config = await fetchSettingsConfig()
+      if (config) {
+        provider.value = config.provider
+        modelName.value = config.model ?? ''
+        if (config.runtime?.contextWindow)
+          MAX_CONTEXT_TOKENS.value = config.runtime.contextWindow
       }
     }
-    catch (error) {
-      console.warn('[chat store] Failed to load model settings:', error)
-      // Keep default value
+    catch (err) {
+      console.warn('[chat store] Failed to load model settings:', err)
+    }
+  }
+
+  async function saveModelSettings(newProvider: LLMProviderType, newModel: string) {
+    if (isSavingModelSettings.value)
+      return
+    isSavingModelSettings.value = true
+    try {
+      const providerChanged = newProvider !== provider.value
+      const payload: Parameters<typeof updateSettingsConfig>[0] = {
+        provider: newProvider,
+        model: newModel,
+      }
+
+      if (providerChanged) {
+        payload.apiBase = DEFAULT_API_BASES[newProvider] ?? ''
+      }
+
+      const result = await updateSettingsConfig(payload)
+
+      if (result.success) {
+        provider.value = newProvider
+        modelName.value = newModel
+        if (result.config?.runtime?.contextWindow)
+          MAX_CONTEXT_TOKENS.value = result.config.runtime.contextWindow
+      }
+    }
+    finally {
+      isSavingModelSettings.value = false
     }
   }
 
@@ -712,6 +749,9 @@ export const useChatStore = defineStore('chat', () => {
     sidebarWidth,
     yoloMode,
     thinkMode,
+    provider,
+    modelName,
+    isSavingModelSettings,
 
     // Current conversation state
     messages,
@@ -735,6 +775,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Conversation management actions
     loadModelSettings,
+    saveModelSettings,
     switchConversation,
     applyConversationData,
     removeConversation,

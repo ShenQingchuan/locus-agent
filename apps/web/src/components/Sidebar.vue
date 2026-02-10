@@ -214,9 +214,10 @@ async function handleDeleteConversation(id: string) {
 
       <!-- Footer -->
       <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
-        <div class="flex items-center justify-between text-xs text-muted-foreground opacity-70">
-          <span>Locus Agent <span class="opacity-50">v{{ appVersion }}</span></span>
-          <Dropdown :items="menuItems" placement="top-end" @select="handleMenuSelect">
+        <div class="flex items-center text-xs text-muted-foreground/70">
+          <span class="font-bold font-mono">Locus Agent</span>
+          <span class="ml-1 font-mono text-muted-foreground/60">v{{ appVersion }}</span>
+          <Dropdown class="ml-auto" :items="menuItems" placement="top-end" trigger="hover" @select="handleMenuSelect">
             <template #trigger>
               <button
                 class="p-1 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors duration-150"

@@ -76,8 +76,8 @@
   --card: 240 10% 3.9%;
   --card-foreground: 0 0% 98%;
 
-  /* Popover: same as background */
-  --popover: 240 10% 3.9%;
+  /* Popover: slightly elevated so dropdowns/popovers stand out */
+  --popover: 240 6% 10%;
   --popover-foreground: 0 0% 98%;
 
   /* Primary: white background + black text in dark mode */

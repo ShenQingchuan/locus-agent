@@ -26,8 +26,16 @@ const { data: conversationData } = useConversationQuery(
 )
 
 // 监听查询数据变化，应用到 store
+// 注意：streaming/loading 期间跳过，避免 useConversationQuery 的异步结果覆盖乐观更新
+// 场景：新对话时 currentConversationId 从 null→uuid 触发 query，
+// 但此时 GET /api/conversations/:id 可能返回 404（会话尚未被 POST 创建），
+// 导致 data===null 分支调用 newConversation() 清空前端消息。
 watch(conversationData, (data) => {
   if (!chatStore.currentConversationId)
+    return
+
+  // streaming 或 loading 期间，前端消息由 sendMessage 乐观管理，不被服务端数据覆盖
+  if (chatStore.isLoading || chatStore.isStreaming)
     return
 
   if (data) {
