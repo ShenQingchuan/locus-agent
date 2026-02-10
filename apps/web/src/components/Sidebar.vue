@@ -44,6 +44,12 @@ const menuItems = computed<DropdownItem[]>(() => [
     icon: isDark.value ? 'i-carbon-sun' : 'i-carbon-moon',
   },
   {
+    key: 'clear-all',
+    label: '清空所有对话',
+    icon: 'i-carbon-trash-can',
+    separator: true,
+  },
+  {
     key: 'settings',
     label: '设置',
     icon: 'i-carbon-settings',
@@ -51,10 +57,34 @@ const menuItems = computed<DropdownItem[]>(() => [
   },
 ])
 
+async function handleClearAll() {
+  const ids = chatStore.conversations.map(c => c.id)
+  if (ids.length === 0)
+    return
+
+  const confirmed = await toast.confirm({
+    title: '清空所有对话',
+    message: `确定要删除全部 ${ids.length} 个对话吗？删除后无法恢复。`,
+    confirmText: '全部删除',
+    cancelText: '取消',
+    type: 'error',
+  })
+  if (!confirmed)
+    return
+
+  await Promise.all(ids.map(id => chatStore.removeConversation(id)))
+  chatStore.newConversation()
+  queryCache.invalidateQueries({ key: ['conversations'] })
+  toast.success('已清空所有对话')
+}
+
 function handleMenuSelect(key: string) {
   switch (key) {
     case 'theme':
       toggleDark()
+      break
+    case 'clear-all':
+      handleClearAll()
       break
     case 'settings':
       router.push({ name: 'settings' })
