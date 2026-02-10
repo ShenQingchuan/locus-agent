@@ -46,7 +46,6 @@
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "@locus-agent/shared": "workspace:*",
     "ai": "catalog:ai-sdk",
-    "diff": "catalog:ai-sdk",
     "drizzle-orm": "catalog:database",
     "hono": "catalog:hono-family",
     "zod": "catalog:ai-sdk"

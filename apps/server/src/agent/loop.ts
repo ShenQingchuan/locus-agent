@@ -28,8 +28,8 @@ export interface AgentLoopOptions {
   maxIterations?: number
   /** AbortSignal 用于取消 */
   abortSignal?: AbortSignal
-  /** 确认模式：true = 需要确认，false = yolo 模式 */
-  confirmMode?: boolean
+  /** 确认模式：true = 需要确认，false = yolo 模式；支持函数形式以便运行期间动态变更 */
+  confirmMode?: boolean | (() => boolean)
   /** 是否启用思考模式（默认 true） */
   thinkingMode?: boolean
   /** 获取工具确认结果的函数（确认模式下使用） */
@@ -62,6 +62,8 @@ You are a helpful AI assistant with access to tools.
 When you need to execute commands or interact with the system, use the available tools.
 Always explain what you're doing and why before using a tool.
 After getting tool results, analyze them and provide a clear response to the user.
+
+File editing: str_replace and write_file return the change result or confirmation. You usually do not need to call read_file after a successful edit. Only read when the edit failed (e.g. old_string not found) or when you need to continue editing other parts of the file.
 `
 
 /**
@@ -81,10 +83,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onFinish,
     maxIterations = 10,
     abortSignal,
-    confirmMode = false,
+    confirmMode: confirmModeOpt = false,
     thinkingMode = true,
     getToolApproval,
   } = options
+
+  const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
 
   // 复制消息数组以避免修改原始数组
   const messages: ModelMessage[] = [...initialMessages]
@@ -116,6 +120,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           messages,
           tools,
           abortSignal,
+          timeout: {
+            totalMs: 600_000,
+            chunkMs: 90_000,
+          },
           ...(thinkingMode
             ? {
                 providerOptions: {
@@ -227,59 +235,53 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         })
       }
 
-      // 执行所有工具调用
-      const toolResults: ToolResultPart[] = []
+      // 并发执行所有工具调用
+      const toolResults: ToolResultPart[] = await Promise.all(
+        toolCalls.map(async (tc): Promise<ToolResultPart> => {
+          let result: unknown
+          let isError = false
 
-      for (const tc of toolCalls) {
-        let result: unknown
-        let isError = false
+          try {
+            if (!hasToolExecutor(tc.toolName)) {
+              throw new Error(`Unknown tool: ${tc.toolName}`)
+            }
 
-        try {
-          if (!hasToolExecutor(tc.toolName)) {
-            throw new Error(`Unknown tool: ${tc.toolName}`)
-          }
+            // 确认模式下，等待用户确认
+            if (shouldConfirm() && getToolApproval) {
+              onToolPendingApproval?.(tc.toolCallId, tc.toolName, tc.args)
 
-          // 确认模式下，等待用户确认
-          if (confirmMode && getToolApproval) {
-            // 通知前端工具等待确认
-            onToolPendingApproval?.(tc.toolCallId, tc.toolName, tc.args)
+              const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
 
-            // 等待用户确认
-            const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
-
-            if (!approved) {
-              // 用户拒绝执行
-              isError = true
-              result = 'Tool execution was rejected by user'
+              if (!approved) {
+                isError = true
+                result = 'Tool execution was rejected by user'
+              }
+              else {
+                result = await executeToolCall(tc.toolName, tc.args)
+              }
             }
             else {
-              // 用户批准，执行工具
               result = await executeToolCall(tc.toolName, tc.args)
             }
           }
-          else {
-            // Yolo 模式：直接执行
-            result = await executeToolCall(tc.toolName, tc.args)
+          catch (error) {
+            isError = true
+            result = error instanceof Error ? error.message : String(error)
           }
-        }
-        catch (error) {
-          isError = true
-          result = error instanceof Error ? error.message : String(error)
-        }
 
-        // 通知工具调用结果
-        onToolCallResult?.(tc.toolCallId, tc.toolName, result, isError)
+          onToolCallResult?.(tc.toolCallId, tc.toolName, result, isError)
 
-        const resultText = typeof result === 'string' ? result : JSON.stringify(result)
-        toolResults.push({
-          type: 'tool-result',
-          toolCallId: tc.toolCallId,
-          toolName: tc.toolName,
-          output: isError
-            ? { type: 'error-text', value: resultText }
-            : { type: 'text', value: resultText },
-        })
-      }
+          const resultText = typeof result === 'string' ? result : JSON.stringify(result)
+          return {
+            type: 'tool-result',
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            output: isError
+              ? { type: 'error-text', value: resultText }
+              : { type: 'text', value: resultText },
+          }
+        }),
+      )
 
       // 添加工具结果消息
       messages.push({

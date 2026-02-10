@@ -56,7 +56,7 @@ export function startServer(options: StartOptions): void {
   Bun.serve({
     fetch: app.fetch,
     port,
-    idleTimeout: 120,
+    idleTimeout: 255,
   })
 
   // eslint-disable-next-line no-console

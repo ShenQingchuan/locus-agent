@@ -1,9 +1,11 @@
-import type { BashResult } from './bash.js'
-import type { EditFileResult } from './edit.js'
 import type { ReadFileResult } from './read.js'
+import type { StrReplaceResult } from './str-replace.js'
+import type { WriteFileResult } from './write.js'
+import type { BashResult } from './bash.js'
 import { bashTool, executeBash, formatBashResult } from './bash.js'
-import { editFileTool, executeEditFile, formatEditResult } from './edit.js'
 import { executeReadFile, formatReadResult, readFileTool } from './read.js'
+import { executeStrReplace, formatStrReplaceResult, strReplaceTool } from './str-replace.js'
+import { executeWriteFile, formatWriteResult, writeFileTool } from './write.js'
 
 /**
  * All tool definitions exposed to the LLM.
@@ -11,7 +13,8 @@ import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 export const tools = {
   bash: bashTool,
   read_file: readFileTool,
-  edit_file: editFileTool,
+  str_replace: strReplaceTool,
+  write_file: writeFileTool,
 }
 
 /**
@@ -36,9 +39,13 @@ const toolExecutors: Record<ToolName, ToolExecutor> = {
     const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
     return formatReadResult(result)
   },
-  edit_file: async (args) => {
-    const result = await executeEditFile(args as Parameters<typeof executeEditFile>[0])
-    return formatEditResult(result)
+  str_replace: async (args) => {
+    const result = await executeStrReplace(args as Parameters<typeof executeStrReplace>[0])
+    return formatStrReplaceResult(result)
+  },
+  write_file: async (args) => {
+    const result = await executeWriteFile(args as Parameters<typeof executeWriteFile>[0])
+    return formatWriteResult(result)
   },
 }
 
@@ -48,7 +55,8 @@ const toolExecutors: Record<ToolName, ToolExecutor> = {
 const toolRawExecutors: Record<ToolName, ToolExecutor> = {
   bash: executeBash as ToolExecutor,
   read_file: executeReadFile as ToolExecutor,
-  edit_file: executeEditFile as ToolExecutor,
+  str_replace: executeStrReplace as ToolExecutor,
+  write_file: executeWriteFile as ToolExecutor,
 }
 
 /**
@@ -95,4 +103,4 @@ export function getAvailableTools(): ToolName[] {
 }
 
 // Re-export types for external consumers
-export type { BashResult, EditFileResult, ReadFileResult }
+export type { BashResult, ReadFileResult, StrReplaceResult, WriteFileResult }

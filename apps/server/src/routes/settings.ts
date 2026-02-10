@@ -178,10 +178,14 @@ settingsRoutes.put('/config', async (c) => {
   const json = await c.req.json().catch(() => null)
   const parsed = updateConfigSchema.safeParse(json)
   if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]
+    const hint = firstIssue
+      ? `（${firstIssue.path.join('.')}: ${firstIssue.message}）`
+      : ''
     return c.json(
       {
         success: false,
-        message: 'Invalid settings payload',
+        message: `请求参数格式错误${hint}`,
         issues: parsed.error.issues,
       },
       400,
@@ -209,20 +213,10 @@ settingsRoutes.put('/config', async (c) => {
 
     const nextApiKey = (() => {
       if (parsed.data.apiKey === undefined)
-        return currentProviderKey
+        return currentProviderKey ?? ''
       const trimmed = parsed.data.apiKey.trim()
-      return trimmed.length > 0 ? trimmed : currentProviderKey
+      return trimmed.length > 0 ? trimmed : (currentProviderKey ?? '')
     })()
-
-    if (!nextApiKey) {
-      return c.json(
-        {
-          success: false,
-          message: 'API key is required',
-        },
-        400,
-      )
-    }
 
     const nextApiBase = (() => {
       if (parsed.data.apiBase === undefined) {

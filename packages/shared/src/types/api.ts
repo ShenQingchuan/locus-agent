@@ -94,4 +94,6 @@ export interface ToolApprovalRequest {
   toolCallId: string
   /** 是否批准 */
   approved: boolean
+  /** 同时切换为 YOLO 模式，后续工具调用直接放行 */
+  switchToYolo?: boolean
 }

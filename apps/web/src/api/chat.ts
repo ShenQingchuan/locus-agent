@@ -247,6 +247,7 @@ export async function approveToolCall(
   conversationId: string,
   toolCallId: string,
   approved: boolean,
+  switchToYolo?: boolean,
 ): Promise<boolean> {
   try {
     const response = await fetch(`/api/chat/approve`, {
@@ -258,6 +259,7 @@ export async function approveToolCall(
         conversationId,
         toolCallId,
         approved,
+        switchToYolo,
       }),
     })
 
@@ -540,16 +542,18 @@ export async function updateSettingsConfig(
     const json = await response.json().catch(() => null) as any
 
     if (!response.ok) {
+      const msg = json?.message || response.statusText || 'Request failed'
+      const friendly = response.status >= 500 ? '服务器内部错误，请稍后重试' : msg
       return {
         success: false,
-        message: json?.message || response.statusText || 'Request failed',
+        message: friendly,
       }
     }
 
     if (json?.success === false) {
       return {
         success: false,
-        message: json?.message || 'Save failed',
+        message: json?.message || '保存失败',
       }
     }
 

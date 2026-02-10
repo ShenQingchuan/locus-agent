@@ -25,6 +25,12 @@ export const chatRoutes = new Hono()
 const activeAbortControllers = new Map<string, AbortController>()
 
 /**
+ * 活跃会话的可变 confirmMode 状态
+ * key: conversationId, value: 可变引用，approve 端点可实时更新
+ */
+const activeConfirmModes = new Map<string, { value: boolean }>()
+
+/**
  * 发送 SSE 事件的辅助函数
  */
 function createSSEEvent(event: SSEEvent): { event: string, data: string } {
@@ -125,6 +131,10 @@ chatRoutes.post('/', async (c) => {
   const abortController = new AbortController()
   activeAbortControllers.set(conversationId, abortController)
 
+  // 可变 confirmMode 状态，approve 端点收到 switchToYolo 时会实时更新
+  const confirmModeState = { value: confirmMode ?? config.confirmMode }
+  activeConfirmModes.set(conversationId, confirmModeState)
+
   return streamSSE(c, async (stream) => {
     // 用于生成消息 ID
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -148,7 +158,7 @@ chatRoutes.post('/', async (c) => {
         model: createLLMModel(),
         messages,
         abortSignal: abortController.signal,
-        confirmMode: confirmMode ?? config.confirmMode,
+        confirmMode: () => confirmModeState.value,
         thinkingMode: thinkingMode ?? true,
 
         // 思考过程增量回调
@@ -277,8 +287,8 @@ chatRoutes.post('/', async (c) => {
       }))
     }
     finally {
-      // 清理 AbortController
       activeAbortControllers.delete(conversationId)
+      activeConfirmModes.delete(conversationId)
     }
   })
 })
@@ -314,7 +324,7 @@ chatRoutes.post('/abort', async (c) => {
 // POST /api/chat/approve - Approve or reject tool execution
 chatRoutes.post('/approve', async (c) => {
   const body = await c.req.json<ToolApprovalRequest>()
-  const { conversationId, toolCallId, approved } = body
+  const { conversationId, toolCallId, approved, switchToYolo } = body
 
   if (!conversationId || !toolCallId || approved === undefined) {
     return c.json(
@@ -327,6 +337,14 @@ chatRoutes.post('/approve', async (c) => {
       },
       400,
     )
+  }
+
+  // 实时切换当前运行中 loop 的 confirmMode
+  if (switchToYolo) {
+    const state = activeConfirmModes.get(conversationId)
+    if (state) {
+      state.value = false
+    }
   }
 
   const resolved = resolveApproval(toolCallId, approved)

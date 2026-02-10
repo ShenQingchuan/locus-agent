@@ -2,7 +2,7 @@
 import type { LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
 import { DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
-import { Dropdown, Select } from '@locus-agent/ui'
+import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
@@ -19,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const chatStore = useChatStore()
+const toast = useToast()
 
 const { textarea, input } = useTextareaAutosize()
 
@@ -70,11 +71,13 @@ const modelInputWidth = computed(() => {
   return `${Math.max(3, text.length) + 1}ch`
 })
 
-const debouncedSaveModel = useDebounceFn(() => {
-  chatStore.saveModelSettings(chatStore.provider, localModel.value.trim())
+const debouncedSaveModel = useDebounceFn(async () => {
+  const result = await chatStore.saveModelSettings(chatStore.provider, localModel.value.trim())
+  if (!result.success)
+    toast.error(result.message || '保存模型设置失败')
 }, 800)
 
-function handleProviderChange(value: string) {
+async function handleProviderChange(value: string) {
   const p = value as LLMProviderType
   // Save current model for the old provider before switching
   if (localModel.value.trim()) {
@@ -83,7 +86,10 @@ function handleProviderChange(value: string) {
   // Restore previously remembered model for the new provider (or empty)
   const remembered = customModelPerProvider.value[p] ?? ''
   localModel.value = remembered
-  chatStore.saveModelSettings(p, remembered)
+  const result = await chatStore.saveModelSettings(p, remembered)
+  if (!result.success) {
+    toast.error(result.message || '切换提供商失败')
+  }
 }
 
 function handleModelInput() {

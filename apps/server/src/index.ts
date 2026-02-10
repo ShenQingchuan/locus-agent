@@ -101,7 +101,7 @@ function startDev() {
     })
   })
 
-  return { fetch: app.fetch, port, idleTimeout: 120 }
+  return { fetch: app.fetch, port, idleTimeout: 255 }
 }
 
 export default import.meta.main ? startDev() : undefined

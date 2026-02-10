@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
 import presetTypography from '@unocss/preset-typography'
-import presetUno from '@unocss/preset-uno'
-import { defineConfig, presetIcons } from 'unocss'
+import { defineConfig, presetIcons, presetWind4 } from 'unocss'
+
+const moonshotSvg = readFileSync(new URL('./public/moonshot.svg', import.meta.url), 'utf-8')
 
 export default defineConfig({
   content: {
@@ -12,10 +14,15 @@ export default defineConfig({
     },
   },
   presets: [
-    presetUno(),
+    presetWind4(),
     presetIcons({
       scale: 1.2,
       cdn: 'https://esm.sh/',
+      collections: {
+        custom: {
+          moonshot: moonshotSvg,
+        },
+      },
     }),
     presetTypography({
       cssExtend: {

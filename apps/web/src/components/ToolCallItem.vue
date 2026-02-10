@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ToolCallState } from '@/stores/chat'
 import { computed, ref } from 'vue'
+import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
+import DiffViewer from './DiffViewer.vue'
 import ToolCallModal from './ToolCallModal.vue'
 
 const props = defineProps<{
@@ -51,8 +53,29 @@ const statusIconClass = computed(() => {
 const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => string> = {
   bash: args => String(args.command ?? ''),
   read_file: args => String(args.file_path ?? ''),
-  edit_file: args => String(args.file_path ?? ''),
+  str_replace: args => String(args.file_path ?? ''),
+  write_file: args => String(args.file_path ?? ''),
 }
+
+/** Inline diff patch string for str_replace / write_file tool calls */
+const inlineDiff = computed<string | null>(() => {
+  const { toolName, args } = props.tool.toolCall
+  const filePath = String(args.file_path ?? '')
+
+  if (toolName === 'str_replace' && typeof args.old_string === 'string') {
+    return buildReplaceDiff(filePath, args.old_string, String(args.new_string ?? ''))
+  }
+
+  if (toolName === 'write_file' && typeof args.content === 'string') {
+    return buildNewFileDiff(filePath, args.content)
+  }
+
+  return null
+})
+
+const inlineDiffFilePath = computed(() =>
+  String(props.tool.toolCall.args.file_path ?? ''),
+)
 
 const defaultSummary = computed(() => {
   const { status, toolCall, result } = props.tool
@@ -134,6 +157,16 @@ const slotProps = computed(() => ({
           拒绝
         </button>
       </div>
+
+      <!-- Inline diff for awaiting-approval -->
+      <div
+        v-if="inlineDiff"
+        class="border-t border-border rounded-b-lg overflow-hidden"
+      >
+        <div class="max-h-[400px] overflow-y-auto">
+          <DiffViewer :patch="inlineDiff" :file-path="inlineDiffFilePath" />
+        </div>
+      </div>
     </div>
 
     <!-- Other states: compact inline -->
@@ -152,6 +185,16 @@ const slotProps = computed(() => ({
           {{ defaultSummary }}
         </slot>
       </span>
+    </div>
+
+    <!-- Inline diff for completed / error states -->
+    <div
+      v-if="inlineDiff && tool.status !== 'pending' && tool.status !== 'awaiting-approval'"
+      class="mt-1.5 rounded-md border border-border overflow-hidden"
+    >
+      <div class="max-h-[400px] overflow-y-auto">
+        <DiffViewer :patch="inlineDiff" :file-path="inlineDiffFilePath" />
+      </div>
     </div>
 
     <!-- Detail modal -->

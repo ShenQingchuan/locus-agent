@@ -171,9 +171,9 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function saveModelSettings(newProvider: LLMProviderType, newModel: string) {
+  async function saveModelSettings(newProvider: LLMProviderType, newModel: string): Promise<{ success: boolean, message?: string }> {
     if (isSavingModelSettings.value)
-      return
+      return { success: false, message: '正在保存中' }
     isSavingModelSettings.value = true
     try {
       const providerChanged = newProvider !== provider.value
@@ -193,7 +193,13 @@ export const useChatStore = defineStore('chat', () => {
         modelName.value = newModel
         if (result.config?.runtime?.contextWindow)
           MAX_CONTEXT_TOKENS.value = result.config.runtime.contextWindow
+        return { success: true }
       }
+      return { success: false, message: result.message }
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : '未知错误'
+      return { success: false, message: msg }
     }
     finally {
       isSavingModelSettings.value = false
@@ -613,7 +619,9 @@ export const useChatStore = defineStore('chat', () => {
   async function handleToolApproval(toolCallId: string, approved: boolean) {
     if (!currentConversationId.value)
       return false
-    const success = await approveToolCall(currentConversationId.value, toolCallId, approved)
+    // 若当前已开启 yoloMode，通知后端将运行中 loop 切换为免确认
+    const switchToYolo = approved && yoloMode.value ? true : undefined
+    const success = await approveToolCall(currentConversationId.value, toolCallId, approved, switchToYolo)
     if (success) {
       removePendingApproval(toolCallId)
     }
