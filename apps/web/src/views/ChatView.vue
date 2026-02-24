@@ -27,7 +27,7 @@ const { data: conversationData } = useConversationQuery(
 
 // 监听查询数据变化，应用到 store
 // 注意：streaming/loading 期间跳过，避免 useConversationQuery 的异步结果覆盖乐观更新
-// 场景：新对话时 currentConversationId 从 null→uuid 触发 query，
+// 场景：新会话时 currentConversationId 从 null→uuid 触发 query，
 // 但此时 GET /api/conversations/:id 可能返回 404（会话尚未被 POST 创建），
 // 导致 data===null 分支调用 newConversation() 清空前端消息。
 watch(conversationData, (data) => {
@@ -168,7 +168,7 @@ function handleNewChat() {
 
           <!-- Title -->
           <h1 class="text-sm font-medium text-foreground truncate max-w-[200px] sm:max-w-none">
-            {{ chatStore.currentConversation?.title || '新对话' }}
+            {{ chatStore.currentConversation?.title || '新会话' }}
           </h1>
         </div>
 
@@ -176,7 +176,7 @@ function handleNewChat() {
           <!-- New chat button (mobile) -->
           <button
             class="btn-ghost btn-icon sm:hidden"
-            title="新对话"
+            title="新会话"
             @click="handleNewChat"
           >
             <div class="i-carbon-add h-4 w-4" />

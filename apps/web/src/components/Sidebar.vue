@@ -205,7 +205,7 @@ async function handleDeleteConversation(id: string) {
           @click="handleNewChat"
         >
           <div class="i-carbon-add h-4 w-4" />
-          <span class="text-sm font-medium">新对话</span>
+          <span class="text-sm font-medium">新会话</span>
         </button>
       </div>
 

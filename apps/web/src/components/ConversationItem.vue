@@ -18,7 +18,7 @@ const { relative: formattedTime } = useRelativeTime(
 )
 
 const truncatedTitle = computed(() => {
-  const title = props.conversation.title || '新对话'
+  const title = props.conversation.title || '新会话'
   return title.length > 24 ? `${title.slice(0, 24)}...` : title
 })
 </script>

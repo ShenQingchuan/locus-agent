@@ -21,10 +21,18 @@ export interface Message {
   content: string
   /** 思考过程内容 */
   reasoning?: string | null
+  /** 生成该助手消息使用的模型（格式：provider/model） */
+  model?: string | null
   /** 工具调用列表（assistant 消息可能包含） */
   toolCalls?: ToolCall[]
   /** 工具执行结果列表（tool 消息包含） */
   toolResults?: ToolResult[]
+  /** Token 使用统计信息 */
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  } | null
   /** 创建时间 */
   createdAt: Date
 }

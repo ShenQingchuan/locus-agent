@@ -80,7 +80,7 @@ conversationsRoutes.delete('/:id', async (c) => {
 conversationsRoutes.post('/:id/messages', async (c) => {
   const conversationId = c.req.param('id')
   const body = await c.req.json()
-  const { role, content, toolCalls, toolResults } = body
+  const { role, content, model, toolCalls, toolResults, usage } = body
 
   const exists = await conversationExists(conversationId)
 
@@ -91,8 +91,10 @@ conversationsRoutes.post('/:id/messages', async (c) => {
   const message = await addMessage(conversationId, {
     role,
     content,
+    model,
     toolCalls,
     toolResults,
+    usage,
   })
 
   return c.json(message, 201)

@@ -43,6 +43,8 @@ export interface DoneEvent {
   type: 'done'
   /** 完整的响应消息 ID */
   messageId: string
+  /** 生成该消息使用的模型（格式：provider/model） */
+  model?: string
   /** 使用的 token 数量 */
   usage?: {
     promptTokens: number
@@ -88,6 +90,20 @@ export interface ToolPendingApprovalEvent {
 }
 
 /**
+ * 工具输出增量事件
+ * 当工具（如 bash）执行中产生流式输出时逐步发送
+ */
+export interface ToolOutputDeltaEvent {
+  type: 'tool-output-delta'
+  /** 工具调用 ID */
+  toolCallId: string
+  /** 输出流类型 */
+  stream: 'stdout' | 'stderr'
+  /** 增量内容 */
+  delta: string
+}
+
+/**
  * 所有 SSE 事件类型的联合类型
  */
 export type SSEEvent
@@ -98,6 +114,7 @@ export type SSEEvent
     | DoneEvent
     | ErrorEvent
     | ToolPendingApprovalEvent
+    | ToolOutputDeltaEvent
 
 /**
  * SSE 事件类型字符串

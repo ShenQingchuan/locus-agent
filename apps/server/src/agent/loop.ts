@@ -22,6 +22,8 @@ export interface AgentLoopOptions {
   onReasoningDelta?: (delta: string) => void | Promise<void>
   /** 工具等待确认回调（确认模式下使用） */
   onToolPendingApproval?: (toolCallId: string, toolName: string, args: unknown) => void | Promise<void>
+  /** 工具执行过程中的流式输出回调（如 bash 的 stdout/stderr） */
+  onToolOutputDelta?: (toolCallId: string, stream: 'stdout' | 'stderr', delta: string) => void | Promise<void>
   /** 完成回调 */
   onFinish?: (finishReason: string, usage: { inputTokens: number, outputTokens: number }) => void | Promise<void>
   /** 最大迭代次数 */
@@ -58,12 +60,14 @@ export interface AgentLoopResult {
  * 默认系统提示词
  */
 const DEFAULT_SYSTEM_PROMPT = `
-You are a helpful AI assistant with access to tools.
+You are a helpful AI assistant named Locus, with access to tools.
 When you need to execute commands or interact with the system, use the available tools.
 Always explain what you're doing and why before using a tool.
 After getting tool results, analyze them and provide a clear response to the user.
 
-File editing: str_replace and write_file return the change result or confirmation. You usually do not need to call read_file after a successful edit. Only read when the edit failed (e.g. old_string not found) or when you need to continue editing other parts of the file.
+File editing: str_replace and write_file return the change result or confirmation. 
+You usually do not need to call read_file after a successful edit.
+Only read when the edit failed (e.g. old_string not found) or when you need to continue editing other parts of the file.
 `
 
 /**
@@ -80,6 +84,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onToolCallResult,
     onReasoningDelta,
     onToolPendingApproval,
+    onToolOutputDelta,
     onFinish,
     maxIterations = 10,
     abortSignal,
@@ -271,11 +276,15 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
                 result = 'Tool execution was rejected by user'
               }
               else {
-                result = await executeToolCall(tc.toolName, tc.args)
+                result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+                  ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
+                  : undefined)
               }
             }
             else {
-              result = await executeToolCall(tc.toolName, tc.args)
+              result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+                ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
+                : undefined)
             }
           }
           catch (error) {

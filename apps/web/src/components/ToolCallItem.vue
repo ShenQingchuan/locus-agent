@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ToolCallState } from '@/stores/chat'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import DiffViewer from './DiffViewer.vue'
 import ToolCallModal from './ToolCallModal.vue'
@@ -26,6 +26,7 @@ defineSlots<{
 }>()
 
 const modalOpen = ref(false)
+const terminalRef = ref<HTMLElement | null>(null)
 
 const statusIcon = computed(() => {
   switch (props.tool.status) {
@@ -114,6 +115,28 @@ const slotProps = computed(() => ({
   result: props.tool.result?.result,
   isError: props.tool.result?.isError,
 }))
+
+/** Whether this tool has an inline terminal output widget */
+const hasTerminalOutput = computed(() => {
+  return props.tool.toolCall.toolName === 'bash' && !!props.tool.output
+})
+
+/** The terminal output text to display */
+const terminalOutput = computed(() => props.tool.output || '')
+
+/** Whether the bash command is still running (streaming) */
+const isBashRunning = computed(() => {
+  return props.tool.toolCall.toolName === 'bash' && props.tool.status === 'pending'
+})
+
+// Auto-scroll terminal to bottom when output changes
+watch(terminalOutput, () => {
+  nextTick(() => {
+    if (terminalRef.value) {
+      terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+    }
+  })
+})
 </script>
 
 <template>
@@ -185,6 +208,26 @@ const slotProps = computed(() => ({
           {{ defaultSummary }}
         </slot>
       </span>
+    </div>
+
+    <!-- Bash terminal output widget -->
+    <div
+      v-if="hasTerminalOutput"
+      class="mt-1.5 rounded-md border border-border bg-[#1a1a2e] overflow-hidden"
+    >
+      <div
+        ref="terminalRef"
+        class="max-h-[300px] overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed text-[#e0e0e0] whitespace-pre-wrap break-all"
+      >
+        {{ terminalOutput }}
+      </div>
+      <div
+        v-if="isBashRunning"
+        class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#888]"
+      >
+        <div class="i-svg-spinners:bars-fade h-3 w-3" />
+        <span>running...</span>
+      </div>
     </div>
 
     <!-- Inline diff for completed / error states -->

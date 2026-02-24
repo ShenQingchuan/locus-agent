@@ -10,6 +10,13 @@ import { executeStrReplace, formatStrReplaceResult, strReplaceTool } from './str
 import { executeWriteFile, formatWriteResult, writeFileTool } from './write.js'
 
 /**
+ * 工具执行流式输出回调
+ */
+export interface ToolOutputCallbacks {
+  onOutputDelta?: (stream: 'stdout' | 'stderr', delta: string) => void | Promise<void>
+}
+
+/**
  * All tool definitions exposed to the LLM.
  */
 export const tools = {
@@ -30,11 +37,25 @@ export type ToolName = keyof typeof tools
 type ToolExecutor<T = unknown, R = unknown> = (args: T) => Promise<R>
 
 /**
- * Executors that return a formatted string (fed back to the LLM).
+ * 带流式回调的执行器签名
  */
-const toolExecutors: Record<ToolName, ToolExecutor> = {
-  bash: async (args) => {
-    const result = await executeBash(args as { command: string, timeout?: number })
+type StreamingToolExecutor<T = unknown, R = unknown> = (args: T, callbacks?: ToolOutputCallbacks) => Promise<R>
+
+/**
+ * Executors that return a formatted string (fed back to the LLM).
+ * bash executor accepts optional streaming callbacks.
+ */
+const toolExecutors: Record<ToolName, StreamingToolExecutor> = {
+  bash: async (args, callbacks) => {
+    const result = await executeBash(
+      args as { command: string, timeout?: number },
+      callbacks?.onOutputDelta
+        ? {
+            onStdout: chunk => callbacks.onOutputDelta!('stdout', chunk),
+            onStderr: chunk => callbacks.onOutputDelta!('stderr', chunk),
+          }
+        : undefined,
+    )
     return formatBashResult(result)
   },
   read_file: async (args) => {
@@ -65,13 +86,14 @@ const toolRawExecutors: Record<ToolName, ToolExecutor> = {
  * 执行工具调用（内置优先，其次 MCP）
  * @param toolName 工具名称
  * @param args 工具参数
+ * @param callbacks 可选的流式输出回调
  * @returns 格式化后的结果字符串
  */
-export async function executeToolCall(toolName: string, args: unknown): Promise<string> {
+export async function executeToolCall(toolName: string, args: unknown, callbacks?: ToolOutputCallbacks): Promise<string> {
   // 内置工具
   const builtinExecutor = toolExecutors[toolName as ToolName]
   if (builtinExecutor) {
-    const result = await builtinExecutor(args)
+    const result = await builtinExecutor(args, callbacks)
     return typeof result === 'string' ? result : JSON.stringify(result)
   }
   // MCP 工具

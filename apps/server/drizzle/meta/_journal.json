@@ -15,6 +15,20 @@
       "when": 1770375919220,
       "tag": "0001_handy_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771905126926,
+      "tag": "0002_handy_psynapse",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1771905378078,
+      "tag": "0003_complete_riptide",
+      "breakpoints": true
     }
   ]
 }

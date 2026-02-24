@@ -28,7 +28,8 @@ export interface ChatStreamOptions {
   onToolCallStart?: (toolCall: ToolCall) => void
   onToolCallResult?: (toolResult: ToolResult) => void
   onToolPendingApproval?: (approval: PendingApproval) => void
-  onDone?: (messageId: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }) => void
+  onToolOutputDelta?: (toolCallId: string, stream: 'stdout' | 'stderr', delta: string) => void
+  onDone?: (messageId: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }, model?: string) => void
   onError?: (code: string, message: string) => void
 }
 
@@ -70,6 +71,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     onToolCallStart,
     onToolCallResult,
     onToolPendingApproval,
+    onToolOutputDelta,
     onDone,
     onError,
   } = options
@@ -160,8 +162,11 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
               args: event.args,
             })
             break
+          case 'tool-output-delta':
+            onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
+            break
           case 'done':
-            onDone?.(event.messageId, event.usage)
+            onDone?.(event.messageId, event.usage, event.model)
             break
           case 'error':
             onError?.(event.code, event.message)
@@ -194,8 +199,11 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
               args: event.args,
             })
             break
+          case 'tool-output-delta':
+            onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
+            break
           case 'done':
-            onDone?.(event.messageId, event.usage)
+            onDone?.(event.messageId, event.usage, event.model)
             break
           case 'error':
             onError?.(event.code, event.message)

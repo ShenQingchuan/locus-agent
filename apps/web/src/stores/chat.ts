@@ -1,6 +1,6 @@
 import type { Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
-import { DEFAULT_API_BASES } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -14,11 +14,14 @@ import {
   updateConversation,
   updateSettingsConfig,
 } from '@/api/chat'
+import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
+  /** 工具执行过程中的流式输出（如 bash 的 stdout/stderr） */
+  output?: string
 }
 
 export type MessagePart
@@ -30,6 +33,8 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** 助手消息所使用的模型（格式：provider/model） */
+  model?: string
   timestamp: number
   toolCalls?: ToolCallState[]
   isStreaming?: boolean
@@ -108,29 +113,22 @@ export const useChatStore = defineStore('chat', () => {
   // 模型上下文窗口配置（动态从 API 获取，默认：128K）
   const MAX_CONTEXT_TOKENS = ref(128_000)
 
-  const TOKENS_PER_CHAR = 4
   const BASE_CONTEXT_OVERHEAD_TOKENS = 250
   const MESSAGE_OVERHEAD_TOKENS = 6
   const TOOL_CALL_OVERHEAD_TOKENS = 20
   const TOOL_RESULT_OVERHEAD_TOKENS = 12
 
+  const activeTokenizerModel = computed(() => {
+    const selectedModel = (modelName.value || DEFAULT_MODELS[provider.value] || '').trim()
+    return selectedModel || undefined
+  })
+
   function estimateTextTokens(text: string): number {
-    if (!text)
-      return 0
-    return Math.ceil(text.length / TOKENS_PER_CHAR)
+    return countTextTokens(text, activeTokenizerModel.value)
   }
 
   function estimateUnknownTokens(value: unknown): number {
-    if (value === null || value === undefined)
-      return 0
-    if (typeof value === 'string')
-      return estimateTextTokens(value)
-    try {
-      return estimateTextTokens(JSON.stringify(value))
-    }
-    catch {
-      return 0
-    }
+    return countUnknownTokens(value, activeTokenizerModel.value)
   }
 
   function estimateCoreMessageTokens(message: CoreMessage): number {
@@ -303,7 +301,15 @@ export const useChatStore = defineStore('chat', () => {
         id: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
+        model: m.role === 'assistant' ? (m.model ?? undefined) : undefined,
         reasoning: m.reasoning || undefined,
+        usage: m.role === 'assistant' && m.usage
+          ? {
+              promptTokens: m.usage.promptTokens,
+              completionTokens: m.usage.completionTokens,
+              totalTokens: m.usage.totalTokens,
+            }
+          : undefined,
         timestamp: new Date(m.createdAt).getTime(),
         toolCalls: toolCallStates,
         parts: parts.length > 0 ? parts : undefined,
@@ -476,6 +482,30 @@ export const useChatStore = defineStore('chat', () => {
     pendingApprovals.value.delete(toolResult.toolCallId)
   }
 
+  function appendToolCallOutput(toolCallId: string, _stream: 'stdout' | 'stderr', delta: string) {
+    // Find the message containing this toolCallId (search from the end for efficiency)
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      const message = messages.value[i]
+      if (!message?.toolCalls || message.toolCalls.length === 0)
+        continue
+
+      const tcIndex = message.toolCalls.findIndex(
+        tc => tc.toolCall.toolCallId === toolCallId,
+      )
+      if (tcIndex === -1)
+        continue
+
+      const tc = message.toolCalls[tcIndex]!
+      const newToolCalls = [...message.toolCalls]
+      newToolCalls[tcIndex] = {
+        ...tc,
+        output: (tc.output || '') + delta,
+      }
+      messages.value[i] = { ...message, toolCalls: newToolCalls }
+      return
+    }
+  }
+
   function setToolCallAwaitingApproval(messageId: string, toolCallId: string) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
@@ -617,10 +647,14 @@ export const useChatStore = defineStore('chat', () => {
       content,
     })
 
+    const selectedModel = (modelName.value || DEFAULT_MODELS[provider.value] || 'unknown').trim()
+    const assistantModel = `${provider.value}/${selectedModel}`
+
     // Create assistant message placeholder
     const assistantMessageId = addMessage({
       role: 'assistant',
       content: '',
+      model: assistantModel,
       isStreaming: true,
     })
 
@@ -650,8 +684,14 @@ export const useChatStore = defineStore('chat', () => {
           addPendingApproval(approval)
           setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId)
         },
-        onDone: (_messageId, usage) => {
+        onToolOutputDelta: (toolCallId, stream, delta) => {
+          appendToolCallOutput(toolCallId, stream, delta)
+        },
+        onDone: (_messageId, usage, model) => {
           const updates: Partial<Message> = { isStreaming: false }
+          if (model) {
+            updates.model = model
+          }
           if (usage && usage.totalTokens > 0) {
             updates.usage = usage
           }
@@ -879,6 +919,7 @@ export const useChatStore = defineStore('chat', () => {
     appendToMessage,
     addToolCallToMessage,
     updateToolCallResult,
+    appendToolCallOutput,
     setToolCallAwaitingApproval,
     addPendingApproval,
     removePendingApproval,

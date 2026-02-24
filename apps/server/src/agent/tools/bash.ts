@@ -23,9 +23,61 @@ export interface BashResult {
 }
 
 /**
+ * 流式输出回调选项
+ */
+export interface BashStreamCallbacks {
+  onStdout?: (chunk: string) => void | Promise<void>
+  onStderr?: (chunk: string) => void | Promise<void>
+}
+
+/**
+ * 从 ReadableStream 逐块读取并回调，同时收集完整内容
+ */
+async function consumeStream(
+  stream: ReadableStream<Uint8Array> | null,
+  onChunk?: (chunk: string) => void | Promise<void>,
+): Promise<string> {
+  if (!stream)
+    return ''
+
+  const decoder = new TextDecoder()
+  const reader = stream.getReader()
+  let collected = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done)
+        break
+      const text = decoder.decode(value, { stream: true })
+      collected += text
+      if (onChunk) {
+        await onChunk(text)
+      }
+    }
+    // Flush remaining bytes
+    const remaining = decoder.decode()
+    if (remaining) {
+      collected += remaining
+      if (onChunk) {
+        await onChunk(remaining)
+      }
+    }
+  }
+  finally {
+    reader.releaseLock()
+  }
+
+  return collected
+}
+
+/**
  * Bash 工具执行函数
  */
-export async function executeBash(args: { command: string, timeout?: number }): Promise<BashResult> {
+export async function executeBash(
+  args: { command: string, timeout?: number },
+  streamCallbacks?: BashStreamCallbacks,
+): Promise<BashResult> {
   const { command, timeout = 30000 } = args
 
   try {
@@ -42,15 +94,15 @@ export async function executeBash(args: { command: string, timeout?: number }): 
       proc.kill()
     }, timeout)
 
-    // 等待进程完成
-    const exitCode = await proc.exited
+    // 并发流式读取 stdout 和 stderr，同时等待进程退出
+    const [stdout, stderr, exitCode] = await Promise.all([
+      consumeStream(proc.stdout as ReadableStream<Uint8Array>, streamCallbacks?.onStdout),
+      consumeStream(proc.stderr as ReadableStream<Uint8Array>, streamCallbacks?.onStderr),
+      proc.exited,
+    ])
 
     // 清除超时
     clearTimeout(timeoutId)
-
-    // 读取输出
-    const stdout = await new Response(proc.stdout).text()
-    const stderr = await new Response(proc.stderr).text()
 
     return {
       stdout,

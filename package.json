@@ -3,14 +3,17 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@10.30.2",
   "scripts": {
     "dev": "bun scripts/dev.ts",
     "dev:server": "pnpm -F @locus-agent/server dev",
     "dev:web": "pnpm -F @locus-agent/web dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm -F @locus-agent/server db:generate",
+    "db:migrate": "pnpm -F @locus-agent/server db:migrate",
+    "db:studio": "pnpm -F @locus-agent/server db:studio"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-tools",

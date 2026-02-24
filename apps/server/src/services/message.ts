@@ -12,8 +12,15 @@ export interface AddMessageInput {
   content: string
   /** 思考过程内容 (Kimi K2.5 原生 reasoning_content) */
   reasoning?: string
+  /** 助手消息所使用的模型（格式：provider/model） */
+  model?: string
   toolCalls?: ToolCall[]
   toolResults?: ToolResult[]
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
 }
 
 /**
@@ -32,8 +39,10 @@ export async function addMessage(
     role: message.role,
     content: message.content,
     reasoning: message.reasoning ?? null,
+    model: message.model ?? null,
     toolCalls: message.toolCalls ?? null,
     toolResults: message.toolResults ?? null,
+    usage: message.usage ?? null,
     createdAt: now,
   }
 
@@ -65,8 +74,10 @@ export async function addMessages(
     role: message.role,
     content: message.content,
     reasoning: message.reasoning ?? null,
+    model: message.model ?? null,
     toolCalls: message.toolCalls ?? null,
     toolResults: message.toolResults ?? null,
+    usage: message.usage ?? null,
     createdAt: now,
   }))
 

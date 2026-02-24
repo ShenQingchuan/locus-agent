@@ -25,8 +25,16 @@ export const messages = sqliteTable('messages', {
   content: text('content').notNull(),
   /** 思考过程内容 */
   reasoning: text('reasoning'),
+  /** 助手消息所使用的模型（格式：provider/model） */
+  model: text('model'),
   toolCalls: text('tool_calls', { mode: 'json' }).$type<unknown[] | null>(),
   toolResults: text('tool_results', { mode: 'json' }).$type<unknown[] | null>(),
+  /** Token 使用统计信息 */
+  usage: text('usage', { mode: 'json' }).$type<{
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  } | null>(),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

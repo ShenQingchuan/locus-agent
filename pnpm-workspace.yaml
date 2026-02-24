@@ -46,6 +46,7 @@ catalogs:
     '@pinia/colada': ^0.21.2
     '@vue/tsconfig': ^0.8.1
     '@vueuse/core': ^14.2.0
+    js-tiktoken: ^1.0.21
     markstream-vue: ^0.0.6
     pinia: ^3.0.4
     vue: ^3.5.27

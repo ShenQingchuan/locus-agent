@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
+import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
 import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
+import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 import ToolCallItem from './ToolCallItem.vue'
 
 const props = defineProps<{
@@ -63,8 +65,15 @@ function isLastTextPart(partIndex: number): boolean {
   return false
 }
 
-function estimateTokensFromText(text: string): number {
-  return Math.ceil(text.length / 4)
+const estimateModelHint = computed(() => {
+  if (props.message.role === 'assistant' && props.message.model)
+    return props.message.model
+  const selectedModel = (chatStore.modelName || DEFAULT_MODELS[chatStore.provider] || '').trim()
+  return selectedModel || undefined
+})
+
+function estimateTokensFromText(text: string, modelHint?: string): number {
+  return countTextTokens(text, modelHint)
 }
 
 // Calculate token count for this message (hide while streaming)
@@ -76,25 +85,62 @@ const messageTokens = computed<number | null>(() => {
 
   if (msg.role === 'assistant') {
     if (msg.usage) {
-      // Use precise token count from API (includes thinking if provided by model)
+      // Show generated tokens for this assistant message body.
+      if (msg.usage.completionTokens > 0)
+        return msg.usage.completionTokens
       return msg.usage.totalTokens
     }
 
     // Estimate for assistant messages without usage info
-    let estimate = estimateTokensFromText(msg.content)
+    let estimate = estimateTokensFromText(msg.content, estimateModelHint.value)
     if (msg.reasoning) {
-      estimate += estimateTokensFromText(msg.reasoning)
+      estimate += estimateTokensFromText(msg.reasoning, estimateModelHint.value)
     }
     if (msg.toolCalls && msg.toolCalls.length > 0) {
-      // Rough estimate: ~100 tokens per tool call
-      estimate += msg.toolCalls.length * 100
+      for (const toolCallState of msg.toolCalls) {
+        estimate += estimateTokensFromText(toolCallState.toolCall.toolCallId, estimateModelHint.value)
+        estimate += estimateTokensFromText(toolCallState.toolCall.toolName, estimateModelHint.value)
+        estimate += countUnknownTokens(toolCallState.toolCall.args, estimateModelHint.value)
+      }
     }
     return estimate > 0 ? estimate : null
   }
 
-  // Estimate for user messages (rough: 4 chars = 1 token)
-  const estimate = estimateTokensFromText(msg.content)
+  const estimate = estimateTokensFromText(msg.content, estimateModelHint.value)
   return estimate > 0 ? estimate : null
+})
+
+const isEstimatedTokens = computed(() => {
+  const msg = props.message
+  if (msg.isStreaming)
+    return false
+  if (msg.role === 'assistant')
+    return !msg.usage
+  return true
+})
+
+const messageTokensText = computed(() => {
+  if (messageTokens.value === null)
+    return null
+  return isEstimatedTokens.value
+    ? `~${messageTokens.value} tokens`
+    : `${messageTokens.value} tokens`
+})
+
+const messageTokensTitle = computed<string | undefined>(() => {
+  const msg = props.message
+  if (msg.isStreaming)
+    return undefined
+  if (msg.role === 'assistant' && msg.usage) {
+    return `输出: ${msg.usage.completionTokens} · 输入: ${msg.usage.promptTokens} · 总计: ${msg.usage.totalTokens}`
+  }
+  return isEstimatedTokens.value ? '估算值' : undefined
+})
+
+const assistantModelLabel = computed<string | null>(() => {
+  if (props.message.role !== 'assistant')
+    return null
+  return props.message.model || '未记录模型'
 })
 </script>
 
@@ -133,8 +179,9 @@ const messageTokens = computed<number | null>(() => {
           <span
             v-if="messageTokens !== null"
             class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 mr-1"
+            :title="messageTokensTitle"
           >
-            {{ messageTokens }} tokens
+            {{ messageTokensText }}
           </span>
           <Tooltip :content="absoluteTime">
             <span class="text-xs text-muted-foreground/60 mr-2">{{ relativeTime }}</span>
@@ -162,12 +209,19 @@ const messageTokens = computed<number | null>(() => {
           <Tooltip :content="absoluteTime">
             <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
           </Tooltip>
+          <span
+            v-if="assistantModelLabel"
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1 font-mono"
+          >
+            {{ assistantModelLabel }}
+          </span>
           <!-- Token count (hover only, right of timestamp) -->
           <span
             v-if="messageTokens !== null"
             class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1"
+            :title="messageTokensTitle"
           >
-            {{ messageTokens }} tokens
+            {{ messageTokensText }}
           </span>
         </div>
 

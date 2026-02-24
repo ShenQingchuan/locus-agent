@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { requestApproval, resolveApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
-import { createLLMModel } from '../agent/providers/index.js'
+import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { config } from '../config.js'
 import { conversationExists, createConversation, touchConversation } from '../services/conversation.js'
 import { addMessage } from '../services/message.js'
@@ -156,6 +156,9 @@ chatRoutes.post('/', async (c) => {
     const collectedToolResults: ToolResult[] = []
 
     try {
+      const runtimeModelInfo = getCurrentModelInfo()
+      const assistantModel = `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
+
       // 构建消息历史
       // 将 shared 类型转换为 AI SDK 类型
       const convertedHistory: ModelMessage[] = historyMessages
@@ -165,7 +168,7 @@ chatRoutes.post('/', async (c) => {
 
       // 运行 Agent Loop
       const result = await runAgentLoop({
-        model: createLLMModel(),
+        model: createLLMModel(runtimeModelInfo.model),
         messages,
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,
@@ -228,6 +231,16 @@ chatRoutes.post('/', async (c) => {
           }))
         },
 
+        // 工具执行流式输出回调（如 bash 的 stdout/stderr）
+        onToolOutputDelta: async (toolCallId, streamType, delta) => {
+          await stream.writeSSE(createSSEEvent({
+            type: 'tool-output-delta',
+            toolCallId,
+            stream: streamType,
+            delta,
+          }))
+        },
+
         // 获取工具确认结果（确认模式下使用）
         getToolApproval: async (toolCallId, toolName, args) => {
           return requestApproval(toolCallId, toolName, args)
@@ -238,6 +251,7 @@ chatRoutes.post('/', async (c) => {
           await stream.writeSSE(createSSEEvent({
             type: 'done',
             messageId,
+            model: assistantModel,
             usage: {
               promptTokens: usage.inputTokens,
               completionTokens: usage.outputTokens,
@@ -249,6 +263,12 @@ chatRoutes.post('/', async (c) => {
 
       // 保存 AI 响应消息到数据库
       if (result.finishReason !== 'aborted') {
+        const usage = {
+          promptTokens: result.usage.inputTokens,
+          completionTokens: result.usage.outputTokens,
+          totalTokens: result.usage.totalTokens,
+        }
+
         // 如果有工具调用，保存包含工具信息的消息
         if (collectedToolCalls.length > 0) {
           // 保存 assistant 消息（包含工具调用）
@@ -256,7 +276,9 @@ chatRoutes.post('/', async (c) => {
             role: 'assistant',
             content: assistantText || '',
             reasoning: assistantReasoning || undefined,
+            model: assistantModel,
             toolCalls: collectedToolCalls,
+            usage,
           })
 
           // 保存 tool 消息（包含工具结果）
@@ -274,6 +296,8 @@ chatRoutes.post('/', async (c) => {
             role: 'assistant',
             content: assistantText,
             reasoning: assistantReasoning || undefined,
+            model: assistantModel,
+            usage,
           })
         }
 

@@ -13,7 +13,7 @@ export async function createConversation(title?: string, id?: string): Promise<C
 
   const newConversation: NewConversation = {
     id: conversationId,
-    title: title || '新对话',
+    title: title || '新会话',
     createdAt: now,
     updatedAt: now,
   }
