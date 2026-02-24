@@ -1,17 +1,25 @@
 <script setup lang="ts">
+import type { RiskLevel } from '@locus-agent/shared'
 import type { ToolCallState } from '@/stores/chat'
+import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import DiffViewer from './DiffViewer.vue'
 import ToolCallModal from './ToolCallModal.vue'
+import WhitelistPopover from './WhitelistPopover.vue'
 
 const props = defineProps<{
   tool: ToolCallState
+  /** 服务端预计算的建议匹配前缀 */
+  suggestedPattern?: string
+  /** 服务端预计算的风险等级 */
+  riskLevel?: RiskLevel
 }>()
 
 const emit = defineEmits<{
   approve: [toolCallId: string]
   reject: [toolCallId: string]
+  whitelist: [toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }]
 }>()
 
 defineSlots<{
@@ -26,7 +34,13 @@ defineSlots<{
 }>()
 
 const modalOpen = ref(false)
+const whitelistOpen = ref(false)
+const whitelistPopoverRef = ref<HTMLElement | null>(null)
 const terminalRef = ref<HTMLElement | null>(null)
+
+onClickOutside(whitelistPopoverRef, () => {
+  whitelistOpen.value = false
+})
 
 const statusIcon = computed(() => {
   switch (props.tool.status) {
@@ -182,6 +196,29 @@ watch(terminalOutput, () => {
           <div class="i-carbon-checkmark h-3 w-3" />
           允许执行
         </button>
+        <div ref="whitelistPopoverRef" class="relative">
+          <button
+            class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors duration-150"
+            @click.stop="whitelistOpen = !whitelistOpen"
+          >
+            <div class="i-carbon-filter h-3 w-3" />
+            加入白名单
+          </button>
+          <!-- Whitelist Popover -->
+          <div
+            v-if="whitelistOpen"
+            class="absolute left-0 bottom-full mb-1 z-[999]"
+          >
+            <WhitelistPopover
+              :tool-name="tool.toolCall.toolName"
+              :args="tool.toolCall.args"
+              :suggested-pattern="suggestedPattern"
+              :risk-level="riskLevel"
+              @confirm="(payload) => { whitelistOpen = false; emit('whitelist', tool.toolCall.toolCallId, payload) }"
+              @cancel="whitelistOpen = false"
+            />
+          </div>
+        </div>
         <button
           class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors duration-150"
           @click.stop="emit('reject', tool.toolCall.toolCallId)"

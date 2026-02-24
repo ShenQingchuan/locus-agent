@@ -74,6 +74,15 @@ export function getPendingApprovals(): PendingApproval[] {
 }
 
 /**
+ * 获取指定 toolCallId 的待确认请求（不删除）
+ * @param toolCallId 工具调用 ID
+ * @returns 待确认请求，或 undefined
+ */
+export function getPendingApproval(toolCallId: string): PendingApproval | undefined {
+  return pendingApprovals.get(toolCallId)
+}
+
+/**
  * 清除指定 toolCallId 的待确认请求（用于超时或取消场景）
  * @param toolCallId 工具调用 ID
  */

@@ -300,12 +300,56 @@ async function toggleDisabled(name: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Whitelist
+// ---------------------------------------------------------------------------
+
+const wlRules = ref<WhitelistRule[]>([])
+const isWlLoading = ref(false)
+
+async function loadWhitelist() {
+  isWlLoading.value = true
+  try {
+    wlRules.value = await fetchWhitelistRules()
+  }
+  catch (error) {
+    console.error('Failed to load whitelist rules:', error)
+  }
+  finally {
+    isWlLoading.value = false
+  }
+}
+
+async function onDeleteWhitelistRule(ruleId: string) {
+  const success = await deleteWhitelistRule(ruleId)
+  if (success) {
+    wlRules.value = wlRules.value.filter(r => r.id !== ruleId)
+    toast.success('白名单规则已删除')
+  }
+  else {
+    toast.error('删除失败')
+  }
+}
+
+function wlRiskLabel(rule: WhitelistRule): { text: string, class: string } {
+  const risk = getRiskLevel(rule.toolName, rule.pattern)
+  switch (risk) {
+    case 'dangerous':
+      return { text: '危险', class: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-950/50' }
+    case 'moderate':
+      return { text: '中等', class: 'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-950/50' }
+    default:
+      return { text: '安全', class: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-950/50' }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
 onMounted(() => {
   loadConfig()
   loadMCP()
+  loadWhitelist()
 })
 
 async function loadConfig() {
@@ -791,6 +835,78 @@ async function saveConfig() {
                   <span v-if="isMcpSaving" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
                   保存 MCP 配置
                 </button>
+              </div>
+            </section>
+
+            <!-- Whitelist Management -->
+            <section class="card p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold text-foreground">
+                    白名单管理
+                  </h2>
+                  <p class="text-xs text-muted-foreground mt-0.5">
+                    管理工具调用的自动放行规则
+                  </p>
+                </div>
+                <button
+                  class="btn-ghost btn-icon"
+                  title="刷新"
+                  :disabled="isWlLoading"
+                  @click="loadWhitelist"
+                >
+                  <div class="i-carbon-renew h-4 w-4" :class="isWlLoading ? 'animate-spin' : ''" />
+                </button>
+              </div>
+
+              <div class="mt-4">
+                <div v-if="isWlLoading" class="flex-col-center py-6 text-muted-foreground">
+                  <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
+                  <span class="text-xs mt-1.5 opacity-70">加载中...</span>
+                </div>
+
+                <div v-else-if="wlRules.length === 0" class="py-6 text-center">
+                  <div class="i-carbon-filter h-8 w-8 mx-auto text-muted-foreground/30" />
+                  <p class="text-xs text-muted-foreground/60 mt-2">
+                    暂无白名单规则
+                  </p>
+                  <p class="text-[10px] text-muted-foreground/40 mt-0.5">
+                    在工具审批时可添加
+                  </p>
+                </div>
+
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="rule in wlRules"
+                    :key="rule.id"
+                    class="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-muted/20"
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <code class="text-xs font-mono font-medium text-foreground flex-shrink-0">
+                        {{ rule.toolName }}
+                      </code>
+                      <span v-if="rule.pattern" class="text-xs font-mono text-muted-foreground truncate">
+                        {{ rule.pattern }}
+                      </span>
+                      <span
+                        class="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        :class="wlRiskLabel(rule).class"
+                      >
+                        {{ wlRiskLabel(rule).text }}
+                      </span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                        {{ rule.scope === 'global' ? '全局' : '会话' }}
+                      </span>
+                    </div>
+                    <button
+                      class="btn-ghost btn-icon flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      title="删除"
+                      @click="onDeleteWhitelistRule(rule.id)"
+                    >
+                      <div class="i-carbon-trash-can h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
 

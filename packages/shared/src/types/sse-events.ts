@@ -1,4 +1,5 @@
 import type { ToolCall, ToolResult } from './tool.js'
+import type { RiskLevel } from './whitelist.js'
 
 /**
  * SSE 事件类型
@@ -87,6 +88,10 @@ export interface ToolPendingApprovalEvent {
   toolName: string
   /** 工具参数 */
   args: Record<string, unknown>
+  /** 建议的匹配前缀（服务端预计算） */
+  suggestedPattern?: string
+  /** 风险等级（服务端预计算） */
+  riskLevel?: RiskLevel
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {
+  AddToWhitelistPayload,
   Conversation,
   CoreMessage,
   ListConversationsResponse,
@@ -6,15 +7,21 @@ import type {
   MCPServersConfig,
   MCPServerStatus,
   Message,
+  RiskLevel,
   SSEEvent,
   ToolCall,
   ToolResult,
+  WhitelistRule,
 } from '@locus-agent/shared'
 
 export interface PendingApproval {
   toolCallId: string
   toolName: string
   args: Record<string, unknown>
+  /** 服务端预计算的建议匹配前缀 */
+  suggestedPattern?: string
+  /** 服务端预计算的风险等级 */
+  riskLevel?: RiskLevel
 }
 
 export interface ChatStreamOptions {
@@ -160,6 +167,8 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
               toolCallId: event.toolCallId,
               toolName: event.toolName,
               args: event.args,
+              suggestedPattern: event.suggestedPattern,
+              riskLevel: event.riskLevel,
             })
             break
           case 'tool-output-delta':
@@ -197,6 +206,8 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
               toolCallId: event.toolCallId,
               toolName: event.toolName,
               args: event.args,
+              suggestedPattern: event.suggestedPattern,
+              riskLevel: event.riskLevel,
             })
             break
           case 'tool-output-delta':
@@ -258,6 +269,7 @@ export async function approveToolCall(
   toolCallId: string,
   approved: boolean,
   switchToYolo?: boolean,
+  addToWhitelist?: AddToWhitelistPayload,
 ): Promise<boolean> {
   try {
     const response = await fetch(`/api/chat/approve`, {
@@ -270,6 +282,7 @@ export async function approveToolCall(
         toolCallId,
         approved,
         switchToYolo,
+        addToWhitelist,
       }),
     })
 
@@ -283,6 +296,47 @@ export async function approveToolCall(
   }
   catch (error) {
     console.error('Failed to approve tool call:', error)
+    return false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Whitelist API
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch whitelist rules
+ */
+export async function fetchWhitelistRules(conversationId?: string): Promise<WhitelistRule[]> {
+  try {
+    const params = conversationId ? `?conversationId=${conversationId}` : ''
+    const response = await fetch(`/api/chat/whitelist${params}`)
+    if (!response.ok)
+      return []
+    const data = await response.json()
+    return data.rules ?? []
+  }
+  catch (error) {
+    console.error('Failed to fetch whitelist rules:', error)
+    return []
+  }
+}
+
+/**
+ * Delete a whitelist rule
+ */
+export async function deleteWhitelistRule(ruleId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/chat/whitelist/${ruleId}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok)
+      return false
+    const data = await response.json()
+    return data.success
+  }
+  catch (error) {
+    console.error('Failed to delete whitelist rule:', error)
     return false
   }
 }

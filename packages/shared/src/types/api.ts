@@ -1,5 +1,6 @@
 import type { Conversation } from './conversation.js'
 import type { CoreMessage, Message } from './message.js'
+import type { AddToWhitelistPayload } from './whitelist.js'
 
 /**
  * 聊天请求
@@ -96,4 +97,6 @@ export interface ToolApprovalRequest {
   approved: boolean
   /** 同时切换为 YOLO 模式，后续工具调用直接放行 */
   switchToYolo?: boolean
+  /** 同时将该工具调用模式加入白名单 */
+  addToWhitelist?: AddToWhitelistPayload
 }

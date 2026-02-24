@@ -5,13 +5,21 @@ import type {
   ToolApprovalRequest,
   ToolCall,
   ToolResult,
+  WhitelistRule,
 } from '@locus-agent/shared'
 import type { ModelMessage } from 'ai'
+import { extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { requestApproval, resolveApproval } from '../agent/approval.js'
+import { getPendingApproval, requestApproval, resolveApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
+import {
+  addGlobalRule,
+  addSessionRule,
+  getAllRules,
+  removeRule,
+} from '../agent/whitelist.js'
 import { config } from '../config.js'
 import { conversationExists, createConversation, touchConversation } from '../services/conversation.js'
 import { addMessage } from '../services/message.js'
@@ -173,6 +181,7 @@ chatRoutes.post('/', async (c) => {
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,
         thinkingMode: thinkingMode ?? true,
+        conversationId,
 
         // 思考过程增量回调
         onReasoningDelta: async (delta) => {
@@ -223,11 +232,16 @@ chatRoutes.post('/', async (c) => {
 
         // 工具等待确认回调（确认模式下使用）
         onToolPendingApproval: async (toolCallId, toolName, args) => {
+          const argsRecord = args as Record<string, unknown>
+          const suggestedPattern = extractDefaultPattern(toolName, argsRecord)
+          const riskLevel = getRiskLevel(toolName, suggestedPattern)
           await stream.writeSSE(createSSEEvent({
             type: 'tool-pending-approval',
             toolCallId,
             toolName,
-            args: args as Record<string, unknown>,
+            args: argsRecord,
+            suggestedPattern,
+            riskLevel,
           }))
         },
 
@@ -358,7 +372,7 @@ chatRoutes.post('/abort', async (c) => {
 // POST /api/chat/approve - Approve or reject tool execution
 chatRoutes.post('/approve', async (c) => {
   const body = await c.req.json<ToolApprovalRequest>()
-  const { conversationId, toolCallId, approved, switchToYolo } = body
+  const { conversationId, toolCallId, approved, switchToYolo, addToWhitelist } = body
 
   if (!conversationId || !toolCallId || approved === undefined) {
     return c.json(
@@ -381,6 +395,41 @@ chatRoutes.post('/approve', async (c) => {
     }
   }
 
+  // 处理"加入白名单"请求
+  if (addToWhitelist && approved) {
+    const ruleId = `wl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    // 从 pending approval 中获取工具名称
+    const pending = getPendingApproval(toolCallId)
+    if (pending) {
+      const rule: WhitelistRule = {
+        id: ruleId,
+        toolName: pending.toolName,
+        pattern: addToWhitelist.pattern,
+        scope: addToWhitelist.scope,
+        createdAt: Date.now(),
+      }
+
+      if (addToWhitelist.scope === 'global') {
+        const result = addGlobalRule(rule)
+        if (!result.success) {
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: 'WHITELIST_DENIED',
+                message: result.error ?? '无法添加至全局白名单',
+              },
+            },
+            400,
+          )
+        }
+      }
+      else {
+        addSessionRule(conversationId, rule)
+      }
+    }
+  }
+
   const resolved = resolveApproval(toolCallId, approved)
 
   if (!resolved) {
@@ -397,4 +446,27 @@ chatRoutes.post('/approve', async (c) => {
   }
 
   return c.json({ success: true, approved })
+})
+
+// GET /api/chat/whitelist - Get whitelist rules
+chatRoutes.get('/whitelist', async (c) => {
+  const conversationId = c.req.query('conversationId')
+  const rules = getAllRules(conversationId || undefined)
+  return c.json({ success: true, rules })
+})
+
+// DELETE /api/chat/whitelist/:id - Delete a whitelist rule
+chatRoutes.delete('/whitelist/:id', async (c) => {
+  const ruleId = c.req.param('id')
+  if (!ruleId) {
+    return c.json(
+      {
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: 'Rule ID is required' },
+      },
+      400,
+    )
+  }
+  removeRule(ruleId)
+  return c.json({ success: true })
 })

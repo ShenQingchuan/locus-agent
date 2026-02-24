@@ -1,6 +1,7 @@
 import type { LanguageModel, ModelMessage, ToolResultPart } from 'ai'
 import { streamText } from 'ai'
 import { executeToolCall, getMergedTools, hasToolExecutor } from './tools/registry.js'
+import { isWhitelisted } from './whitelist.js'
 
 /**
  * Agent Loop 配置选项
@@ -36,6 +37,8 @@ export interface AgentLoopOptions {
   thinkingMode?: boolean
   /** 获取工具确认结果的函数（确认模式下使用） */
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
+  /** 会话 ID（用于白名单匹配） */
+  conversationId?: string
 }
 
 /**
@@ -91,6 +94,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     confirmMode: confirmModeOpt = false,
     thinkingMode = true,
     getToolApproval,
+    conversationId,
   } = options
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
@@ -263,22 +267,36 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
               throw new Error(`Unknown tool: ${tc.toolName}`)
             }
 
-            // 确认模式下，等待用户确认
+            // 确认模式下，检查白名单后决定是否等待用户确认
             if (shouldConfirm() && getToolApproval) {
-              if (onToolPendingApproval) {
-                await onToolPendingApproval(tc.toolCallId, tc.toolName, tc.args)
-              }
+              // 白名单检查：如果匹配则自动放行
+              const whitelistMatch = conversationId
+                ? isWhitelisted(conversationId, tc.toolName, tc.args)
+                : null
 
-              const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
-
-              if (!approved) {
-                isError = true
-                result = 'Tool execution was rejected by user'
-              }
-              else {
+              if (whitelistMatch) {
+                // 白名单命中，自动放行
                 result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
                   ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
                   : undefined)
+              }
+              else {
+                // 未命中白名单，需要用户确认
+                if (onToolPendingApproval) {
+                  await onToolPendingApproval(tc.toolCallId, tc.toolName, tc.args)
+                }
+
+                const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
+
+                if (!approved) {
+                  isError = true
+                  result = 'Tool execution was rejected by user'
+                }
+                else {
+                  result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+                    ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
+                    : undefined)
+                }
               }
             }
             else {

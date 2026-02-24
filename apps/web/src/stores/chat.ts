@@ -62,6 +62,9 @@ export const useChatStore = defineStore('chat', () => {
   const currentStreamingMessageId = ref<string | null>(null)
   const pendingApprovals = ref<Map<string, PendingApproval>>(new Map())
 
+  // Whitelist state
+  const whitelistRules = ref<WhitelistRule[]>([])
+
   // Sidebar state
   const STORAGE_KEY_SIDEBAR_WIDTH = 'locus-agent:sidebar-width'
 
@@ -763,6 +766,51 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
+   * 批准工具执行并同时加入白名单
+   */
+  async function approveAndWhitelist(toolCallId: string, payload: AddToWhitelistPayload) {
+    if (!currentConversationId.value)
+      return false
+
+    // 立即更新 UI
+    removePendingApproval(toolCallId)
+    setToolCallExecuting(toolCallId)
+
+    const success = await approveToolCall(
+      currentConversationId.value,
+      toolCallId,
+      true,
+      undefined,
+      payload,
+    )
+
+    // 成功后刷新白名单列表
+    if (success) {
+      await loadWhitelistRules()
+    }
+    return success
+  }
+
+  /**
+   * 加载白名单规则
+   */
+  async function loadWhitelistRules() {
+    const rules = await fetchWhitelistRules(currentConversationId.value || undefined)
+    whitelistRules.value = rules
+  }
+
+  /**
+   * 删除白名单规则
+   */
+  async function removeWhitelistRule(ruleId: string) {
+    const success = await deleteWhitelistRule(ruleId)
+    if (success) {
+      whitelistRules.value = whitelistRules.value.filter(r => r.id !== ruleId)
+    }
+    return success
+  }
+
+  /**
    * 开始编辑消息
    */
   function startEditMessage(messageId: string) {
@@ -893,6 +941,7 @@ export const useChatStore = defineStore('chat', () => {
     error,
     currentStreamingMessageId,
     pendingApprovals,
+    whitelistRules,
 
     // Edit message state
     editingMessageId,
@@ -939,6 +988,9 @@ export const useChatStore = defineStore('chat', () => {
     handleToolApproval,
     approveToolExecution,
     rejectToolExecution,
+    approveAndWhitelist,
+    loadWhitelistRules,
+    removeWhitelistRule,
     retryFromMessage,
     startEditMessage,
     cancelEditMessage,

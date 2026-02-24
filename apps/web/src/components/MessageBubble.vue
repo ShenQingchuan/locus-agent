@@ -29,6 +29,10 @@ async function handleReject(toolCallId: string) {
   await chatStore.rejectToolExecution(toolCallId)
 }
 
+async function handleWhitelist(toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }) {
+  await chatStore.approveAndWhitelist(toolCallId, payload)
+}
+
 async function handleRetry() {
   await chatStore.retryFromMessage(props.message.id)
 }
@@ -248,8 +252,11 @@ const assistantModelLabel = computed<string | null>(() => {
               v-for="tool in getToolCallSlice(part.toolCallIndex)"
               :key="tool.toolCall.toolCallId"
               :tool="tool"
+              :suggested-pattern="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.suggestedPattern"
+              :risk-level="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.riskLevel"
               @approve="handleApprove"
               @reject="handleReject"
+              @whitelist="handleWhitelist"
             />
           </template>
 
