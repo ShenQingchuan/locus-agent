@@ -40,6 +40,12 @@ const modeItems = computed<DropdownItem[]>(() => [
     icon: 'i-ic:sharp-cruelty-free',
     active: chatStore.yoloMode,
   },
+  {
+    key: 'whitelist',
+    label: '工具白名单',
+    icon: 'i-carbon-tool-box',
+    separator: true,
+  },
 ])
 
 function handleModeSelect(key: string) {
@@ -47,6 +53,8 @@ function handleModeSelect(key: string) {
     chatStore.toggleThinkMode()
   else if (key === 'yolo')
     chatStore.toggleYoloMode()
+  else if (key === 'whitelist')
+    whitelistOpen.value = !whitelistOpen.value
 }
 
 const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
@@ -189,18 +197,9 @@ function handleKeydown(event: KeyboardEvent) {
               </button>
             </template>
           </Dropdown>
-
-          <!-- Whitelist button -->
-          <div class="relative">
-            <button
-              class="flex items-center px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
-              @click.stop="whitelistOpen = !whitelistOpen"
-            >
-              <span>工具白名单</span>
-            </button>
-            <div v-if="whitelistOpen" class="absolute left-0 bottom-full mb-1 z-[999]">
-              <SessionWhitelistPopover @close="whitelistOpen = false" />
-            </div>
+          <!-- Session whitelist popover (triggered from dropdown menu) -->
+          <div v-if="whitelistOpen" class="absolute left-0 bottom-full mb-1 z-[999]">
+            <SessionWhitelistPopover @close="whitelistOpen = false" />
           </div>
 
           <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>

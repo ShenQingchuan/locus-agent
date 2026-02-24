@@ -56,16 +56,16 @@ function isDangerous(rule: WhitelistRule): boolean {
         <div
           v-for="rule in chatStore.whitelistRules"
           :key="rule.id"
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-muted/30 group"
+          class="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border bg-muted/30 group leading-none"
         >
           <code
-            class="text-xs font-mono"
+            class="text-xs font-mono leading-none"
             :class="isDangerous(rule) ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
           >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
-          <span
-            v-if="rule.scope === 'global'"
-            class="text-[9px] text-muted-foreground/50 font-sans"
-          >全局</span>
+          <template v-if="rule.scope === 'global'">
+            <div class="w-px h-3 bg-muted-foreground/20" />
+            <span class="text-[10px] leading-none text-muted-foreground/70 font-sans">全局</span>
+          </template>
           <button
             class="h-3.5 w-3.5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
             title="删除"

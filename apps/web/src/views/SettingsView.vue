@@ -881,10 +881,10 @@ async function saveConfig() {
                   <div
                     v-for="rule in wlRules"
                     :key="rule.id"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted/30 group"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted/30 group leading-none"
                   >
                     <code
-                      class="text-xs font-mono"
+                      class="text-xs font-mono leading-none"
                       :class="wlRiskLabel(rule).text === '危险' ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
                     >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
                     <button
