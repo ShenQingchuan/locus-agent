@@ -8,6 +8,8 @@ const props = defineProps<{
 }>()
 
 const percentage = computed(() => {
+  if (props.total <= 0)
+    return 0
   return Math.min(100, (props.used / props.total) * 100)
 })
 

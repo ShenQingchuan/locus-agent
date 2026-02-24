@@ -13,17 +13,17 @@ export interface AgentLoopOptions {
   /** 语言模型实例 */
   model: LanguageModel
   /** 文本增量回调 */
-  onTextDelta?: (delta: string) => void
+  onTextDelta?: (delta: string) => void | Promise<void>
   /** 工具调用开始回调 */
-  onToolCallStart?: (toolCallId: string, toolName: string, args: unknown) => void
+  onToolCallStart?: (toolCallId: string, toolName: string, args: unknown) => void | Promise<void>
   /** 工具调用结果回调 */
-  onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void
+  onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void | Promise<void>
   /** 思考过程增量回调 */
-  onReasoningDelta?: (delta: string) => void
+  onReasoningDelta?: (delta: string) => void | Promise<void>
   /** 工具等待确认回调（确认模式下使用） */
-  onToolPendingApproval?: (toolCallId: string, toolName: string, args: unknown) => void
+  onToolPendingApproval?: (toolCallId: string, toolName: string, args: unknown) => void | Promise<void>
   /** 完成回调 */
-  onFinish?: (finishReason: string, usage: { inputTokens: number, outputTokens: number }) => void
+  onFinish?: (finishReason: string, usage: { inputTokens: number, outputTokens: number }) => void | Promise<void>
   /** 最大迭代次数 */
   maxIterations?: number
   /** AbortSignal 用于取消 */
@@ -170,6 +170,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       toolName: string
       args: unknown
     }> = []
+    const seenToolCallIds = new Set<string>()
 
     // 处理流式响应
     for await (const part of response.fullStream) {
@@ -180,21 +181,32 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
       switch (part.type) {
         case 'reasoning-delta':
-          onReasoningDelta?.((part as any).text)
+          if (onReasoningDelta) {
+            await onReasoningDelta((part as any).text)
+          }
           break
 
         case 'text-delta':
           iterationText += part.text
-          onTextDelta?.(part.text)
+          if (onTextDelta) {
+            await onTextDelta(part.text)
+          }
           break
 
         case 'tool-call':
+          if (seenToolCallIds.has(part.toolCallId)) {
+            console.warn(`[agent-loop] Duplicate tool-call event ignored: ${part.toolCallId}`)
+            break
+          }
+          seenToolCallIds.add(part.toolCallId)
           toolCalls.push({
             toolCallId: part.toolCallId,
             toolName: part.toolName,
             args: part.input,
           })
-          onToolCallStart?.(part.toolCallId, part.toolName, part.input)
+          if (onToolCallStart) {
+            await onToolCallStart(part.toolCallId, part.toolName, part.input)
+          }
           break
 
         case 'finish':
@@ -248,7 +260,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
             // 确认模式下，等待用户确认
             if (shouldConfirm() && getToolApproval) {
-              onToolPendingApproval?.(tc.toolCallId, tc.toolName, tc.args)
+              if (onToolPendingApproval) {
+                await onToolPendingApproval(tc.toolCallId, tc.toolName, tc.args)
+              }
 
               const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
 
@@ -269,7 +283,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             result = error instanceof Error ? error.message : String(error)
           }
 
-          onToolCallResult?.(tc.toolCallId, tc.toolName, result, isError)
+          if (onToolCallResult) {
+            await onToolCallResult(tc.toolCallId, tc.toolName, result, isError)
+          }
 
           const resultText = typeof result === 'string' ? result : JSON.stringify(result)
           return {
@@ -303,10 +319,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   }
 
   // 调用完成回调
-  onFinish?.(finishReason, {
-    inputTokens: totalInputTokens,
-    outputTokens: totalOutputTokens,
-  })
+  if (onFinish) {
+    await onFinish(finishReason, {
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+    })
+  }
 
   return {
     text: finalText,

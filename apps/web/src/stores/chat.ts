@@ -108,52 +108,80 @@ export const useChatStore = defineStore('chat', () => {
   // 模型上下文窗口配置（动态从 API 获取，默认：128K）
   const MAX_CONTEXT_TOKENS = ref(128_000)
 
+  const TOKENS_PER_CHAR = 4
+  const BASE_CONTEXT_OVERHEAD_TOKENS = 250
+  const MESSAGE_OVERHEAD_TOKENS = 6
+  const TOOL_CALL_OVERHEAD_TOKENS = 20
+  const TOOL_RESULT_OVERHEAD_TOKENS = 12
+
+  function estimateTextTokens(text: string): number {
+    if (!text)
+      return 0
+    return Math.ceil(text.length / TOKENS_PER_CHAR)
+  }
+
+  function estimateUnknownTokens(value: unknown): number {
+    if (value === null || value === undefined)
+      return 0
+    if (typeof value === 'string')
+      return estimateTextTokens(value)
+    try {
+      return estimateTextTokens(JSON.stringify(value))
+    }
+    catch {
+      return 0
+    }
+  }
+
+  function estimateCoreMessageTokens(message: CoreMessage): number {
+    switch (message.role) {
+      case 'user':
+      case 'system':
+        return MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content)
+      case 'assistant': {
+        let total = MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content)
+        if (message.toolCalls && message.toolCalls.length > 0) {
+          for (const toolCall of message.toolCalls) {
+            total += TOOL_CALL_OVERHEAD_TOKENS
+            total += estimateTextTokens(toolCall.toolCallId)
+            total += estimateTextTokens(toolCall.toolName)
+            total += estimateUnknownTokens(toolCall.args)
+          }
+        }
+        return total
+      }
+      case 'tool': {
+        let total = MESSAGE_OVERHEAD_TOKENS
+        for (const toolResult of message.toolResults) {
+          total += TOOL_RESULT_OVERHEAD_TOKENS
+          total += estimateTextTokens(toolResult.toolCallId)
+          total += estimateTextTokens(toolResult.toolName)
+          total += estimateUnknownTokens(toolResult.result)
+        }
+        return total
+      }
+    }
+  }
+
   // 计算当前会话中使用的总 token 数
   const contextTokensUsed = computed(() => {
-    let total = 0
+    const history = messagesToCoreMessages(messages.value)
+    if (history.length === 0)
+      return 0
 
-    // Only count system prompt tokens when there are messages (after first interaction)
-    const hasMessages = messages.value.length > 0
-
-    // Calculate message tokens first
-    for (const message of messages.value) {
-      if (message.role === 'assistant') {
-        if (message.usage) {
-          // Use exact token count from API response
-          total += message.usage.totalTokens
-        }
-        else {
-          // Estimate tokens for historical messages without usage info
-          // Includes content, reasoning, and tool calls
-          let estimate = Math.ceil(message.content.length / 4)
-          if (message.reasoning) {
-            estimate += Math.ceil(message.reasoning.length / 4)
-          }
-          if (message.toolCalls && message.toolCalls.length > 0) {
-            // Rough estimate: ~100 tokens per tool call
-            estimate += message.toolCalls.length * 100
-          }
-          total += estimate
-        }
-      }
-      else if (message.role === 'user') {
-        // Estimate user message tokens (rough: 4 chars = 1 token)
-        total += Math.ceil(message.content.length / 4)
-      }
+    let total = BASE_CONTEXT_OVERHEAD_TOKENS
+    for (const message of history) {
+      total += estimateCoreMessageTokens(message)
     }
-
-    // Add system prompt and tool definitions estimation only after first interaction
-    // Includes: system prompt (~60 tokens) + tool schemas (~150 tokens) + overhead (~40 tokens)
-    if (hasMessages) {
-      total += 250
-    }
-
     return total
   })
 
   // 计算上下文使用百分比
   const contextUsagePercentage = computed(() => {
-    return Math.min(100, (contextTokensUsed.value / MAX_CONTEXT_TOKENS.value) * 100)
+    const total = MAX_CONTEXT_TOKENS.value
+    if (total <= 0)
+      return 0
+    return Math.min(100, (contextTokensUsed.value / total) * 100)
   })
 
   async function loadModelSettings() {
@@ -396,6 +424,21 @@ export const useChatStore = defineStore('chat', () => {
       return
 
     const toolCalls = [...(message.toolCalls || [])]
+    const existingIndex = toolCalls.findIndex(
+      tc => tc.toolCall.toolCallId === toolCall.toolCallId,
+    )
+    if (existingIndex >= 0) {
+      const existing = toolCalls[existingIndex]
+      if (!existing)
+        return
+      toolCalls[existingIndex] = { ...existing, toolCall }
+      messages.value[index] = {
+        ...message,
+        toolCalls,
+      }
+      return
+    }
+
     const toolCallIndex = toolCalls.length
     toolCalls.push({ toolCall, status: 'pending' })
 
@@ -413,17 +456,19 @@ export const useChatStore = defineStore('chat', () => {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
     if (message?.toolCalls) {
-      const toolCallIndex = message.toolCalls.findIndex(
-        tc => tc.toolCall.toolCallId === toolResult.toolCallId,
-      )
-      const existing = toolCallIndex !== -1 ? message.toolCalls[toolCallIndex] : undefined
-      if (existing) {
-        const newToolCalls = [...message.toolCalls]
-        newToolCalls[toolCallIndex] = {
-          ...existing,
+      let hasMatch = false
+      const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
+        if (toolCallState.toolCall.toolCallId !== toolResult.toolCallId) {
+          return toolCallState
+        }
+        hasMatch = true
+        return {
+          ...toolCallState,
           result: toolResult,
           status: toolResult.isError ? 'error' : 'completed',
         }
+      })
+      if (hasMatch) {
         messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
@@ -435,16 +480,18 @@ export const useChatStore = defineStore('chat', () => {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
     if (message?.toolCalls) {
-      const toolCallIndex = message.toolCalls.findIndex(
-        tc => tc.toolCall.toolCallId === toolCallId,
-      )
-      const existing = toolCallIndex !== -1 ? message.toolCalls[toolCallIndex] : undefined
-      if (existing) {
-        const newToolCalls = [...message.toolCalls]
-        newToolCalls[toolCallIndex] = {
-          ...existing,
+      let hasMatch = false
+      const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
+        if (toolCallState.toolCall.toolCallId !== toolCallId) {
+          return toolCallState
+        }
+        hasMatch = true
+        return {
+          ...toolCallState,
           status: 'awaiting-approval',
         }
+      })
+      if (hasMatch) {
         messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
@@ -453,16 +500,23 @@ export const useChatStore = defineStore('chat', () => {
   function setToolCallExecuting(toolCallId: string) {
     for (let i = 0; i < messages.value.length; i++) {
       const message = messages.value[i]
-      const toolCallIndex = message.toolCalls?.findIndex(
-        tc => tc.toolCall.toolCallId === toolCallId,
-      )
-      if (toolCallIndex !== undefined && toolCallIndex >= 0) {
-        const existing = message.toolCalls![toolCallIndex]
-        if (existing.status === 'awaiting-approval') {
-          const newToolCalls = [...message.toolCalls!]
-          newToolCalls[toolCallIndex] = { ...existing, status: 'pending' }
-          messages.value[i] = { ...message, toolCalls: newToolCalls }
+      if (!message?.toolCalls || message.toolCalls.length === 0)
+        continue
+
+      let hasMatch = false
+      const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
+        if (toolCallState.toolCall.toolCallId !== toolCallId) {
+          return toolCallState
         }
+        hasMatch = true
+        if (toolCallState.status !== 'awaiting-approval') {
+          return toolCallState
+        }
+        return { ...toolCallState, status: 'pending' }
+      })
+
+      if (hasMatch) {
+        messages.value[i] = { ...message, toolCalls: newToolCalls }
         return
       }
     }
@@ -615,6 +669,13 @@ export const useChatStore = defineStore('chat', () => {
           setLoading(false)
         },
       })
+
+      // 兜底：服务端或网络异常结束但未收到 done/error 时，避免界面长期停留在 loading 态
+      if (currentStreamingMessageId.value === assistantMessageId) {
+        updateMessage(assistantMessageId, { isStreaming: false })
+        currentStreamingMessageId.value = null
+        setLoading(false)
+      }
     }
     catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
