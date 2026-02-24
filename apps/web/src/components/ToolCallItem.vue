@@ -58,6 +58,15 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
   write_file: args => String(args.file_path ?? ''),
 }
 
+/**
+ * Tools that render their output via a custom inline widget.
+ * When listed here:
+ *   - The output is shown inline
+ *   - The modal result section is hidden (no duplicate display)
+ * To add a new tool with custom output, just add its name to this set.
+ */
+const toolsWithOutputWidget = new Set<string>(['bash'])
+
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
   const { toolName, args } = props.tool.toolCall
@@ -116,17 +125,18 @@ const slotProps = computed(() => ({
   isError: props.tool.result?.isError,
 }))
 
-/** Whether this tool has an inline terminal output widget */
-const hasTerminalOutput = computed(() => {
-  return props.tool.toolCall.toolName === 'bash' && !!props.tool.output
-})
+/** Whether this tool uses a custom inline output widget */
+const hasOutputWidget = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName))
+
+/** Whether to show the terminal output block (registered + has data) */
+const hasTerminalOutput = computed(() => hasOutputWidget.value && !!props.tool.output)
 
 /** The terminal output text to display */
 const terminalOutput = computed(() => props.tool.output || '')
 
-/** Whether the bash command is still running (streaming) */
-const isBashRunning = computed(() => {
-  return props.tool.toolCall.toolName === 'bash' && props.tool.status === 'pending'
+/** Whether the tool is still running (streaming output) */
+const isToolRunning = computed(() => {
+  return hasOutputWidget.value && props.tool.status === 'pending'
 })
 
 // Auto-scroll terminal to bottom when output changes
@@ -166,7 +176,7 @@ watch(terminalOutput, () => {
       <!-- Action buttons -->
       <div class="flex items-center gap-2 px-3 py-2 border-t border-border">
         <button
-          class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-neutral-300 hover:bg-neutral-400 text-background transition-colors duration-150"
+          class="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-neutral-600 hover:bg-neutral-500 dark:bg-neutral-300 dark:hover:bg-neutral-400 text-background transition-colors duration-150"
           @click.stop="emit('approve', tool.toolCall.toolCallId)"
         >
           <div class="i-carbon-checkmark h-3 w-3" />
@@ -213,20 +223,20 @@ watch(terminalOutput, () => {
     <!-- Bash terminal output widget -->
     <div
       v-if="hasTerminalOutput"
-      class="mt-1.5 rounded-md border border-border bg-[#1a1a2e] overflow-hidden"
+      class="mt-1.5 rounded-md border border-border overflow-hidden bg-neutral-100 dark:bg-[#1a1a2e]"
     >
       <div
         ref="terminalRef"
-        class="max-h-[300px] overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed text-[#e0e0e0] whitespace-pre-wrap break-all"
+        class="max-h-[300px] overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-[#3d2b1f] dark:text-[#e0e0e0]"
       >
         {{ terminalOutput }}
       </div>
       <div
-        v-if="isBashRunning"
-        class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#888]"
+        v-if="isToolRunning"
+        class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#a08060] dark:text-[#888]"
       >
         <div class="i-svg-spinners:bars-fade h-3 w-3" />
-        <span>running...</span>
+        <span>执行中...</span>
       </div>
     </div>
 
@@ -248,6 +258,7 @@ watch(terminalOutput, () => {
       :result="tool.result?.result"
       :is-error="tool.result?.isError"
       :status="tool.status"
+      :hide-result="hasOutputWidget"
       @close="modalOpen = false"
     />
   </div>

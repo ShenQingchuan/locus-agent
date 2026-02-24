@@ -283,10 +283,15 @@ export const useChatStore = defineStore('chat', () => {
             )
             const existingTc = toolCallIndex !== -1 ? toolCallStates[toolCallIndex] : undefined
             if (existingTc) {
+              // For bash tools, restore output from the result so the terminal widget renders
+              const output = existingTc.toolCall.toolName === 'bash' && toolResult.result
+                ? (typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result))
+                : undefined
               toolCallStates[toolCallIndex] = {
                 ...existingTc,
                 result: toolResult,
                 status: toolResult.isError ? 'error' : 'completed',
+                output,
               }
             }
           }

@@ -9,6 +9,8 @@ const props = defineProps<{
   result?: unknown
   isError?: boolean
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
+  /** 若结果已通过外部 widget 展示，则 modal 内不再重复显示 */
+  hideResult?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -120,7 +122,7 @@ const statusLabel = computed(() => {
             </section>
 
             <!-- Results -->
-            <section v-if="result !== undefined">
+            <section v-if="result !== undefined && !hideResult">
               <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 结果
               </h3>
