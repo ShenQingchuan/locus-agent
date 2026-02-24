@@ -1,5 +1,6 @@
 export type * from './api.js'
 export type * from './conversation.js'
+export type * from './knowledge.js'
 export type * from './mcp.js'
 export type * from './message.js'
 export type * from './provider.js'

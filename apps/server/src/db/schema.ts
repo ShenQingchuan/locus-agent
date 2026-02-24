@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const conversations = sqliteTable('conversations', {
   id: text('id').primaryKey(),
@@ -71,9 +71,93 @@ export const settings = sqliteTable('settings', {
     .$defaultFn(() => new Date()),
 })
 
-// Relations
+// ==================== Knowledge Base ====================
+
+/** 文件夹（支持嵌套） */
+export const folders = sqliteTable('folders', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  parentId: text('parent_id').references((): any => folders.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_folders_parent_id').on(t.parentId),
+])
+
+/** 笔记主表 */
+export const notes = sqliteTable('notes', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  /** Markdown 纯文本（用于搜索、AI 上下文注入、导出） */
+  content: text('content').notNull().default(''),
+  /** ProseKit EditorState JSON（精确还原编辑器状态） */
+  editorState: text('editor_state', { mode: 'json' }).$type<Record<string, unknown> | null>(),
+  folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_notes_folder_id').on(t.folderId),
+  index('idx_notes_updated_at').on(t.updatedAt),
+])
+
+/** 标签 */
+export const tags = sqliteTable('tags', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+/** 笔记-标签关联 */
+export const noteTags = sqliteTable('note_tags', {
+  noteId: text('note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+  tagId: text('tag_id')
+    .notNull()
+    .references(() => tags.id, { onDelete: 'cascade' }),
+}, t => [
+  primaryKey({ columns: [t.noteId, t.tagId] }),
+  index('idx_note_tags_tag_id').on(t.tagId),
+])
+
+/** 笔记间链接（双向链接追踪） */
+export const noteLinks = sqliteTable('note_links', {
+  sourceNoteId: text('source_note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+  targetNoteId: text('target_note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+}, t => [
+  primaryKey({ columns: [t.sourceNoteId, t.targetNoteId] }),
+  index('idx_note_links_target').on(t.targetNoteId),
+])
+
+/** 笔记-对话来源关联 */
+export const noteConversations = sqliteTable('note_conversations', {
+  noteId: text('note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+  conversationId: text('conversation_id')
+    .notNull()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+}, t => [
+  primaryKey({ columns: [t.noteId, t.conversationId] }),
+])
+
+// ==================== Relations ====================
+
 export const conversationsRelations = relations(conversations, ({ many }) => ({
   messages: many(messages),
+  noteConversations: many(noteConversations),
 }))
 
 export const messagesRelations = relations(messages, ({ one }) => ({
@@ -83,10 +167,77 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }))
 
-// Types
+export const foldersRelations = relations(folders, ({ one, many }) => ({
+  parent: one(folders, {
+    fields: [folders.parentId],
+    references: [folders.id],
+    relationName: 'folderParent',
+  }),
+  children: many(folders, { relationName: 'folderParent' }),
+  notes: many(notes),
+}))
+
+export const notesRelations = relations(notes, ({ one, many }) => ({
+  folder: one(folders, {
+    fields: [notes.folderId],
+    references: [folders.id],
+  }),
+  noteTags: many(noteTags),
+  outgoingLinks: many(noteLinks, { relationName: 'sourceLinks' }),
+  incomingLinks: many(noteLinks, { relationName: 'targetLinks' }),
+  noteConversations: many(noteConversations),
+}))
+
+export const tagsRelations = relations(tags, ({ many }) => ({
+  noteTags: many(noteTags),
+}))
+
+export const noteTagsRelations = relations(noteTags, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteTags.noteId],
+    references: [notes.id],
+  }),
+  tag: one(tags, {
+    fields: [noteTags.tagId],
+    references: [tags.id],
+  }),
+}))
+
+export const noteLinksRelations = relations(noteLinks, ({ one }) => ({
+  source: one(notes, {
+    fields: [noteLinks.sourceNoteId],
+    references: [notes.id],
+    relationName: 'sourceLinks',
+  }),
+  target: one(notes, {
+    fields: [noteLinks.targetNoteId],
+    references: [notes.id],
+    relationName: 'targetLinks',
+  }),
+}))
+
+export const noteConversationsRelations = relations(noteConversations, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteConversations.noteId],
+    references: [notes.id],
+  }),
+  conversation: one(conversations, {
+    fields: [noteConversations.conversationId],
+    references: [conversations.id],
+  }),
+}))
+
+// ==================== Types ====================
+
 export type Conversation = typeof conversations.$inferSelect
 export type NewConversation = typeof conversations.$inferInsert
 export type Message = typeof messages.$inferSelect
 export type NewMessage = typeof messages.$inferInsert
 export type WhitelistRuleRow = typeof whitelistRules.$inferSelect
 export type NewWhitelistRuleRow = typeof whitelistRules.$inferInsert
+export type Folder = typeof folders.$inferSelect
+export type NewFolder = typeof folders.$inferInsert
+export type Note = typeof notes.$inferSelect
+export type NewNote = typeof notes.$inferInsert
+export type Tag = typeof tags.$inferSelect
+export type NewTag = typeof tags.$inferInsert

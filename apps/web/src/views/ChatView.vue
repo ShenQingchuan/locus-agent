@@ -2,6 +2,7 @@
 import { useQueryCache } from '@pinia/colada'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppNavRail from '@/components/AppNavRail.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import MessageList from '@/components/MessageList.vue'
 import Sidebar from '@/components/Sidebar.vue'
@@ -142,7 +143,10 @@ function handleNewChat() {
 
 <template>
   <div class="h-screen flex bg-background">
-    <!-- Sidebar -->
+    <!-- App Navigation Rail -->
+    <AppNavRail />
+
+    <!-- Chat Sidebar (conversations) -->
     <Sidebar />
 
     <!-- Main chat area -->

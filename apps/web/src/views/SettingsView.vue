@@ -15,7 +15,6 @@ import {
   updateSettingsConfig,
 } from '@/api/chat'
 import MonacoEditor from '@/components/MonacoEditor.vue'
-import Sidebar from '@/components/Sidebar.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -439,7 +438,7 @@ async function saveConfig() {
 
 <template>
   <div class="h-screen flex bg-background">
-    <Sidebar />
+    <AppNavRail />
 
     <div class="flex-1 flex flex-col min-w-0">
       <header class="flex-shrink-0 border-b border-border bg-background px-4 py-3 flex items-center justify-between">

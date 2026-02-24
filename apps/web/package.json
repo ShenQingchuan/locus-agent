@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@ai-sdk/vue": "catalog:vue-family",
@@ -20,6 +20,8 @@
     "markstream-vue": "catalog:vue-family",
     "modern-monaco": "^0.3.7",
     "pinia": "catalog:vue-family",
+    "prosekit": "^0.18.3",
+    "prosemirror-highlight": "^0.15.0",
     "shiki": "catalog:",
     "vue": "catalog:vue-family",
     "vue-router": "catalog:vue-family"

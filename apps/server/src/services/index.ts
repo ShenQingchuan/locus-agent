@@ -1,2 +1,5 @@
 export * from './conversation.js'
+export * from './folder.js'
 export * from './message.js'
+export * from './note.js'
+export * from './tag.js'

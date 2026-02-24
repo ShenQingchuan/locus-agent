@@ -2,7 +2,6 @@
 import type { DropdownItem } from '@locus-agent/ui'
 import { Dropdown, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
-import { useDark, useToggle } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationListQuery } from '@/composables/queries'
@@ -34,26 +33,11 @@ function ensureChatRoute() {
     router.push({ name: 'chat' })
   }
 }
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
-
 const menuItems = computed<DropdownItem[]>(() => [
-  {
-    key: 'theme',
-    label: isDark.value ? '浅色模式' : '深色模式',
-    icon: isDark.value ? 'i-carbon-sun' : 'i-carbon-moon',
-  },
   {
     key: 'clear-all',
     label: '清空所有对话',
     icon: 'i-carbon-trash-can',
-    separator: true,
-  },
-  {
-    key: 'settings',
-    label: '设置',
-    icon: 'i-carbon-settings',
-    separator: true,
   },
 ])
 
@@ -80,14 +64,8 @@ async function handleClearAll() {
 
 function handleMenuSelect(key: string) {
   switch (key) {
-    case 'theme':
-      toggleDark()
-      break
     case 'clear-all':
       handleClearAll()
-      break
-    case 'settings':
-      router.push({ name: 'settings' })
       break
   }
 }
