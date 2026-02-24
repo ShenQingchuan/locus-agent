@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import presetTypography from '@unocss/preset-typography'
-import { defineConfig, presetIcons, presetWind4 } from 'unocss'
+import { defineConfig, presetIcons, presetWebFonts, presetWind4 } from 'unocss'
 
 const moonshotSvg = readFileSync(new URL('./public/moonshot.svg', import.meta.url), 'utf-8')
 
@@ -76,6 +76,12 @@ export default defineConfig({
         'td': {
           'border-bottom-color': 'hsl(var(--border))',
         },
+      },
+    }),
+    presetWebFonts({
+      fonts: {
+        sans: 'Archivo',
+        mono: 'IBM Plex Mono',
       },
     }),
   ],

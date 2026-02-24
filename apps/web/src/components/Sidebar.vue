@@ -7,7 +7,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationListQuery } from '@/composables/queries'
 import { useChatStore } from '@/stores/chat'
-import ConversationItem from './ConversationItem.vue'
+import ConversationList from './ConversationList.vue'
 
 declare const __APP_VERSION__: string
 const appVersion = __APP_VERSION__
@@ -210,37 +210,14 @@ async function handleDeleteConversation(id: string) {
       </div>
 
       <!-- Conversation List -->
-      <div class="flex-1 overflow-y-auto p-2">
-        <!-- Loading state -->
-        <div
-          v-if="isLoadingConversations"
-          class="flex-col-center py-8 text-muted-foreground"
-        >
-          <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
-          <span class="text-xs mt-2 opacity-70">加载中...</span>
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-else-if="chatStore.conversations.length === 0"
-          class="flex-col-center py-8 text-muted-foreground"
-        >
-          <div class="i-carbon-chat h-8 w-8 opacity-30" />
-          <span class="text-xs mt-2 opacity-70">暂无对话</span>
-        </div>
-
-        <!-- Conversation items -->
-        <div v-else class="space-y-1">
-          <ConversationItem
-            v-for="conversation in chatStore.conversations"
-            :key="conversation.id"
-            :conversation="conversation"
-            :is-active="conversation.id === chatStore.currentConversationId"
-            @select="handleSelectConversation"
-            @delete="handleDeleteConversation"
-          />
-        </div>
-      </div>
+      <ConversationList
+        :conversations="chatStore.conversations"
+        :current-id="chatStore.currentConversationId ?? undefined"
+        :loading="isLoadingConversations"
+        class="flex-1 overflow-y-auto"
+        @select="handleSelectConversation"
+        @delete="handleDeleteConversation"
+      />
 
       <!-- Footer -->
       <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
