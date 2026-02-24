@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { createHighlighter } from 'shiki'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
+import { getShikiHighlighter } from '@/utils/shiki'
 
 const props = withDefaults(defineProps<{
   code: string
@@ -12,10 +12,7 @@ const props = withDefaults(defineProps<{
 const html = ref('')
 const codeBlockRef = ref<HTMLElement | null>(null)
 
-const highlighter = createHighlighter({
-  themes: ['github-dark', 'github-light'],
-  langs: ['text'],
-})
+const highlighter = getShikiHighlighter()
 
 watchEffect(async () => {
   // 在 await 之前读取响应式依赖，确保数据更新时能重新触发

@@ -1,4 +1,4 @@
-import type { Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
 import type { PendingApproval } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -8,7 +8,9 @@ import {
   abortChat,
   approveToolCall,
   deleteConversation,
+  deleteWhitelistRule,
   fetchSettingsConfig,
+  fetchWhitelistRules,
   streamChat,
   truncateMessages,
   updateConversation,
@@ -243,6 +245,7 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId.value = id
     clearMessages()
     clearError()
+    loadWhitelistRules()
   }
 
   function applyConversationData(data: { conversation: Conversation, messages: ApiMessage[] }) {

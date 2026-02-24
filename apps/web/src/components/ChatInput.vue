@@ -7,6 +7,7 @@ import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
+import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
 
 defineProps<{
   disabled?: boolean
@@ -22,6 +23,7 @@ const chatStore = useChatStore()
 const toast = useToast()
 
 const { textarea, input } = useTextareaAutosize()
+const whitelistOpen = ref(false)
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
 
@@ -187,6 +189,19 @@ function handleKeydown(event: KeyboardEvent) {
               </button>
             </template>
           </Dropdown>
+
+          <!-- Whitelist button -->
+          <div class="relative">
+            <button
+              class="flex items-center px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+              @click.stop="whitelistOpen = !whitelistOpen"
+            >
+              <span>工具白名单</span>
+            </button>
+            <div v-if="whitelistOpen" class="absolute left-0 bottom-full mb-1 z-[999]">
+              <SessionWhitelistPopover @close="whitelistOpen = false" />
+            </div>
+          </div>
 
           <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
 

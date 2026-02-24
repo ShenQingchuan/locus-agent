@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import type { LLMProviderType, MCPServerConfig, MCPServerStatus } from '@locus-agent/shared'
-import { DEFAULT_API_BASES, LLM_PROVIDERS } from '@locus-agent/shared'
+import type { LLMProviderType, MCPServerConfig, MCPServerStatus, WhitelistRule } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, getRiskLevel, LLM_PROVIDERS } from '@locus-agent/shared'
 import { Switch, useToast } from '@locus-agent/ui'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  deleteWhitelistRule,
   fetchMCPConfig,
   fetchMCPStatus,
   fetchSettingsConfig,
+  fetchWhitelistRules,
   restartMCPServer,
   updateMCPConfig,
   updateSettingsConfig,
@@ -843,10 +845,10 @@ async function saveConfig() {
               <div class="flex items-center justify-between">
                 <div>
                   <h2 class="text-sm font-semibold text-foreground">
-                    白名单管理
+                    全局工具执行白名单
                   </h2>
                   <p class="text-xs text-muted-foreground mt-0.5">
-                    管理工具调用的自动放行规则
+                    对所有会话生效的自动放行规则
                   </p>
                 </div>
                 <button
@@ -875,35 +877,22 @@ async function saveConfig() {
                   </p>
                 </div>
 
-                <div v-else class="space-y-2">
+                <div v-else class="flex flex-wrap gap-2">
                   <div
                     v-for="rule in wlRules"
                     :key="rule.id"
-                    class="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-muted/20"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted/30 group"
                   >
-                    <div class="flex items-center gap-2 min-w-0">
-                      <code class="text-xs font-mono font-medium text-foreground flex-shrink-0">
-                        {{ rule.toolName }}
-                      </code>
-                      <span v-if="rule.pattern" class="text-xs font-mono text-muted-foreground truncate">
-                        {{ rule.pattern }}
-                      </span>
-                      <span
-                        class="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
-                        :class="wlRiskLabel(rule).class"
-                      >
-                        {{ wlRiskLabel(rule).text }}
-                      </span>
-                      <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
-                        {{ rule.scope === 'global' ? '全局' : '会话' }}
-                      </span>
-                    </div>
+                    <code
+                      class="text-xs font-mono"
+                      :class="wlRiskLabel(rule).text === '危险' ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
+                    >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
                     <button
-                      class="btn-ghost btn-icon flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      class="h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
                       title="删除"
                       @click="onDeleteWhitelistRule(rule.id)"
                     >
-                      <div class="i-carbon-trash-can h-3.5 w-3.5" />
+                      <div class="i-carbon-close h-2.5 w-2.5" />
                     </button>
                   </div>
                 </div>

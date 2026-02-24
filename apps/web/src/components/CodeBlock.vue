@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { createHighlighter } from 'shiki'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
+import { getShikiHighlighter } from '@/utils/shiki'
 import DiffViewer from './DiffViewer.vue'
 
 const props = defineProps<{
@@ -21,10 +21,7 @@ const isDiff = computed(() => {
 const html = ref('')
 const codeBlockRef = ref<HTMLElement | null>(null)
 
-const highlighter = createHighlighter({
-  themes: ['github-dark-default', 'min-light'],
-  langs: ['text'],
-})
+const highlighter = getShikiHighlighter()
 
 const resolvedLang = computed(() => {
   const lang = props.node.language || 'text'
