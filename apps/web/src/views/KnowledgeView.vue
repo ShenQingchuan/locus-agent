@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { NoteWithTags } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useDebounceFn } from '@vueuse/core'
@@ -459,11 +458,11 @@ function formatDate(date: Date | string): string {
                 {{ note.title || '无标题' }}
               </div>
               <div class="mt-1 flex items-center gap-1.5">
-                <span class="text-[10px] text-muted-foreground/40">{{ formatDate(note.updatedAt) }}</span>
+                <span class="text-xs text-muted-foreground/80">{{ formatDate(note.updatedAt) }}</span>
                 <span
                   v-for="tag in note.tags.slice(0, 2)"
                   :key="tag.id"
-                  class="text-[10px] px-1 py-px rounded bg-secondary text-secondary-foreground"
+                  class="text-xs px-1 py-px rounded bg-secondary text-secondary-foreground"
                 >{{ tag.name }}</span>
               </div>
             </button>
