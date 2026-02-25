@@ -1,6 +1,8 @@
+import type { Tag } from '../db/schema.js'
 import { Hono } from 'hono'
 import {
   deleteTag,
+  getOrCreateTag,
   listTagsWithCount,
   renameTag,
 } from '../services/tag.js'
@@ -11,6 +13,19 @@ export const tagsRoutes = new Hono()
 tagsRoutes.get('/', async (c) => {
   const result = await listTagsWithCount()
   return c.json({ tags: result })
+})
+
+// POST /api/tags - 创建标签（按名称去重，已存在则返回已有）
+tagsRoutes.post('/', async (c) => {
+  const body = await c.req.json()
+  const { name } = body
+
+  if (!name || typeof name !== 'string') {
+    return c.json({ error: 'Name is required' }, 400)
+  }
+
+  const tag: Tag = await getOrCreateTag(name)
+  return c.json(tag)
 })
 
 // PATCH /api/tags/:id - 重命名标签

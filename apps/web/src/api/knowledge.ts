@@ -8,6 +8,7 @@ import type {
   ListTagsResponse,
   NoteWithTags,
   SearchNotesResponse,
+  Tag,
   TagWithCount,
   UpdateFolderInput,
   UpdateNoteInput,
@@ -118,6 +119,13 @@ export async function deleteFolder(id: string): Promise<void> {
 export async function fetchTags(): Promise<TagWithCount[]> {
   const { tags } = await request<ListTagsResponse>('/tags')
   return tags
+}
+
+export async function createTag(name: string) {
+  return request<Tag>('/tags', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
 }
 
 export async function renameTag(id: string, name: string): Promise<void> {

@@ -1,9 +1,19 @@
 <script setup lang="ts">
+import { onClickOutside } from '@vueuse/core'
 import { useEditor, useEditorDerivedValue } from 'prosekit/vue'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { CODE_BLOCK_LANG_OPTIONS, getResolvedLang } from '@/utils/codeBlockDisplayName'
 
 // Get editor from ProseKit context (parent must wrap this in <ProseKit>)
 const editor = useEditor()
+
+const langPopoverOpen = ref(false)
+const langPopoverRef = ref<HTMLElement | null>(null)
+
+function closeLangPopover() {
+  langPopoverOpen.value = false
+}
+onClickOutside(langPopoverRef, closeLangPopover)
 
 interface ActiveTarget {
   isActive?: (attrs?: Record<string, unknown>) => boolean
@@ -36,6 +46,14 @@ function getEditorApi(): EditorLike {
 // Derive reactive state from editor updates
 const editorState = useEditorDerivedValue((editorInstance) => {
   const api = toEditorLike(editorInstance)
+  const codeBlockActive = isActive(api.nodes.codeBlock)
+  let codeBlockLanguage = ''
+  if (codeBlockActive) {
+    const view = (editorInstance as any)?.view
+    const parent = view?.state?.selection?.$from?.parent
+    if (parent?.type?.name === 'codeBlock')
+      codeBlockLanguage = parent.attrs?.language ?? ''
+  }
   return {
     bold: isActive(api.marks.bold),
     italic: isActive(api.marks.italic),
@@ -45,8 +63,15 @@ const editorState = useEditorDerivedValue((editorInstance) => {
     heading1: isActive(api.nodes.heading, { level: 1 }),
     heading2: isActive(api.nodes.heading, { level: 2 }),
     heading3: isActive(api.nodes.heading, { level: 3 }),
+    codeBlockActive,
+    codeBlockLanguage,
   }
 })
+
+function setCodeBlockLanguage(langId: string) {
+  runCommand(getEditorApi().commands.setCodeBlockAttrs, { language: langId })
+  langPopoverOpen.value = false
+}
 
 interface ToolbarButton {
   key: string
@@ -167,13 +192,36 @@ const historyButtons = computed<ToolbarButton[]>(() => [
       v-for="btn in blockButtons"
       :key="btn.key"
       class="p-1.5 rounded-md text-muted-foreground transition-colors duration-100"
-      :class="btn.isActive
-        ? 'bg-accent text-accent-foreground'
-        : 'hover:bg-accent/50 hover:text-foreground'"
+      :class="[btn.isActive
+                 ? 'bg-accent text-accent-foreground'
+                 : 'hover:bg-accent/50 hover:text-foreground',
+               btn.key === 'codeBlock' && editorState?.codeBlockActive ? 'relative' : '']"
       :title="btn.title"
-      @mousedown.prevent="btn.action()"
+      @mousedown.prevent="btn.key === 'codeBlock' && editorState?.codeBlockActive
+        ? (langPopoverOpen = !langPopoverOpen)
+        : btn.action()"
     >
       <div :class="btn.icon" class="h-4 w-4" />
+      <div
+        v-if="btn.key === 'codeBlock' && editorState?.codeBlockActive"
+        ref="langPopoverRef"
+        class="absolute left-0 top-full mt-1 z-50 min-w-36 rounded-lg border border-border bg-popover shadow-lg py-1 max-h-56 overflow-y-auto"
+        :class="langPopoverOpen ? 'block' : 'hidden'"
+      >
+        <div class="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          切换语言
+        </div>
+        <button
+          v-for="opt in CODE_BLOCK_LANG_OPTIONS"
+          :key="opt.id"
+          class="w-full text-left px-3 py-1.5 text-xs hover:bg-accent/50 transition-colors flex justify-between"
+          :class="getResolvedLang(editorState?.codeBlockLanguage || 'text') === opt.id ? 'bg-accent/30 font-medium' : ''"
+          @mousedown.prevent="setCodeBlockLanguage(opt.id)"
+        >
+          <span>{{ opt.name }}</span>
+          <span v-if="getResolvedLang(editorState?.codeBlockLanguage || 'text') === opt.id" class="i-carbon-checkmark h-3 w-3 text-primary" />
+        </button>
+      </div>
     </button>
 
     <!-- Separator -->

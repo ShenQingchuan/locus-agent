@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
+import { getCodeBlockDisplayName, getResolvedLang } from '@/utils/codeBlockDisplayName'
 import { getShikiHighlighter } from '@/utils/shiki'
 import DiffViewer from './DiffViewer.vue'
 
@@ -23,12 +24,8 @@ const codeBlockRef = ref<HTMLElement | null>(null)
 
 const highlighter = getShikiHighlighter()
 
-const resolvedLang = computed(() => {
-  const lang = props.node.language || 'text'
-  // shiki lang alias
-  const aliases: Record<string, string> = { 'sh': 'bash', 'zsh': 'bash', 'js': 'javascript', 'ts': 'typescript', 'py': 'python', 'yml': 'yaml', 'c++': 'cpp' }
-  return aliases[lang] || lang
-})
+const resolvedLang = computed(() => getResolvedLang(props.node.language || 'text'))
+const displayLang = computed(() => getCodeBlockDisplayName(props.node.language || 'text'))
 
 watchEffect(async () => {
   // 在 await 之前读取响应式依赖，确保流式更新时能重新触发
@@ -84,7 +81,7 @@ async function handleCopy() {
   <div v-else class="code-block-wrapper relative group my-3 overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-1.5 bg-muted/50 text-xs text-muted-foreground">
-      <span class="font-mono">{{ node.language || 'text' }}</span>
+      <span class="font-mono">{{ displayLang }}</span>
       <button
         class="transition-opacity duration-150 p-1 rounded hover:bg-muted"
         title="复制"

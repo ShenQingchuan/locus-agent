@@ -65,6 +65,22 @@ catalogs:
     hono:
       specifier: ^4.11.7
       version: 4.11.7
+  prosekit-family:
+    modern-monaco:
+      specifier: ^0.3.7
+      version: 0.3.7
+    prosekit:
+      specifier: ^0.18.3
+      version: 0.18.3
+    prosemirror-highlight:
+      specifier: ^0.15.0
+      version: 0.15.0
+    prosemirror-markdown:
+      specifier: ^1.13.4
+      version: 1.13.4
+    prosemirror-model:
+      specifier: ^1.25.4
+      version: 1.25.4
   unocss-family:
     '@iconify/json':
       specifier: ^2.2.437
@@ -235,17 +251,23 @@ importers:
         specifier: catalog:vue-family
         version: 0.0.6(shiki@3.22.0)(vue@3.5.27(typescript@5.9.3))
       modern-monaco:
-        specifier: ^0.3.7
+        specifier: catalog:prosekit-family
         version: 0.3.7(typescript@5.9.3)
       pinia:
         specifier: catalog:vue-family
         version: 3.0.4(typescript@5.9.3)(vue@3.5.27(typescript@5.9.3))
       prosekit:
-        specifier: ^0.18.3
+        specifier: catalog:prosekit-family
         version: 0.18.3(@shikijs/types@3.22.0)(@types/hast@3.0.4)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-transform@1.11.0)(prosemirror-view@1.41.6)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vue@3.5.27(typescript@5.9.3))
       prosemirror-highlight:
-        specifier: ^0.15.0
+        specifier: catalog:prosekit-family
         version: 0.15.0(@shikijs/types@3.22.0)(@types/hast@3.0.4)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-transform@1.11.0)(prosemirror-view@1.41.6)
+      prosemirror-markdown:
+        specifier: catalog:prosekit-family
+        version: 1.13.4
+      prosemirror-model:
+        specifier: catalog:prosekit-family
+        version: 1.25.4
       shiki:
         specifier: 'catalog:'
         version: 3.22.0
@@ -1494,8 +1516,17 @@ packages:
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
+  '@types/linkify-it@5.0.0':
+    resolution: {integrity: sha512-sVDA58zAw4eWAffKOaQH5/5j3XeayukzDk+ewSsnv3p4yJEZHCCzMDiZM8e0OUrRvmpGZ85jf4yDHkHsgBNr9Q==, tarball: https://registry.npmjs.org/@types/linkify-it/-/linkify-it-5.0.0.tgz}
+
+  '@types/markdown-it@14.1.2':
+    resolution: {integrity: sha512-promo4eFwuiW+TfGxhi+0x3czqTYJkG8qB17ZUJiVF10Xm7NLVRSLUsfRTU/6h1e24VvRnXCx+hG7li58lkzog==, tarball: https://registry.npmjs.org/@types/markdown-it/-/markdown-it-14.1.2.tgz}
+
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
+
+  '@types/mdurl@2.0.0':
+    resolution: {integrity: sha512-RGdgjQUZba5p6QEFAVx2OGb8rQDL/cPRG7GiedRzMcJ1tYnUANBncjbSB1NRGwbvjcPeikRABz2nshyPk1bhWg==, tarball: https://registry.npmjs.org/@types/mdurl/-/mdurl-2.0.0.tgz}
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
@@ -2714,6 +2745,10 @@ packages:
     resolution: {integrity: sha512-nZpRTJj4S6bN0I5wsNBtgzDKx+HYBBSsvKjGdYw7/tPdrzfo3gUTt3ZbeAjPGeZaC6a4LFi4JdhTVeLm3F6TIQ==}
     engines: {node: '>=18'}
 
+  markdown-it@14.1.1:
+    resolution: {integrity: sha512-BuU2qnTti9YKgK5N+IeMubp14ZUKUUw7yeJbkjtosvHiP0AZ5c8IAgEMk79D0eC8F23r4Ac/q8cAIFdm2FtyoA==, tarball: https://registry.npmjs.org/markdown-it/-/markdown-it-14.1.1.tgz}
+    hasBin: true
+
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
@@ -3173,6 +3208,9 @@ packages:
 
   prosemirror-keymap@1.2.3:
     resolution: {integrity: sha512-4HucRlpiLd1IPQQXNqeo81BGtkY8Ai5smHhKW9jjPKRc2wQIxksg7Hl1tTI2IfT2B/LgX6bfYvXxEpJl7aKYKw==, tarball: https://registry.npmjs.org/prosemirror-keymap/-/prosemirror-keymap-1.2.3.tgz}
+
+  prosemirror-markdown@1.13.4:
+    resolution: {integrity: sha512-D98dm4cQ3Hs6EmjK500TdAOew4Z03EV71ajEFiWra3Upr7diytJsjF4mPV2dW+eK5uNectiRj0xFxYI9NLXDbw==, tarball: https://registry.npmjs.org/prosemirror-markdown/-/prosemirror-markdown-1.13.4.tgz}
 
   prosemirror-math@0.2.2:
     resolution: {integrity: sha512-9k3oRRAEeQBAc2Yjq0G6+Z7anJ62ODEo0CcYFYwbH+1aVVqQoGMWur+8qTrXdbPpKg5q/d1dyDcpVA3p2Xf0xA==, tarball: https://registry.npmjs.org/prosemirror-math/-/prosemirror-math-0.2.2.tgz}
@@ -4875,9 +4913,18 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/linkify-it@5.0.0': {}
+
+  '@types/markdown-it@14.1.2':
+    dependencies:
+      '@types/linkify-it': 5.0.0
+      '@types/mdurl': 2.0.0
+
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
+
+  '@types/mdurl@2.0.0': {}
 
   '@types/ms@2.1.0': {}
 
@@ -6219,6 +6266,15 @@ snapshots:
       punycode.js: 2.3.1
       uc.micro: 2.1.0
 
+  markdown-it@14.1.1:
+    dependencies:
+      argparse: 2.0.1
+      entities: 4.5.0
+      linkify-it: 5.0.0
+      mdurl: 2.0.0
+      punycode.js: 2.3.1
+      uc.micro: 2.1.0
+
   markdown-table@3.0.4: {}
 
   markstream-vue@0.0.6(shiki@3.22.0)(vue@3.5.27(typescript@5.9.3)):
@@ -6847,6 +6903,12 @@ snapshots:
     dependencies:
       prosemirror-state: 1.4.4
       w3c-keyname: 2.2.8
+
+  prosemirror-markdown@1.13.4:
+    dependencies:
+      '@types/markdown-it': 14.1.2
+      markdown-it: 14.1.1
+      prosemirror-model: 1.25.4
 
   prosemirror-math@0.2.2:
     dependencies:

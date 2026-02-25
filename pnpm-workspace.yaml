@@ -40,6 +40,12 @@ catalogs:
   vite-family:
     '@vitejs/plugin-vue': ^6.0.4
     vite: ^7.3.1
+  prosekit-family:
+    modern-monaco: ^0.3.7
+    prosekit: ^0.18.3
+    prosemirror-highlight: ^0.15.0
+    prosemirror-markdown: ^1.13.4
+    prosemirror-model: ^1.25.4
   vue-family:
     '@ai-sdk/vue': ^3.0.73
     '@pierre/diffs': ^1.0.10

@@ -5,7 +5,10 @@ import { useQueryCache } from '@pinia/colada'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import * as api from '@/api/knowledge'
 import AppNavRail from '@/components/AppNavRail.vue'
+import AddTagsModal from '@/components/knowledge/AddTagsModal.vue'
+import CreateTagModal from '@/components/knowledge/CreateTagModal.vue'
 import NoteEditor from '@/components/knowledge/NoteEditor.vue'
 import {
   useFoldersQuery,
@@ -68,8 +71,10 @@ const editTitle = ref('')
 const isCreatingFolder = ref(false)
 const newFolderName = ref('')
 const searchInput = ref('')
-const showFolders = ref(true)
+const showFolders = ref(false)
 const showTags = ref(false)
+const showCreateTagModal = ref(false)
+const showAddTagsModal = ref(false)
 
 // ==================== 生命周期 ====================
 
@@ -236,6 +241,30 @@ function cancelCreateFolder() {
   newFolderName.value = ''
 }
 
+async function handleCreateTag(name: string) {
+  try {
+    await api.createTag(name)
+    queryCache.invalidateQueries({ key: ['tags'] })
+    toast.success('标签已创建')
+    showTags.value = true
+  }
+  catch (e: any) {
+    toast.error(e?.message || '创建失败')
+  }
+}
+
+async function handleSaveTags(tagNames: string[]) {
+  if (!store.currentNoteId)
+    return
+  const updated = await store.saveCurrentNote({ tagNames })
+  if (updated && store.currentNoteId) {
+    queryCache.setQueryData(['note', store.currentNoteId], updated)
+    queryCache.invalidateQueries({ key: ['notes'] })
+    queryCache.invalidateQueries({ key: ['tags'] })
+    toast.success('标签已更新')
+  }
+}
+
 // ==================== 工具函数 ====================
 
 function formatSaveTime(date: Date | string): string {
@@ -339,7 +368,7 @@ function getPreview(note: NoteWithTags): string {
                 v-model="newFolderName"
                 type="text"
                 placeholder="文件夹名称"
-                class="w-full h-6 px-2 rounded border border-sidebar-ring bg-transparent text-xs text-sidebar-foreground focus:outline-none"
+                class="w-full h-6 px-2 rounded bg-neutral-300/20 bg-transparent text-xs text-sidebar-foreground focus:outline-none"
                 autofocus
                 @keydown.enter="handleCreateFolder"
                 @keydown.escape="cancelCreateFolder"
@@ -367,18 +396,27 @@ function getPreview(note: NoteWithTags): string {
 
           <!-- Tags toggle -->
           <div class="px-3 pt-1 pb-1.5">
-            <button
-              class="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
-              @click="showTags = !showTags"
-            >
-              <div class="i-carbon-chevron-right h-2.5 w-2.5 transition-transform duration-150" :class="{ 'rotate-90': showTags }" />
-              标签
-            </button>
+            <div class="flex items-center justify-between">
+              <button
+                class="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground transition-colors"
+                @click="showTags = !showTags"
+              >
+                <div class="i-carbon-chevron-right h-2.5 w-2.5 transition-transform duration-150" :class="{ 'rotate-90': showTags }" />
+                标签
+              </button>
+              <button
+                class="p-0.5 rounded hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground transition-colors"
+                title="新建标签"
+                @click="showCreateTagModal = true"
+              >
+                <div class="i-carbon-add text-sm" />
+              </button>
+            </div>
             <template v-if="showTags && tagsList.length > 0">
               <button
                 v-for="tag in tagsList"
                 :key="tag.id"
-                class="w-full flex items-center gap-2 py-1 text-xs transition-colors duration-100"
+                class="w-full flex items-center gap-2 px-2 py-1 text-xs transition-colors duration-100"
                 :class="store.selectedTagId === tag.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/50'"
@@ -453,7 +491,7 @@ function getPreview(note: NoteWithTags): string {
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Status bar (only when note selected) -->
       <header v-if="currentNote" class="flex-shrink-0 border-b border-border bg-background px-4 py-1.5 flex items-center justify-between gap-1">
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 flex-wrap">
           <span v-if="store.isSaving" class="text-xs text-muted-foreground">保存中...</span>
           <span v-else-if="store.lastSavedAt" class="text-xs text-muted-foreground">
             已保存 {{ formatSaveTime(store.lastSavedAt) }}
@@ -466,6 +504,13 @@ function getPreview(note: NoteWithTags): string {
             :key="tag.id"
             class="text-xs px-1.5 py-0.5 rounded-md bg-secondary text-secondary-foreground"
           >{{ tag.name }}</span>
+          <button
+            class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            title="添加标签"
+            @click="showAddTagsModal = true"
+          >
+            <div class="i-carbon-tag-group h-4 w-4" />
+          </button>
         </div>
         <button
           class="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-accent/50 transition-colors"
@@ -521,5 +566,18 @@ function getPreview(note: NoteWithTags): string {
         </div>
       </main>
     </div>
+
+    <CreateTagModal
+      :open="showCreateTagModal"
+      @create="handleCreateTag"
+      @close="showCreateTagModal = false"
+    />
+    <AddTagsModal
+      :open="showAddTagsModal"
+      :note-tags="currentNote?.tags ?? []"
+      :all-tags="tagsList"
+      @save="handleSaveTags"
+      @close="showAddTagsModal = false"
+    />
   </div>
 </template>

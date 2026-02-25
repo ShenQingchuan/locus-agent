@@ -3,13 +3,16 @@ import type { NodeJSON } from 'prosekit/core'
 import type { HighlightParser } from 'prosekit/extensions/code-block'
 import type { ComponentPublicInstance } from 'vue'
 import { defineBasicExtension } from 'prosekit/basic'
-import { createEditor, defineKeymap, isInCodeBlock, Priority, union, unsetBlockType, withPriority } from 'prosekit/core'
+import { createEditor, defineKeymap, defineNodeSpec, definePlugin, isInCodeBlock, Priority, union, unsetBlockType, withPriority } from 'prosekit/core'
 import { defineCodeBlockHighlight } from 'prosekit/extensions/code-block'
 import { definePlaceholder } from 'prosekit/extensions/placeholder'
+import { Plugin as PmPlugin } from 'prosekit/pm/state'
 import { ProseKit, useDocChange } from 'prosekit/vue'
 import { createParser as createShikiParser } from 'prosemirror-highlight/shiki'
 import { bundledLanguagesInfo } from 'shiki'
 import { markRaw } from 'vue'
+import { getCodeBlockDisplayName } from '@/utils/codeBlockDisplayName'
+import { nodeToMarkdown } from '@/utils/docToMarkdown'
 import { getShikiHighlighter } from '@/utils/shiki'
 import NoteToolbar from './NoteToolbar.vue'
 
@@ -108,6 +111,38 @@ function createDualThemeCodeBlockParser(): HighlightParser {
   }
 }
 
+function defineCodeBlockSpecWithDisplayName() {
+  return defineNodeSpec({
+    name: 'codeBlock',
+    content: 'text*',
+    group: 'block',
+    code: true,
+    defining: true,
+    marks: '',
+    attrs: {
+      language: { default: '', validate: 'string' },
+    },
+    parseDOM: [{
+      tag: 'pre',
+      preserveWhitespace: 'full',
+      getAttrs: (node) => {
+        const el = node as HTMLElement
+        const code = el.querySelector('code')
+        const raw = el.getAttribute('data-language') ?? code?.className?.match(/language-(\S+)/)?.[1] ?? ''
+        return { language: normalizeCodeBlockLanguage(raw) }
+      },
+    }],
+    toDOM(node) {
+      const { language } = node.attrs
+      return [
+        'pre',
+        { 'data-language': getCodeBlockDisplayName(language) || undefined },
+        ['code', { class: language ? `language-${language}` : undefined }, 0],
+      ]
+    },
+  })
+}
+
 function defineCodeBlockEditingKeymap() {
   return withPriority(defineKeymap({
     Tab: (state, dispatch) => {
@@ -143,10 +178,25 @@ function defineCodeBlockEditingKeymap() {
   }), Priority.high)
 }
 
+function defineMarkdownClipboardText() {
+  return definePlugin(({ schema }) => {
+    return new PmPlugin({
+      props: {
+        clipboardTextSerializer(slice) {
+          const tempDoc = schema.topNodeType.create(null, slice.content)
+          return nodeToMarkdown(tempDoc)
+        },
+      },
+    })
+  })
+}
+
 function buildExtension() {
   return union(
     defineBasicExtension(),
+    defineCodeBlockSpecWithDisplayName(),
     defineCodeBlockEditingKeymap(),
+    defineMarkdownClipboardText(),
     definePlaceholder({ placeholder: '开始写作...' }),
     defineCodeBlockHighlight({
       parser: createDualThemeCodeBlockParser(),
@@ -185,7 +235,7 @@ const editor = markRaw(createEditor({
 function mountEditor(
   ref: Element | ComponentPublicInstance | null,
 ): void {
-  const place = ref && '$el' in ref ? ref.$el as Element | null : ref
+  const place = ref && '$el' in ref ? (ref as ComponentPublicInstance).$el as Element | null : ref
   editor.mount(place as HTMLElement | null | undefined)
 }
 
@@ -239,6 +289,8 @@ function extractPlainText(doc: any): string {
   walk(doc)
   return parts.join('').trim()
 }
+
+
 </script>
 
 <template>
