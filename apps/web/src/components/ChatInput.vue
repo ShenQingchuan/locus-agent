@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
-import { DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
+import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -65,10 +65,11 @@ const localModel = ref('')
 const customModelPerProvider = ref<Partial<Record<LLMProviderType, string>>>({})
 
 watch(() => chatStore.modelName, (v) => {
-  localModel.value = v
-  // Seed the per-provider cache with the initial server value
-  if (v) {
-    customModelPerProvider.value[chatStore.provider] = v
+  const normalized = normalizeModelForProvider(v ?? '', chatStore.provider)
+  localModel.value = normalized
+  // Seed the per-provider cache with the normalized value
+  if (normalized) {
+    customModelPerProvider.value[chatStore.provider] = normalized
   }
 }, { immediate: true })
 
@@ -94,7 +95,8 @@ async function handleProviderChange(value: string) {
     customModelPerProvider.value[chatStore.provider] = localModel.value.trim()
   }
   // Restore previously remembered model for the new provider (or empty)
-  const remembered = customModelPerProvider.value[p] ?? ''
+  // Normalize: e.g. moonshotai/kimi-k2.5 -> kimi-k2.5 when switching to moonshotai
+  const remembered = normalizeModelForProvider(customModelPerProvider.value[p] ?? '', p)
   localModel.value = remembered
   const result = await chatStore.saveModelSettings(p, remembered)
   if (!result.success) {
@@ -122,6 +124,12 @@ watch(() => chatStore.editingMessageId, async (newId) => {
     await nextTick()
     textarea.value?.focus()
   }
+})
+
+// When new conversation is created, focus the prompt input
+watch(() => chatStore.focusInputTrigger, async () => {
+  await nextTick()
+  textarea.value?.focus()
 })
 
 function handleSubmit() {

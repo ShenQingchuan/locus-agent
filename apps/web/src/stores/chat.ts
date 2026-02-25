@@ -594,11 +594,15 @@ export const useChatStore = defineStore('chat', () => {
     error.value = null
   }
 
+  // Incremented when newConversation is called; ChatInput watches this to focus the prompt input
+  const focusInputTrigger = ref(0)
+
   function newConversation() {
     // 不立即生成 ID，发消息时再创建
     currentConversationId.value = null
     yoloMode.value = false
     clearMessages()
+    focusInputTrigger.value++
   }
 
   async function toggleYoloMode() {
@@ -949,6 +953,9 @@ export const useChatStore = defineStore('chat', () => {
     // Edit message state
     editingMessageId,
     editingContent,
+
+    // Focus input trigger (incremented on newConversation; ChatInput watches to focus)
+    focusInputTrigger,
 
     // Computed
     hasError,

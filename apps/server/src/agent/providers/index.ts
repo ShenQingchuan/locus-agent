@@ -4,7 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { DEFAULT_MODELS } from '@locus-agent/shared'
+import { DEFAULT_MODELS, normalizeModelForProvider } from '@locus-agent/shared'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 export type { LLMProviderType }
@@ -289,11 +289,11 @@ export function getCurrentModelInfo(): {
 }
 
 /**
- * SDK 内置默认地址与实际推荐地址不同的提供商，在此覆盖。
- * 例如 @ai-sdk/moonshotai 默认 api.moonshot.ai，但国内 key 需要 api.moonshot.cn。
+ * Default base URLs
  */
 const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
   moonshotai: 'https://api.moonshot.cn/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
 }
 
 /**
@@ -302,6 +302,7 @@ const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
 export function createLLMModel(modelId: string = getDefaultModel()): LanguageModel {
   const cfg = getConfig()
   const baseURL = cfg.apiBase || PROVIDER_DEFAULT_BASE_URLS[cfg.provider]
+  const effectiveModelId = normalizeModelForProvider(modelId, cfg.provider)
 
   switch (cfg.provider) {
     case 'anthropic': {
@@ -309,21 +310,21 @@ export function createLLMModel(modelId: string = getDefaultModel()): LanguageMod
         apiKey: cfg.apiKey,
         ...(baseURL ? { baseURL } : {}),
       })
-      return anthropic(modelId)
+      return anthropic(effectiveModelId)
     }
     case 'moonshotai': {
       const moonshot = createMoonshotAI({
         apiKey: cfg.apiKey,
         ...(baseURL ? { baseURL } : {}),
       })
-      return moonshot(modelId)
+      return moonshot(effectiveModelId)
     }
     case 'openrouter': {
       const openrouter = createOpenRouter({
         apiKey: cfg.apiKey,
         ...(baseURL ? { baseURL } : {}),
       })
-      return openrouter(modelId)
+      return openrouter(effectiveModelId)
     }
     case 'openai':
     default: {
@@ -334,10 +335,10 @@ export function createLLMModel(modelId: string = getDefaultModel()): LanguageMod
           apiKey: cfg.apiKey,
           baseURL,
         })
-        return provider.chatModel(modelId)
+        return provider.chatModel(effectiveModelId)
       }
       const openai = createOpenAI({ apiKey: cfg.apiKey })
-      return openai(modelId)
+      return openai(effectiveModelId)
     }
   }
 }

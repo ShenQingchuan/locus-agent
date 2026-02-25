@@ -8,6 +8,7 @@ export {
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
   LLM_PROVIDERS,
+  normalizeModelForProvider,
 } from './provider.js'
 
 export type * from './sse-events.js'

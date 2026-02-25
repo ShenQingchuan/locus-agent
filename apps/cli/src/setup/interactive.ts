@@ -1,6 +1,7 @@
 import type { LLMSettings } from '@locus-agent/server/settings'
 import { exit } from 'node:process'
 import * as p from '@clack/prompts'
+import { DEFAULT_API_BASES } from '@locus-agent/shared'
 
 export interface SetupResult extends LLMSettings {
   port: number
@@ -49,10 +50,10 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
       },
 
       apiBase: ({ results }) => {
-        const names = { openai: 'OpenAI', anthropic: 'Anthropic', moonshotai: 'Moonshot AI', openrouter: 'OpenRouter' } as const
+        const defaultBase = DEFAULT_API_BASES[results.provider!]
         return p.text({
-          message: `Custom API base URL (leave empty for official ${names[results.provider!]})`,
-          placeholder: 'https://api.example.com/v1',
+          message: `Custom API base URL (default: ${defaultBase})`,
+          placeholder: defaultBase,
           initialValue: existing?.apiBase ?? '',
         })
       },
@@ -93,10 +94,13 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
 
   p.outro('Configuration saved!')
 
+  const apiBaseRaw = (result.apiBase as string)?.trim()
+  const apiBase = apiBaseRaw || (DEFAULT_API_BASES[result.provider] ?? undefined)
+
   return {
     provider: result.provider,
     apiKey: (result.apiKey as string) || existing?.apiKey as string,
-    apiBase: (result.apiBase as string) || undefined,
+    apiBase,
     model: (result.model as string) || undefined,
     port: Number(result.port) || 3000,
   }

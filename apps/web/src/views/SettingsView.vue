@@ -455,7 +455,15 @@ async function saveConfig() {
           </h1>
         </div>
 
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2">
+          <button
+            class="btn-primary btn-xs !px-4"
+            :disabled="isLoading || isSaving || !!loadError"
+            @click="saveConfig"
+          >
+            <span v-if="isSaving" class="i-carbon-circle-dash text-sm animate-spin mr-1.5" />
+            保存
+          </button>
           <button
             class="btn-ghost btn-icon"
             title="刷新"
@@ -518,11 +526,14 @@ async function saveConfig() {
               <div class="mt-4 grid gap-4">
                 <div class="grid gap-1.5">
                   <label class="text-xs text-muted-foreground">提供方</label>
-                  <select v-model="form.provider" class="input-field">
-                    <option v-for="opt in providerOptions" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </option>
-                  </select>
+                  <div class="relative">
+                    <select v-model="form.provider" class="select-field">
+                      <option v-for="opt in providerOptions" :key="opt.value" :value="opt.value">
+                        {{ opt.label }}
+                      </option>
+                    </select>
+                    <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
 
                 <div class="grid gap-1.5">
@@ -781,14 +792,17 @@ async function saveConfig() {
                       </div>
                       <div class="grid gap-1.5">
                         <label class="text-xs text-muted-foreground">协议</label>
-                        <select v-model="newServer.transportType" class="input-field">
-                          <option value="sse">
-                            SSE（Server-Sent Events）
-                          </option>
-                          <option value="http">
-                            Streamable HTTP
-                          </option>
-                        </select>
+                        <div class="relative">
+                          <select v-model="newServer.transportType" class="select-field">
+                            <option value="sse">
+                              SSE（Server-Sent Events）
+                            </option>
+                            <option value="http">
+                              Streamable HTTP
+                            </option>
+                          </select>
+                          <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        </div>
                       </div>
                       <div class="grid gap-1.5">
                         <label class="text-xs text-muted-foreground">
@@ -897,24 +911,6 @@ async function saveConfig() {
                 </div>
               </div>
             </section>
-
-            <div class="flex items-center justify-end gap-2">
-              <button
-                class="btn-ghost"
-                :disabled="isSaving"
-                @click="router.push({ name: 'chat' })"
-              >
-                返回
-              </button>
-              <button
-                class="btn-primary"
-                :disabled="isSaving"
-                @click="saveConfig"
-              >
-                <span v-if="isSaving" class="i-carbon-circle-dash h-4 w-4 animate-spin mr-2" />
-                保存
-              </button>
-            </div>
           </template>
         </div>
       </main>

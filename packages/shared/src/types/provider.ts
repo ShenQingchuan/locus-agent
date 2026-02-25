@@ -22,3 +22,19 @@ export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntrie
 export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEntries(
   LLM_PROVIDERS.map(p => [p.value, p.defaultApiBase]),
 ) as Record<LLMProviderType, string>
+
+/**
+ * Normalize model name for the given provider.
+ * OpenRouter uses provider/model format (e.g. moonshotai/kimi-k2.5).
+ * Direct providers use model-only format from DEFAULT_MODELS.
+ * Strip provider prefix when using direct provider.
+ */
+export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {
+  const trimmed = model.trim()
+  if (provider === 'openrouter')
+    return trimmed
+  const prefix = `${provider}/`
+  if (trimmed.startsWith(prefix))
+    return trimmed.slice(prefix.length).trim() || DEFAULT_MODELS[provider]
+  return trimmed
+}
