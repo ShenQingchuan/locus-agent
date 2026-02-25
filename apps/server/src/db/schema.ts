@@ -94,6 +94,8 @@ export const notes = sqliteTable('notes', {
   content: text('content').notNull().default(''),
   /** ProseKit EditorState JSON（精确还原编辑器状态） */
   editorState: text('editor_state', { mode: 'json' }).$type<Record<string, unknown> | null>(),
+  /** LLM-generated summary (reserved for future use, currently empty) */
+  summary: text('summary'),
   folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()

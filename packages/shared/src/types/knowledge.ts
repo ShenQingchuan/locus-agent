@@ -11,6 +11,8 @@ export interface Note {
   content: string
   /** ProseKit EditorState JSON */
   editorState?: Record<string, unknown> | null
+  /** LLM-generated summary (reserved for future use, currently empty) */
+  summary?: string | null
   folderId: string | null
   createdAt: Date
   updatedAt: Date

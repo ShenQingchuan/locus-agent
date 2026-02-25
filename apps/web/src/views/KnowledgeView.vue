@@ -291,10 +291,6 @@ function formatDate(date: Date | string): string {
     return `${Math.floor(diff / 86400_000)} 天前`
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
-
-function getPreview(note: NoteWithTags): string {
-  return (note.content || '').slice(0, 100).replace(/\n/g, ' ') || '空笔记'
-}
 </script>
 
 <template>
@@ -461,9 +457,6 @@ function getPreview(note: NoteWithTags): string {
             >
               <div class="text-sm font-medium text-foreground truncate">
                 {{ note.title || '无标题' }}
-              </div>
-              <div class="mt-0.5 text-[11px] text-muted-foreground/60 line-clamp-2 leading-relaxed">
-                {{ getPreview(note) }}
               </div>
               <div class="mt-1 flex items-center gap-1.5">
                 <span class="text-[10px] text-muted-foreground/40">{{ formatDate(note.updatedAt) }}</span>
