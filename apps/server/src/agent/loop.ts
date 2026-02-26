@@ -1,7 +1,9 @@
-import type { LanguageModel, ModelMessage, ToolResultPart } from 'ai'
+import type { LanguageModel, ModelMessage } from 'ai'
 import type { QuestionAnswer, QuestionItem } from './tools/ask_question.js'
+import type { DelegateArgs, DelegateResult } from './tools/delegate.js'
 import { streamText } from 'ai'
 import { formatQuestionAnswers } from './tools/ask_question.js'
+import { executeDelegate } from './tools/delegate.js'
 import { executeToolCall, getMergedTools, hasToolExecutor, interactiveTools } from './tools/registry.js'
 import { isWhitelisted } from './whitelist.js'
 
@@ -45,6 +47,10 @@ export interface AgentLoopOptions {
   getQuestionAnswer?: (toolCallId: string, questions: QuestionItem[]) => Promise<QuestionAnswer[]>
   /** 会话 ID（用于白名单匹配） */
   conversationId?: string
+  /** Delegate 子代理状态流式回调（delegate 工具使用） */
+  onDelegateDelta?: (toolCallId: string, delta: { type: 'text' | 'reasoning' | 'tool_start' | 'tool_result', content: string, toolName?: string, isError?: boolean }) => void | Promise<void>
+  /** 工具调用超时时间（毫秒），未设置则使用默认超时 */
+  toolTimeoutMs?: number
 }
 
 /**
@@ -83,6 +89,25 @@ Only read when the edit failed (e.g. old_string not found) or when you need to c
  * 运行 Agent Loop
  * 循环执行 AI 调用和工具调用，直到完成或达到最大迭代次数
  */
+/**
+ * 带超时的 Promise 包装器
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  if (timeoutMs <= 0)
+    return promise
+
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    }),
+  ])
+}
+
+/**
+ * 运行 Agent Loop
+ * 循环执行 AI 调用和工具调用，直到完成或达到最大迭代次数
+ */
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
   const {
     messages: initialMessages,
@@ -103,6 +128,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onQuestionPending,
     getQuestionAnswer,
     conversationId,
+    onDelegateDelta,
+    toolTimeoutMs = 0, // 0 表示不设置超时
   } = options
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
@@ -182,11 +209,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
     // 收集本次迭代的文本
     let iterationText = ''
-    const toolCalls: Array<{
+    let pendingToolCall: {
       toolCallId: string
       toolName: string
       args: unknown
-    }> = []
+    } | null = null
     const seenToolCallIds = new Set<string>()
 
     // 处理流式响应
@@ -216,13 +243,16 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             break
           }
           seenToolCallIds.add(part.toolCallId)
-          toolCalls.push({
-            toolCallId: part.toolCallId,
-            toolName: part.toolName,
-            args: part.input,
-          })
-          if (onToolCallStart) {
-            await onToolCallStart(part.toolCallId, part.toolName, part.input)
+          // 只保留第一个工具调用，后续的忽略（将在下一轮处理）
+          if (!pendingToolCall) {
+            pendingToolCall = {
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              args: part.input,
+            }
+            if (onToolCallStart) {
+              await onToolCallStart(part.toolCallId, part.toolName, part.input)
+            }
           }
           break
 
@@ -243,122 +273,189 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     // 累积最终文本
     finalText += iterationText
 
-    // 如果有工具调用，执行它们
-    if (toolCalls.length > 0) {
-      // 使用 SDK 生成的完整 assistant 消息（包含 reasoning + tool-call）
-      const responseData = await response.response
-      const assistantMessages = responseData.messages.filter(m => m.role === 'assistant')
-      if (assistantMessages.length > 0) {
-        messages.push(assistantMessages[assistantMessages.length - 1])
-      }
-      else {
-        // fallback: 手动构建
-        messages.push({
-          role: 'assistant',
-          content: toolCalls.map(tc => ({
-            type: 'tool-call' as const,
-            toolCallId: tc.toolCallId,
-            toolName: tc.toolName,
-            input: tc.args,
-          })),
-        })
-      }
+    // 如果有工具调用，执行它（每轮只处理一个工具）
+    if (pendingToolCall) {
+      const tc = pendingToolCall
 
-      // 并发执行所有工具调用
-      const toolResults: ToolResultPart[] = await Promise.all(
-        toolCalls.map(async (tc): Promise<ToolResultPart> => {
-          let result: unknown
-          let isError = false
+      // 构建 assistant 消息（包含 tool-call）
+      messages.push({
+        role: 'assistant',
+        content: [{
+          type: 'tool-call' as const,
+          toolCallId: tc.toolCallId,
+          toolName: tc.toolName,
+          input: tc.args,
+        }],
+      })
 
-          try {
-            if (!hasToolExecutor(tc.toolName)) {
-              throw new Error(`Unknown tool: ${tc.toolName}`)
+      // 执行工具
+      let result: unknown
+      let isError = false
+
+      try {
+        if (!hasToolExecutor(tc.toolName)) {
+          throw new Error(`Unknown tool: ${tc.toolName}`)
+        }
+
+        // 交互式工具（如 ask_question、delegate）走特殊流程
+        if (interactiveTools.has(tc.toolName)) {
+          if (tc.toolName === 'ask_question' && getQuestionAnswer) {
+            const args = tc.args as { questions: QuestionItem[] }
+            const questions = args.questions || []
+
+            // 通知前端显示提问卡片
+            if (onQuestionPending) {
+              await onQuestionPending(tc.toolCallId, questions)
             }
 
-            // 交互式工具（如 ask_question）走特殊流程
-            if (interactiveTools.has(tc.toolName)) {
-              if (tc.toolName === 'ask_question' && getQuestionAnswer) {
-                const args = tc.args as { questions: QuestionItem[] }
-                const questions = args.questions || []
+            // 等待用户回答
+            const answers = await getQuestionAnswer(tc.toolCallId, questions)
 
-                // 通知前端显示提问卡片
-                if (onQuestionPending) {
-                  await onQuestionPending(tc.toolCallId, questions)
-                }
+            // 格式化回答
+            result = formatQuestionAnswers(answers)
+          }
+          else if (tc.toolName === 'delegate') {
+            const args = tc.args as DelegateArgs
 
-                // 等待用户回答
-                const answers = await getQuestionAnswer(tc.toolCallId, questions)
+            // 收集 delegate 执行过程中的 deltas（用于持久化存储）
+            const delegateDeltas: Array<{ type: string, content: string, toolName?: string, isError?: boolean }> = []
 
-                // 格式化回答
-                result = formatQuestionAnswers(answers)
-              }
-              else {
-                throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
-              }
+            // 执行 delegate，使用当前相同的模型，传递流式状态回调
+            const delegateResult: DelegateResult = await executeDelegate(
+              args,
+              model,
+              onDelegateDelta
+                ? {
+                    onTextDelta: async (delta) => {
+                      const d = { type: 'text' as const, content: delta }
+                      delegateDeltas.push(d)
+                      await onDelegateDelta(tc.toolCallId, d)
+                    },
+                    onReasoningDelta: async (delta) => {
+                      const d = { type: 'reasoning' as const, content: delta }
+                      delegateDeltas.push(d)
+                      await onDelegateDelta(tc.toolCallId, d)
+                    },
+                    onToolCallStart: async (_id, toolName, toolArgs) => {
+                      const d = {
+                        type: 'tool_start' as const,
+                        content: JSON.stringify(toolArgs),
+                        toolName,
+                      }
+                      delegateDeltas.push(d)
+                      await onDelegateDelta(tc.toolCallId, d)
+                    },
+                    onToolCallResult: async (_id, toolName, toolResult, isError) => {
+                      const d = {
+                        type: 'tool_result' as const,
+                        content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+                        toolName,
+                        isError,
+                      }
+                      delegateDeltas.push(d)
+                      await onDelegateDelta(tc.toolCallId, d)
+                    },
+                  }
+                : undefined,
+            )
+
+            // 返回包含 deltas 和独立 token 统计的结果
+            // 注意：子代理的 token 不计入主会话上下文
+            result = {
+              ...delegateResult,
+              deltas: delegateDeltas,
+              // 标记这是子代理结果，其 token 已单独统计
+              isSubAgentResult: true,
             }
-            // 确认模式下，检查白名单后决定是否等待用户确认
-            else if (shouldConfirm() && getToolApproval) {
-              // 白名单检查：如果匹配则自动放行
-              const whitelistMatch = conversationId
-                ? isWhitelisted(conversationId, tc.toolName, tc.args)
-                : null
 
-              if (whitelistMatch) {
-                // 白名单命中，自动放行
-                result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
-                  ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-                  : undefined)
-              }
-              else {
-                // 未命中白名单，需要用户确认
-                if (onToolPendingApproval) {
-                  await onToolPendingApproval(tc.toolCallId, tc.toolName, tc.args)
-                }
+            // 从主会话的 token 统计中减去子代理使用的 token
+            // 这样子代理的 token 不会计入主会话上下文限制
+            const subAgentInputTokens = delegateResult.usage.inputTokens
+            const subAgentOutputTokens = delegateResult.usage.outputTokens
+            totalInputTokens -= subAgentInputTokens
+            totalOutputTokens -= subAgentOutputTokens
+          }
+          else {
+            throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
+          }
+        }
+        // 确认模式下，检查白名单后决定是否等待用户确认
+        else if (shouldConfirm() && getToolApproval) {
+          // 白名单检查：如果匹配则自动放行
+          const whitelistMatch = conversationId
+            ? isWhitelisted(conversationId, tc.toolName, tc.args)
+            : null
 
-                const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
+          if (whitelistMatch) {
+            // 白名单命中，自动放行（应用超时）
+            const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+              ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
+              : undefined)
+            result = await withTimeout(
+              toolPromise,
+              toolTimeoutMs,
+              `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
+            )
+          }
+          else {
+            // 未命中白名单，需要用户确认
+            if (onToolPendingApproval) {
+              await onToolPendingApproval(tc.toolCallId, tc.toolName, tc.args)
+            }
 
-                if (!approved) {
-                  isError = true
-                  result = 'Tool execution was rejected by user'
-                }
-                else {
-                  result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
-                    ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-                    : undefined)
-                }
-              }
+            const approved = await getToolApproval(tc.toolCallId, tc.toolName, tc.args)
+
+            if (!approved) {
+              isError = true
+              result = 'Tool execution was rejected by user'
             }
             else {
-              result = await executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+              // 用户确认后执行（应用超时）
+              const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
                 ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
                 : undefined)
+              result = await withTimeout(
+                toolPromise,
+                toolTimeoutMs,
+                `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
+              )
             }
           }
-          catch (error) {
-            isError = true
-            result = error instanceof Error ? error.message : String(error)
-          }
+        }
+        else {
+          // 普通执行模式（应用超时）
+          const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
+            ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
+            : undefined)
+          result = await withTimeout(
+            toolPromise,
+            toolTimeoutMs,
+            `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
+          )
+        }
+      }
+      catch (error) {
+        isError = true
+        result = error instanceof Error ? error.message : String(error)
+      }
 
-          if (onToolCallResult) {
-            await onToolCallResult(tc.toolCallId, tc.toolName, result, isError)
-          }
+      if (onToolCallResult) {
+        await onToolCallResult(tc.toolCallId, tc.toolName, result, isError)
+      }
 
-          const resultText = typeof result === 'string' ? result : JSON.stringify(result)
-          return {
-            type: 'tool-result',
-            toolCallId: tc.toolCallId,
-            toolName: tc.toolName,
-            output: isError
-              ? { type: 'error-text', value: resultText }
-              : { type: 'text', value: resultText },
-          }
-        }),
-      )
+      const resultText = typeof result === 'string' ? result : JSON.stringify(result)
 
       // 添加工具结果消息
       messages.push({
         role: 'tool',
-        content: toolResults,
+        content: [{
+          type: 'tool-result',
+          toolCallId: tc.toolCallId,
+          toolName: tc.toolName,
+          output: isError
+            ? { type: 'error-text', value: resultText }
+            : { type: 'text', value: resultText },
+        }],
       })
 
       // 继续循环让 AI 处理工具结果

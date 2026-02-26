@@ -276,6 +276,16 @@ chatRoutes.post('/', async (c) => {
           return requestQuestionAnswer(toolCallId, questions)
         },
 
+        // Delegate 子代理状态流式回调
+        onDelegateDelta: async (toolCallId, delta) => {
+          const event: SSEEvent = {
+            type: 'delegate-delta',
+            toolCallId,
+            delta,
+          }
+          await stream.writeSSE(createSSEEvent(event))
+        },
+
         // 完成回调
         onFinish: async (_finishReason, usage) => {
           await stream.writeSSE(createSSEEvent({

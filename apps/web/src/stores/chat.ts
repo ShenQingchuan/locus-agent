@@ -19,12 +19,24 @@ import {
 } from '@/api/chat'
 import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 
+/**
+ * Delegate 工具流式状态更新
+ */
+export interface DelegateDelta {
+  type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
+  content: string
+  toolName?: string
+  isError?: boolean
+}
+
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question'
   /** 工具执行过程中的流式输出（如 bash 的 stdout/stderr） */
   output?: string
+  /** Delegate 工具的流式状态更新 */
+  delegateDeltas?: DelegateDelta[]
 }
 
 export type MessagePart
@@ -530,6 +542,33 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /**
+   * 追加 Delegate 工具的流式状态更新
+   */
+  function appendDelegateDelta(toolCallId: string, delta: DelegateDelta) {
+    // Find the message containing this toolCallId (search from the end for efficiency)
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      const message = messages.value[i]
+      if (!message?.toolCalls || message.toolCalls.length === 0)
+        continue
+
+      const tcIndex = message.toolCalls.findIndex(
+        tc => tc.toolCall.toolCallId === toolCallId,
+      )
+      if (tcIndex === -1)
+        continue
+
+      const tc = message.toolCalls[tcIndex]!
+      const newToolCalls = [...message.toolCalls]
+      newToolCalls[tcIndex] = {
+        ...tc,
+        delegateDeltas: [...(tc.delegateDeltas || []), delta],
+      }
+      messages.value[i] = { ...message, toolCalls: newToolCalls }
+      return
+    }
+  }
+
   function setToolCallAwaitingApproval(messageId: string, toolCallId: string) {
     const messageIndex = messages.value.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
@@ -769,6 +808,9 @@ export const useChatStore = defineStore('chat', () => {
         },
         onToolOutputDelta: (toolCallId, stream, delta) => {
           appendToolCallOutput(toolCallId, stream, delta)
+        },
+        onDelegateDelta: (event) => {
+          appendDelegateDelta(event.toolCallId, event.delta)
         },
         onDone: (_messageId, usage, model) => {
           const updates: Partial<Message> = { isStreaming: false }
@@ -1127,6 +1169,7 @@ export const useChatStore = defineStore('chat', () => {
     addToolCallToMessage,
     updateToolCallResult,
     appendToolCallOutput,
+    appendDelegateDelta,
     setToolCallAwaitingApproval,
     addPendingApproval,
     removePendingApproval,

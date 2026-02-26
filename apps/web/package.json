@@ -14,6 +14,7 @@
     "@locus-agent/shared": "workspace:*",
     "@locus-agent/ui": "workspace:*",
     "@pierre/diffs": "catalog:vue-family",
+    "beautiful-mermaid": "catalog:vue-family",
     "@pinia/colada": "catalog:vue-family",
     "@vueuse/core": "catalog:vue-family",
     "js-tiktoken": "catalog:vue-family",

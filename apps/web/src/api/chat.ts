@@ -38,6 +38,16 @@ export interface PendingQuestion {
   }>
 }
 
+export interface DelegateDeltaEvent {
+  toolCallId: string
+  delta: {
+    type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
+    content: string
+    toolName?: string
+    isError?: boolean
+  }
+}
+
 export interface ChatStreamOptions {
   conversationId: string
   message: string
@@ -51,6 +61,7 @@ export interface ChatStreamOptions {
   onToolPendingApproval?: (approval: PendingApproval) => void
   onQuestionPending?: (question: PendingQuestion) => void
   onToolOutputDelta?: (toolCallId: string, stream: 'stdout' | 'stderr', delta: string) => void
+  onDelegateDelta?: (event: DelegateDeltaEvent) => void
   onDone?: (messageId: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }, model?: string) => void
   onError?: (code: string, message: string) => void
 }
@@ -95,6 +106,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     onToolPendingApproval,
     onQuestionPending,
     onToolOutputDelta,
+    onDelegateDelta,
     onDone,
     onError,
   } = options
@@ -196,6 +208,12 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
           case 'tool-output-delta':
             onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
             break
+          case 'delegate-delta':
+            onDelegateDelta?.({
+              toolCallId: event.toolCallId,
+              delta: event.delta,
+            })
+            break
           case 'done':
             onDone?.(event.messageId, event.usage, event.model)
             break
@@ -240,6 +258,12 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
             break
           case 'tool-output-delta':
             onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
+            break
+          case 'delegate-delta':
+            onDelegateDelta?.({
+              toolCallId: event.toolCallId,
+              delta: event.delta,
+            })
             break
           case 'done':
             onDone?.(event.messageId, event.usage, event.model)

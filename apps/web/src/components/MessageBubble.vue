@@ -170,7 +170,7 @@ const assistantModelLabel = computed<string | null>(() => {
     <!-- User message: right aligned -->
     <template v-if="isUser">
       <div
-        class="max-w-[90%] text-right group rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors duration-200"
+        class="max-w-[95%] text-right group rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors duration-200"
         :class="isEditing ? 'bg-yellow-400/15 dark:bg-yellow-500/20' : ''"
       >
         <div class="flex items-center gap-1 justify-end">

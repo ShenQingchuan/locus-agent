@@ -5,6 +5,7 @@ import type { ToolCallState } from '@/stores/chat'
 import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
+import DelegateCard from './DelegateCard.vue'
 import DiffViewer from './DiffViewer.vue'
 import QuestionCard from './QuestionCard.vue'
 import ToolCallModal from './ToolCallModal.vue'
@@ -87,6 +88,11 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
       ? questions[0]!.question
       : `${questions.length} 个问题`
   },
+  delegate: (args) => {
+    const agentName = String(args.agent_name ?? args.agent_type ?? '子代理')
+    const task = String(args.task ?? '')
+    return `${agentName}: ${task.slice(0, 40)}${task.length > 40 ? '...' : ''}`
+  },
 }
 
 /**
@@ -96,7 +102,7 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
  *   - The modal result section is hidden (no duplicate display)
  * To add a new tool with custom output, just add its name to this set.
  */
-const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question'])
+const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
 
 /**
  * Tools that hide the compact summary row after completion.
@@ -104,7 +110,7 @@ const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question'])
  * so the one-line summary would be redundant.
  * To add a new tool, just add its name to this set.
  */
-const toolsWithHiddenSummary = new Set<string>(['ask_question'])
+const toolsWithHiddenSummary = new Set<string>(['ask_question', 'delegate'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -168,6 +174,102 @@ const slotProps = computed(() => ({
 /** Whether this is an ask_question tool */
 const isAskQuestion = computed(() => props.tool.toolCall.toolName === 'ask_question')
 
+/** Whether this is a delegate tool */
+const isDelegate = computed(() => props.tool.toolCall.toolName === 'delegate')
+
+/** Delegate 工具参数 */
+const delegateArgs = computed(() => {
+  if (!isDelegate.value)
+    return null
+  const args = props.tool.toolCall.args
+  return {
+    agentName: String(args.agent_name ?? args.agent_type ?? '子代理'),
+    agentType: String(args.agent_type ?? 'custom'),
+    task: String(args.task ?? ''),
+    context: args.context ? String(args.context) : undefined,
+  }
+})
+
+/** 从 delegate 结果中解析出的元数据 */
+const delegateMeta = computed(() => {
+  if (!isDelegate.value)
+    return null
+  if (props.tool.status !== 'completed' && props.tool.status !== 'error')
+    return null
+  const raw = props.tool.result?.result
+  if (!raw)
+    return null
+
+  // 后端可能返回对象（包含 deltas）或字符串（旧格式）
+  if (typeof raw === 'object' && raw !== null) {
+    const r = raw as { success?: boolean, agentName?: string, agentType?: string, iterations?: number, usage?: { inputTokens: number, outputTokens: number, totalTokens: number } }
+    return {
+      iterations: r.iterations ?? 0,
+      inputTokens: r.usage?.inputTokens ?? 0,
+      outputTokens: r.usage?.outputTokens ?? 0,
+      totalTokens: r.usage?.totalTokens ?? 0,
+      success: r.success ?? false,
+      agentName: r.agentName ?? '',
+      agentType: r.agentType ?? '',
+    }
+  }
+
+  // 旧格式：解析结果字符串
+  if (typeof raw === 'string') {
+    const lines = raw.split('\n')
+    let iterations = 0
+    let inputTokens = 0
+    let outputTokens = 0
+    let totalTokens = 0
+    let success = false
+    let agentName = ''
+    let agentType = ''
+
+    for (const line of lines.slice(0, 10)) {
+      if (line.startsWith('## Delegate Result:')) {
+        agentName = line.replace('## Delegate Result:', '').trim()
+      }
+      if (line.startsWith('Type:')) {
+        agentType = line.replace('Type:', '').trim()
+      }
+      if (line.startsWith('Success:')) {
+        success = line.includes('true')
+      }
+      if (line.startsWith('Iterations:')) {
+        const match = line.match(/Iterations:\s*(\d+)/)
+        if (match)
+          iterations = Number.parseInt(match[1]!, 10)
+      }
+      if (line.startsWith('Tokens:')) {
+        const match = line.match(/Tokens:\s*(\d+)\D*in:\s*(\d+)\D*out:\s*(\d+)/)
+        if (match) {
+          totalTokens = Number.parseInt(match[1]!, 10)
+          inputTokens = Number.parseInt(match[2]!, 10)
+          outputTokens = Number.parseInt(match[3]!, 10)
+        }
+      }
+    }
+
+    return { iterations, inputTokens, outputTokens, totalTokens, success, agentName, agentType }
+  }
+
+  return null
+})
+
+/** 从 delegate 结果中提取 deltas（用于恢复历史状态） */
+const delegateDeltasFromResult = computed((): Array<{ type: 'text' | 'reasoning' | 'tool_start' | 'tool_result', content: string, toolName?: string, isError?: boolean }> => {
+  if (!isDelegate.value)
+    return []
+  const raw = props.tool.result?.result
+  if (!raw || typeof raw !== 'object')
+    return []
+  const deltas = (raw as { deltas?: Array<{ type: string, content: string, toolName?: string, isError?: boolean }> }).deltas ?? []
+  // 验证并转换类型
+  return deltas.filter((d): d is { type: 'text' | 'reasoning' | 'tool_start' | 'tool_result', content: string, toolName?: string, isError?: boolean } =>
+    ['text', 'reasoning', 'tool_start', 'tool_result'].includes(d.type),
+  )
+})
+
 /** 已完成的 ask_question 工具的结构化问答结果 */
 const questionResultPairs = computed<Array<{ question: string, answer: string }> | null>(() => {
   if (!isAskQuestion.value)
@@ -201,6 +303,21 @@ const hasTerminalOutput = computed(() => hasOutputWidget.value && !!props.tool.o
 
 /** The terminal output text to display */
 const terminalOutput = computed(() => props.tool.output || '')
+
+/** Bash 命令（用于在终端顶部显示） */
+const bashCommand = computed(() => {
+  if (props.tool.toolCall.toolName !== 'bash')
+    return null
+  return String(props.tool.toolCall.args.command ?? '')
+})
+
+/** 带命令前缀的完整终端输出 */
+const terminalDisplayContent = computed(() => {
+  const cmd = bashCommand.value
+  if (!cmd)
+    return terminalOutput.value
+  return `$ ${cmd}\n\n${terminalOutput.value}`
+})
 
 /** Whether the tool is still running (streaming output) */
 const isToolRunning = computed(() => {
@@ -328,7 +445,7 @@ watch(terminalOutput, () => {
         ref="terminalRef"
         class="max-h-[300px] overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-[#3d2b1f] dark:text-[#e0e0e0]"
       >
-        {{ terminalOutput }}
+        {{ terminalDisplayContent }}
       </div>
       <div
         v-if="isToolRunning"
@@ -359,6 +476,21 @@ watch(terminalOutput, () => {
         </div>
       </div>
     </div>
+
+    <!-- Delegate 子代理卡片 -->
+    <DelegateCard
+      v-if="isDelegate && delegateArgs"
+      :tool-call-id="tool.toolCall.toolCallId"
+      :agent-name="delegateArgs.agentName"
+      :agent-type="delegateArgs.agentType"
+      :task="delegateArgs.task"
+      :context="delegateArgs.context"
+      :status="tool.status === 'error' ? 'error' : tool.status === 'completed' ? 'completed' : 'pending'"
+      :deltas="tool.delegateDeltas?.length ? tool.delegateDeltas : delegateDeltasFromResult"
+      :iterations="delegateMeta?.iterations"
+      :usage="delegateMeta ? { inputTokens: delegateMeta.inputTokens, outputTokens: delegateMeta.outputTokens, totalTokens: delegateMeta.totalTokens } : undefined"
+      class="mt-1.5"
+    />
 
     <!-- Inline diff for completed / error states -->
     <div

@@ -7,6 +7,7 @@ import type { WriteFileResult } from './write.js'
 import { mcpManager } from '../mcp/manager.js'
 import { askQuestionTool } from './ask_question.js'
 import { bashTool, executeBash, formatBashResult } from './bash.js'
+import { delegateTool } from './delegate.js'
 import { executeGlob, formatGlobResult, globTool } from './glob.js'
 import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 import { executeStrReplace, formatStrReplaceResult, strReplaceTool } from './str-replace.js'
@@ -29,6 +30,7 @@ export const tools = {
   str_replace: strReplaceTool,
   write_file: writeFileTool,
   ask_question: askQuestionTool,
+  delegate: delegateTool,
 }
 
 /**
@@ -50,7 +52,7 @@ type StreamingToolExecutor<T = unknown, R = unknown> = (args: T, callbacks?: Too
  * 需要在 agent loop 中特殊处理的交互式工具集合
  * 这些工具不通过 toolExecutors 执行，而是由 loop 拦截并走独立的交互流程
  */
-export const interactiveTools = new Set<string>(['ask_question'])
+export const interactiveTools = new Set<string>(['ask_question', 'delegate'])
 
 /**
  * Executors that return a formatted string (fed back to the LLM).
@@ -173,3 +175,7 @@ export function getAvailableTools(): string[] {
 
 // Re-export types for external consumers
 export type { BashResult, GlobResult, ReadFileResult, StrReplaceResult, WriteFileResult }
+
+// Delegate exports
+export { delegateTool, executeDelegate, formatDelegateResult } from './delegate.js'
+export type { DelegateArgs, DelegateResult, SubAgentConfig } from './delegate.js'

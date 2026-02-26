@@ -128,6 +128,27 @@ export interface QuestionPendingEvent {
 }
 
 /**
+ * Delegate 子代理状态增量事件
+ * 当子代理执行过程中产生状态更新时逐步发送
+ */
+export interface DelegateDeltaEvent {
+  type: 'delegate-delta'
+  /** 工具调用 ID */
+  toolCallId: string
+  /** 状态增量数据 */
+  delta: {
+    /** 增量类型 */
+    type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
+    /** 增量内容 */
+    content: string
+    /** 工具名称（仅 tool_start 和 tool_result 类型有） */
+    toolName?: string
+    /** 是否错误（仅 tool_result 类型有） */
+    isError?: boolean
+  }
+}
+
+/**
  * 所有 SSE 事件类型的联合类型
  */
 export type SSEEvent
@@ -140,6 +161,7 @@ export type SSEEvent
     | ToolPendingApprovalEvent
     | ToolOutputDeltaEvent
     | QuestionPendingEvent
+    | DelegateDeltaEvent
 
 /**
  * SSE 事件类型字符串
