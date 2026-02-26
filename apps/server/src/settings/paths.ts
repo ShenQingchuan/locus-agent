@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { env } from 'node:process'
 
 const APP_NAME = 'locus-agent'
 
@@ -9,7 +10,7 @@ const APP_NAME = 'locus-agent'
  * Default: ~/.local/share/locus-agent/
  */
 export function getDataDir(): string {
-  const xdgData = process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share')
+  const xdgData = env.XDG_DATA_HOME || join(homedir(), '.local', 'share')
   return join(xdgData, APP_NAME)
 }
 

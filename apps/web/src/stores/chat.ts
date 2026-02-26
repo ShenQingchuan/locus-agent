@@ -1,11 +1,12 @@
 import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
-import type { PendingApproval } from '@/api/chat'
+import type { PendingApproval, PendingQuestion, QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
   abortChat,
+  answerQuestion,
   approveToolCall,
   deleteConversation,
   deleteWhitelistRule,
@@ -21,7 +22,7 @@ import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
-  status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
+  status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question'
   /** 工具执行过程中的流式输出（如 bash 的 stdout/stderr） */
   output?: string
 }
@@ -63,6 +64,7 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref<{ code: string, message: string } | null>(null)
   const currentStreamingMessageId = ref<string | null>(null)
   const pendingApprovals = ref<Map<string, PendingApproval>>(new Map())
+  const pendingQuestions = ref<Map<string, PendingQuestion>>(new Map())
 
   // Whitelist state
   const whitelistRules = ref<WhitelistRule[]>([])
@@ -538,6 +540,27 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function setToolCallAwaitingQuestion(messageId: string, toolCallId: string) {
+    const messageIndex = messages.value.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    if (message?.toolCalls) {
+      let hasMatch = false
+      const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
+        if (toolCallState.toolCall.toolCallId !== toolCallId) {
+          return toolCallState
+        }
+        hasMatch = true
+        return {
+          ...toolCallState,
+          status: 'awaiting-question',
+        }
+      })
+      if (hasMatch) {
+        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+      }
+    }
+  }
+
   function setToolCallExecuting(toolCallId: string) {
     for (let i = 0; i < messages.value.length; i++) {
       const message = messages.value[i]
@@ -550,7 +573,7 @@ export const useChatStore = defineStore('chat', () => {
           return toolCallState
         }
         hasMatch = true
-        if (toolCallState.status !== 'awaiting-approval') {
+        if (toolCallState.status !== 'awaiting-approval' && toolCallState.status !== 'awaiting-question') {
           return toolCallState
         }
         return { ...toolCallState, status: 'pending' }
@@ -575,11 +598,24 @@ export const useChatStore = defineStore('chat', () => {
     pendingApprovals.value.clear()
   }
 
+  function addPendingQuestion(question: PendingQuestion) {
+    pendingQuestions.value.set(question.toolCallId, question)
+  }
+
+  function removePendingQuestion(toolCallId: string) {
+    pendingQuestions.value.delete(toolCallId)
+  }
+
+  function clearPendingQuestions() {
+    pendingQuestions.value.clear()
+  }
+
   function clearMessages() {
     messages.value = []
     error.value = null
     currentStreamingMessageId.value = null
     clearPendingApprovals()
+    clearPendingQuestions()
   }
 
   function setLoading(loading: boolean) {
@@ -699,6 +735,10 @@ export const useChatStore = defineStore('chat', () => {
           addPendingApproval(approval)
           setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId)
         },
+        onQuestionPending: (question) => {
+          addPendingQuestion(question)
+          setToolCallAwaitingQuestion(assistantMessageId, question.toolCallId)
+        },
         onToolOutputDelta: (toolCallId, stream, delta) => {
           appendToolCallOutput(toolCallId, stream, delta)
         },
@@ -795,6 +835,20 @@ export const useChatStore = defineStore('chat', () => {
     if (success) {
       await loadWhitelistRules()
     }
+    return success
+  }
+
+  /**
+   * 提交提问回答
+   */
+  async function submitQuestionAnswer(toolCallId: string, answers: QuestionAnswer[]) {
+    // 移除待回答状态
+    removePendingQuestion(toolCallId)
+
+    // 将工具状态切换为 pending（等待服务端处理结果）
+    setToolCallExecuting(toolCallId)
+
+    const success = await answerQuestion(toolCallId, answers)
     return success
   }
 
@@ -948,6 +1002,7 @@ export const useChatStore = defineStore('chat', () => {
     error,
     currentStreamingMessageId,
     pendingApprovals,
+    pendingQuestions,
     whitelistRules,
 
     // Edit message state
@@ -999,6 +1054,7 @@ export const useChatStore = defineStore('chat', () => {
     approveToolExecution,
     rejectToolExecution,
     approveAndWhitelist,
+    submitQuestionAnswer,
     loadWhitelistRules,
     removeWhitelistRule,
     retryFromMessage,

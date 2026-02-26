@@ -8,7 +8,7 @@ const props = defineProps<{
   args: Record<string, unknown>
   result?: unknown
   isError?: boolean
-  status: 'pending' | 'completed' | 'error' | 'awaiting-approval'
+  status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question'
   /** 若结果已通过外部 widget 展示，则 modal 内不再重复显示 */
   hideResult?: boolean
 }>()
@@ -54,6 +54,7 @@ const statusIcon = computed(() => {
   switch (props.status) {
     case 'pending': return 'i-carbon-hourglass'
     case 'awaiting-approval': return 'i-carbon-warning-alt'
+    case 'awaiting-question': return 'i-carbon-help'
     case 'completed': return 'i-carbon-checkmark'
     case 'error': return 'i-carbon-close'
     default: return 'i-carbon-tool-box'
@@ -72,6 +73,7 @@ const statusLabel = computed(() => {
   switch (props.status) {
     case 'pending': return '执行中'
     case 'awaiting-approval': return '等待确认'
+    case 'awaiting-question': return '等待回答'
     case 'completed': return '已完成'
     case 'error': return '错误'
     default: return ''

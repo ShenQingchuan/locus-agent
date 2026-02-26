@@ -47,19 +47,19 @@ const emit = defineEmits<{
 
 defineSlots<{
   /** Custom render for each item content */
-  default: (props: { item: any, index: number }) => any
+  'default': (props: { item: any, index: number }) => any
   /** Custom render for actions area */
-  actions: (props: { item: any, index: number }) => any
+  'actions': (props: { item: any, index: number }) => any
   /** Empty state slot */
-  empty: () => any
+  'empty': () => any
   /** Loading state slot */
-  loading: () => any
+  'loading': () => any
   /** Header slot (above the list, includes select-all in multi-select mode) */
-  header: () => any
+  'header': () => any
   /** Select all label slot */
   'select-all-label': () => any
   /** Footer slot (below the list) */
-  footer: () => any
+  'footer': () => any
 }>()
 
 // Normalize selection to array
@@ -156,6 +156,12 @@ function toggleSelectAll() {
 }
 </script>
 
+<script lang="ts">
+// Re-exports for external use
+export { default as ListItem } from './ListItem.vue'
+export type { ListItemAction, ListItemSelectMode } from './ListItem.vue'
+</script>
+
 <template>
   <div class="list-root">
     <!-- Header slot with optional select-all (only in checkbox mode) -->
@@ -196,8 +202,8 @@ function toggleSelectAll() {
     <div v-else class="list-container" :class="listClass">
       <ListItem
         v-for="(item, index) in items"
-        :key="getItemKey(item)"
         :id="getItemKey(item)"
+        :key="getItemKey(item)"
         :selected="isSelected(item)"
         :selectable="multiSelect"
         :select-mode="selectMode"
@@ -269,9 +275,3 @@ function toggleSelectAll() {
   padding: 0.5rem;
 }
 </style>
-
-<script lang="ts">
-// Re-exports for external use
-export { default as ListItem } from './ListItem.vue'
-export type { ListItemAction, ListItemSelectMode } from './ListItem.vue'
-</script>

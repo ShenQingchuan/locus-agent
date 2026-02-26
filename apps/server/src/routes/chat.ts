@@ -8,12 +8,14 @@ import type {
   WhitelistRule,
 } from '@locus-agent/shared'
 import type { ModelMessage } from 'ai'
+import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import { extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { getPendingApproval, requestApproval, resolveApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
+import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
 import {
   addGlobalRule,
   addSessionRule,
@@ -260,6 +262,20 @@ chatRoutes.post('/', async (c) => {
           return requestApproval(toolCallId, toolName, args)
         },
 
+        // 提问等待回答回调（ask_question 工具使用）
+        onQuestionPending: async (toolCallId, questions) => {
+          await stream.writeSSE(createSSEEvent({
+            type: 'question-pending',
+            toolCallId,
+            questions,
+          }))
+        },
+
+        // 获取用户对提问的回答（ask_question 工具使用）
+        getQuestionAnswer: async (toolCallId, questions) => {
+          return requestQuestionAnswer(toolCallId, questions)
+        },
+
         // 完成回调
         onFinish: async (_finishReason, usage) => {
           await stream.writeSSE(createSSEEvent({
@@ -446,6 +462,45 @@ chatRoutes.post('/approve', async (c) => {
   }
 
   return c.json({ success: true, approved })
+})
+
+// POST /api/chat/answer - Submit answers to ask_question tool
+chatRoutes.post('/answer', async (c) => {
+  const body = await c.req.json<{
+    toolCallId: string
+    answers: QuestionAnswer[]
+  }>()
+  const { toolCallId, answers } = body
+
+  if (!toolCallId || !answers) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'toolCallId and answers are required',
+        },
+      },
+      400,
+    )
+  }
+
+  const resolved = resolveQuestionAnswer(toolCallId, answers)
+
+  if (!resolved) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No pending question found for this toolCallId',
+        },
+      },
+      404,
+    )
+  }
+
+  return c.json({ success: true })
 })
 
 // GET /api/chat/whitelist - Get whitelist rules

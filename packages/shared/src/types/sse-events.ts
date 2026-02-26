@@ -109,6 +109,23 @@ export interface ToolOutputDeltaEvent {
 }
 
 /**
+ * 提问等待回答事件
+ * 当 AI 使用 ask_question 工具向用户提问时发送
+ */
+export interface QuestionPendingEvent {
+  type: 'question-pending'
+  /** 工具调用 ID */
+  toolCallId: string
+  /** 问题列表 */
+  questions: Array<{
+    /** 问题文本 */
+    question: string
+    /** 预设选项 */
+    options: string[]
+  }>
+}
+
+/**
  * 所有 SSE 事件类型的联合类型
  */
 export type SSEEvent
@@ -120,6 +137,7 @@ export type SSEEvent
     | ErrorEvent
     | ToolPendingApprovalEvent
     | ToolOutputDeltaEvent
+    | QuestionPendingEvent
 
 /**
  * SSE 事件类型字符串

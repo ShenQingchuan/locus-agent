@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
 import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
@@ -31,6 +32,18 @@ async function handleReject(toolCallId: string) {
 
 async function handleWhitelist(toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }) {
   await chatStore.approveAndWhitelist(toolCallId, payload)
+}
+
+async function handleQuestionAnswer(toolCallId: string, answers: QuestionAnswer[]) {
+  await chatStore.submitQuestionAnswer(toolCallId, answers)
+}
+
+function getQuestionData(toolCallId: string) {
+  const pending = chatStore.pendingQuestions.get(toolCallId)
+  if (pending) {
+    return { questions: pending.questions }
+  }
+  return undefined
 }
 
 async function handleRetry() {
@@ -234,12 +247,13 @@ const assistantModelLabel = computed<string | null>(() => {
           <!-- Reasoning/Thinking part -->
           <details
             v-if="part.type === 'reasoning' && part.content"
-            class="my-2"
+            class="my-2 group/reasoning"
             :open="message.isStreaming"
           >
             <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1">
               <div class="i-carbon-idea h-3 w-3" />
-              <span>思考过程</span>
+              <span>{{ message.isStreaming ? '思考过程' : '思考结束' }}</span>
+              <span v-if="!message.isStreaming" class="reasoning-hint opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开思考过程</span>
             </summary>
             <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
               {{ part.content }}
@@ -254,9 +268,11 @@ const assistantModelLabel = computed<string | null>(() => {
               :tool="tool"
               :suggested-pattern="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.suggestedPattern"
               :risk-level="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.riskLevel"
+              :question-data="getQuestionData(tool.toolCall.toolCallId)"
               @approve="handleApprove"
               @reject="handleReject"
               @whitelist="handleWhitelist"
+              @question-answer="handleQuestionAnswer"
             />
           </template>
 
@@ -296,5 +312,10 @@ const assistantModelLabel = computed<string | null>(() => {
 .text-right .markstream-vue .heading-node,
 .text-right .markstream-vue .list-node {
   text-align: right;
+}
+
+/* 展开时隐藏提示文字 */
+details[open] .reasoning-hint {
+  display: none;
 }
 </style>

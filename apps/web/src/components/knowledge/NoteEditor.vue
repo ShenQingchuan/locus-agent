@@ -289,8 +289,6 @@ function extractPlainText(doc: any): string {
   walk(doc)
   return parts.join('').trim()
 }
-
-
 </script>
 
 <template>

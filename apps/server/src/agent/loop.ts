@@ -1,6 +1,8 @@
 import type { LanguageModel, ModelMessage, ToolResultPart } from 'ai'
+import type { QuestionAnswer, QuestionItem } from './tools/ask_question.js'
 import { streamText } from 'ai'
-import { executeToolCall, getMergedTools, hasToolExecutor } from './tools/registry.js'
+import { formatQuestionAnswers } from './tools/ask_question.js'
+import { executeToolCall, getMergedTools, hasToolExecutor, interactiveTools } from './tools/registry.js'
 import { isWhitelisted } from './whitelist.js'
 
 /**
@@ -37,6 +39,10 @@ export interface AgentLoopOptions {
   thinkingMode?: boolean
   /** 获取工具确认结果的函数（确认模式下使用） */
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
+  /** 提问等待回答回调（ask_question 工具使用） */
+  onQuestionPending?: (toolCallId: string, questions: QuestionItem[]) => void | Promise<void>
+  /** 获取用户对提问的回答（ask_question 工具使用） */
+  getQuestionAnswer?: (toolCallId: string, questions: QuestionItem[]) => Promise<QuestionAnswer[]>
   /** 会话 ID（用于白名单匹配） */
   conversationId?: string
 }
@@ -94,6 +100,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     confirmMode: confirmModeOpt = false,
     thinkingMode = true,
     getToolApproval,
+    onQuestionPending,
+    getQuestionAnswer,
     conversationId,
   } = options
 
@@ -267,8 +275,29 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
               throw new Error(`Unknown tool: ${tc.toolName}`)
             }
 
+            // 交互式工具（如 ask_question）走特殊流程
+            if (interactiveTools.has(tc.toolName)) {
+              if (tc.toolName === 'ask_question' && getQuestionAnswer) {
+                const args = tc.args as { questions: QuestionItem[] }
+                const questions = args.questions || []
+
+                // 通知前端显示提问卡片
+                if (onQuestionPending) {
+                  await onQuestionPending(tc.toolCallId, questions)
+                }
+
+                // 等待用户回答
+                const answers = await getQuestionAnswer(tc.toolCallId, questions)
+
+                // 格式化回答
+                result = formatQuestionAnswers(answers)
+              }
+              else {
+                throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
+              }
+            }
             // 确认模式下，检查白名单后决定是否等待用户确认
-            if (shouldConfirm() && getToolApproval) {
+            else if (shouldConfirm() && getToolApproval) {
               // 白名单检查：如果匹配则自动放行
               const whitelistMatch = conversationId
                 ? isWhitelisted(conversationId, tc.toolName, tc.args)

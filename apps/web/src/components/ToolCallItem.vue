@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { RiskLevel } from '@locus-agent/shared'
+import type { QuestionAnswer } from '@/api/chat'
 import type { ToolCallState } from '@/stores/chat'
 import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import DiffViewer from './DiffViewer.vue'
+import QuestionCard from './QuestionCard.vue'
 import ToolCallModal from './ToolCallModal.vue'
 import WhitelistPopover from './WhitelistPopover.vue'
 
@@ -14,12 +16,17 @@ const props = defineProps<{
   suggestedPattern?: string
   /** 服务端预计算的风险等级 */
   riskLevel?: RiskLevel
+  /** 提问工具的问题数据 */
+  questionData?: {
+    questions: Array<{ question: string, options: string[] }>
+  }
 }>()
 
 const emit = defineEmits<{
   approve: [toolCallId: string]
   reject: [toolCallId: string]
   whitelist: [toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }]
+  questionAnswer: [toolCallId: string, answers: QuestionAnswer[]]
 }>()
 
 defineSlots<{
@@ -46,6 +53,7 @@ const statusIcon = computed(() => {
   switch (props.tool.status) {
     case 'pending': return 'i-carbon-hourglass'
     case 'awaiting-approval': return 'i-carbon-warning-alt'
+    case 'awaiting-question': return 'i-carbon-help'
     case 'completed': return 'i-carbon-checkmark'
     case 'error': return 'i-carbon-close'
     default: return 'i-carbon-tool-box'
@@ -70,6 +78,14 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
   read_file: args => String(args.file_path ?? ''),
   str_replace: args => String(args.file_path ?? ''),
   write_file: args => String(args.file_path ?? ''),
+  ask_question: (args) => {
+    const questions = args.questions as Array<{ question: string }> | undefined
+    if (!questions || questions.length === 0)
+      return '提问'
+    return questions.length === 1
+      ? questions[0]!.question
+      : `${questions.length} 个问题`
+  },
 }
 
 /**
@@ -79,7 +95,15 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
  *   - The modal result section is hidden (no duplicate display)
  * To add a new tool with custom output, just add its name to this set.
  */
-const toolsWithOutputWidget = new Set<string>(['bash'])
+const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question'])
+
+/**
+ * Tools that hide the compact summary row after completion.
+ * These tools have their own result display (e.g. question-answer block),
+ * so the one-line summary would be redundant.
+ * To add a new tool, just add its name to this set.
+ */
+const toolsWithHiddenSummary = new Set<string>(['ask_question'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -116,6 +140,7 @@ const defaultSummary = computed(() => {
   switch (status) {
     case 'pending': return '执行中...'
     case 'awaiting-approval': return '等待确认'
+    case 'awaiting-question': return '等待回答'
     case 'error': return '执行失败'
     case 'completed': {
       if (!result?.result)
@@ -138,6 +163,34 @@ const slotProps = computed(() => ({
   result: props.tool.result?.result,
   isError: props.tool.result?.isError,
 }))
+
+/** Whether this is an ask_question tool */
+const isAskQuestion = computed(() => props.tool.toolCall.toolName === 'ask_question')
+
+/** 已完成的 ask_question 工具的结构化问答结果 */
+const questionResultPairs = computed<Array<{ question: string, answer: string }> | null>(() => {
+  if (!isAskQuestion.value)
+    return null
+  if (props.tool.status !== 'completed' && props.tool.status !== 'error')
+    return null
+  const raw = props.tool.result?.result
+  if (!raw || typeof raw !== 'string')
+    return null
+  // 解析 "- 问题：\n回答" 格式
+  const pairs: Array<{ question: string, answer: string }> = []
+  const blocks = raw.split(/\n\n/).filter(Boolean)
+  for (const block of blocks) {
+    const match = block.match(/^- ([^\n：]+)：\n([\s\S]*)$/)
+    if (match) {
+      pairs.push({ question: match[1]!, answer: match[2]!.trim() })
+    }
+  }
+  return pairs.length > 0 ? pairs : null
+})
+
+/** Whether to hide the compact summary row (tool has its own result display) */
+const hideSummary = computed(() => toolsWithHiddenSummary.has(props.tool.toolCall.toolName)
+  && (props.tool.status === 'completed' || props.tool.status === 'error'))
 
 /** Whether this tool uses a custom inline output widget */
 const hasOutputWidget = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName))
@@ -239,9 +292,17 @@ watch(terminalOutput, () => {
       </div>
     </div>
 
-    <!-- Other states: compact inline -->
+    <!-- Awaiting question: question card -->
+    <QuestionCard
+      v-else-if="tool.status === 'awaiting-question' && isAskQuestion && questionData"
+      :tool-call-id="tool.toolCall.toolCallId"
+      :questions="questionData.questions"
+      @submit="(toolCallId, answers) => emit('questionAnswer', toolCallId, answers)"
+    />
+
+    <!-- Other states: compact inline (hidden when tool has its own result display) -->
     <div
-      v-else
+      v-else-if="!hideSummary"
       class="flex items-center gap-1.5 text-muted-foreground cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
       @click="modalOpen = true"
     >
@@ -274,6 +335,27 @@ watch(terminalOutput, () => {
       >
         <div class="i-svg-spinners:bars-fade h-3 w-3" />
         <span>执行中...</span>
+      </div>
+    </div>
+
+    <!-- ask_question 完成后展示问答结果 -->
+    <div
+      v-if="questionResultPairs"
+      class="mt-1.5 rounded-lg bg-muted/30 px-3 py-2.5 text-left"
+    >
+      <div class="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground/70">
+        <div class="i-ic:round-question-mark h-3 w-3 flex-shrink-0" />
+        <span>提问与回答</span>
+      </div>
+      <div class="space-y-1.5">
+        <div v-for="(pair, idx) in questionResultPairs" :key="idx">
+          <div class="text-sm text-foreground">
+            {{ pair.question }}
+          </div>
+          <div class="text-xs text-muted-foreground mt-0.5">
+            {{ pair.answer }}
+          </div>
+        </div>
       </div>
     </div>
 
