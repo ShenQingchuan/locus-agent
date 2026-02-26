@@ -6,7 +6,6 @@
 
 export interface Note {
   id: string
-  title: string
   /** Markdown 纯文本 */
   content: string
   /** ProseKit EditorState JSON */
@@ -23,7 +22,6 @@ export interface NoteWithTags extends Note {
 }
 
 export interface CreateNoteInput {
-  title: string
   content?: string
   editorState?: Record<string, unknown> | null
   folderId?: string | null
@@ -32,7 +30,6 @@ export interface CreateNoteInput {
 }
 
 export interface UpdateNoteInput {
-  title?: string
   content?: string
   editorState?: Record<string, unknown> | null
   folderId?: string | null

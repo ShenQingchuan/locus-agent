@@ -9,8 +9,8 @@ const isDark = useDark()
 const toggleDark = useToggle(isDark)
 
 const currentModule = computed(() => {
-  if (route.name === 'knowledge')
-    return 'knowledge'
+  if (route.name === 'memories')
+    return 'memories'
   return 'chat'
 })
 
@@ -33,9 +33,9 @@ const navItems: NavItem[] = [
     title: '对话',
   },
   {
-    key: 'knowledge',
+    key: 'memories',
     icon: 'i-material-symbols:book-2',
-    title: '知识库',
+    title: '记忆',
   },
 ]
 </script>

@@ -89,7 +89,6 @@ export const folders = sqliteTable('folders', {
 /** 笔记主表 */
 export const notes = sqliteTable('notes', {
   id: text('id').primaryKey(),
-  title: text('title').notNull(),
   /** Markdown 纯文本（用于搜索、AI 上下文注入、导出） */
   content: text('content').notNull().default(''),
   /** ProseKit EditorState JSON（精确还原编辑器状态） */

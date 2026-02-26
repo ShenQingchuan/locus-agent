@@ -34,6 +34,7 @@ export interface PendingQuestion {
   questions: Array<{
     question: string
     options: string[]
+    multiple?: boolean
   }>
 }
 

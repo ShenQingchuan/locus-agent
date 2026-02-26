@@ -1,59 +1,39 @@
 import type { LLMProviderType } from '@locus-agent/shared'
-import { existsSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
-import { Database } from 'bun:sqlite'
+import { eq } from 'drizzle-orm'
+import { db, settings as settingsTable } from '../db/index.js'
 
 export { ensureDataDir, getDataDir, getSettingsDbPath } from './paths.js'
 
-let _sqlite: Database | null = null
-
-/**
- * Open the settings database
- */
-export function openSettingsDb(dbPath: string): void {
-  const dir = dirname(dbPath)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  _sqlite = new Database(dbPath, { create: true })
-  _sqlite.run('PRAGMA foreign_keys = ON;')
-  _sqlite.run(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
-  `)
-}
-
-/**
- * Close the settings database
- */
-export function closeSettingsDb(): void {
-  if (_sqlite) {
-    _sqlite.close()
-    _sqlite = null
-  }
-}
-
-function getSqlite(): Database {
-  if (!_sqlite)
-    throw new Error('Settings DB not initialized. Call openSettingsDb() first.')
-  return _sqlite
-}
-
 export function getSetting(key: string): string | undefined {
-  const row = getSqlite()
-    .query<{ value: string }, [string]>('SELECT value FROM settings WHERE key = ?')
-    .get(key)
-  return row?.value
+  const rows = db
+    .select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, key))
+    .limit(1)
+    .all()
+
+  return rows[0]?.value
 }
 
 export function setSetting(key: string, value: string): void {
-  getSqlite().run(
-    'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, unixepoch())',
-    [key, value],
-  )
+  const existing = db
+    .select({ key: settingsTable.key })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, key))
+    .limit(1)
+    .all()
+
+  if (existing.length > 0) {
+    db.update(settingsTable)
+      .set({ value, updatedAt: new Date() })
+      .where(eq(settingsTable.key, key))
+      .run()
+  }
+  else {
+    db.insert(settingsTable)
+      .values({ key, value })
+      .run()
+  }
 }
 
 export function isSetupComplete(): boolean {

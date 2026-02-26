@@ -7,6 +7,7 @@ const props = defineProps<{
   questions: Array<{
     question: string
     options: string[]
+    multiple?: boolean
   }>
 }>()
 
@@ -14,54 +15,98 @@ const emit = defineEmits<{
   submit: [toolCallId: string, answers: QuestionAnswer[]]
 }>()
 
-// Track selected answers: index → selected option or custom text
-const selectedAnswers = ref<Map<number, string>>(new Map())
-// Track whether custom input is active for each question
+// 单选：index → 选中的选项文本
+const singleAnswers = ref<Map<number, string>>(new Map())
+// 多选：index → 选中的选项集合
+const multiAnswers = ref<Map<number, Set<string>>>(new Map())
+// 自定义输入是否激活
 const customActive = ref<Map<number, boolean>>(new Map())
-// Custom input text for each question
+// 自定义输入文本
 const customTexts = ref<Map<number, string>>(new Map())
 
-function selectOption(questionIndex: number, option: string) {
-  selectedAnswers.value.set(questionIndex, option)
-  customActive.value.set(questionIndex, false)
-  // Trigger reactivity
-  selectedAnswers.value = new Map(selectedAnswers.value)
+function triggerReactivity() {
+  singleAnswers.value = new Map(singleAnswers.value)
+  multiAnswers.value = new Map(multiAnswers.value)
   customActive.value = new Map(customActive.value)
+  customTexts.value = new Map(customTexts.value)
 }
 
-function activateCustom(questionIndex: number) {
-  customActive.value.set(questionIndex, true)
-  customActive.value = new Map(customActive.value)
-  // Clear option selection, use custom text as answer
-  const customText = customTexts.value.get(questionIndex) || ''
-  if (customText) {
-    selectedAnswers.value.set(questionIndex, customText)
+// ── 单选 ──
+function selectSingle(qIdx: number, option: string) {
+  singleAnswers.value.set(qIdx, option)
+  customActive.value.set(qIdx, false)
+  triggerReactivity()
+}
+
+// ── 多选 ──
+function toggleMulti(qIdx: number, option: string) {
+  let selected = multiAnswers.value.get(qIdx)
+  if (!selected) {
+    selected = new Set()
+    multiAnswers.value.set(qIdx, selected)
+  }
+  if (selected.has(option))
+    selected.delete(option)
+  else
+    selected.add(option)
+  triggerReactivity()
+}
+
+function isMultiSelected(qIdx: number, option: string): boolean {
+  return multiAnswers.value.get(qIdx)?.has(option) ?? false
+}
+
+// ── 自定义输入 ──
+function activateCustom(qIdx: number) {
+  customActive.value.set(qIdx, true)
+  // 单选模式下清除选项选择
+  if (!props.questions[qIdx]?.multiple) {
+    singleAnswers.value.delete(qIdx)
+  }
+  triggerReactivity()
+}
+
+function updateCustomText(qIdx: number, text: string) {
+  customTexts.value.set(qIdx, text)
+  triggerReactivity()
+}
+
+function isCustomActive(qIdx: number): boolean {
+  return customActive.value.get(qIdx) ?? false
+}
+
+// ── 组装当前问题的回答文本 ──
+function getAnswer(qIdx: number): string {
+  const q = props.questions[qIdx]!
+  const parts: string[] = []
+
+  if (q.multiple) {
+    // 多选：收集所有勾选的选项
+    const selected = multiAnswers.value.get(qIdx)
+    if (selected && selected.size > 0) {
+      parts.push(...selected)
+    }
   }
   else {
-    selectedAnswers.value.delete(questionIndex)
+    // 单选
+    const single = singleAnswers.value.get(qIdx)
+    if (single && !isCustomActive(qIdx)) {
+      parts.push(single)
+    }
   }
-  selectedAnswers.value = new Map(selectedAnswers.value)
-}
 
-function updateCustomText(questionIndex: number, text: string) {
-  customTexts.value.set(questionIndex, text)
-  customTexts.value = new Map(customTexts.value)
-  if (customActive.value.get(questionIndex)) {
-    if (text.trim()) {
-      selectedAnswers.value.set(questionIndex, text.trim())
-    }
-    else {
-      selectedAnswers.value.delete(questionIndex)
-    }
-    selectedAnswers.value = new Map(selectedAnswers.value)
+  // 自定义文本
+  if (isCustomActive(qIdx)) {
+    const custom = customTexts.value.get(qIdx)?.trim()
+    if (custom)
+      parts.push(custom)
   }
+
+  return parts.join('、')
 }
 
 const allAnswered = computed(() => {
-  return props.questions.every((_, i) => {
-    const answer = selectedAnswers.value.get(i)
-    return answer && answer.trim().length > 0
-  })
+  return props.questions.every((_, i) => getAnswer(i).length > 0)
 })
 
 const isSubmitted = ref(false)
@@ -74,22 +119,10 @@ function handleSubmit() {
 
   const answers: QuestionAnswer[] = props.questions.map((q, i) => ({
     question: q.question,
-    answer: selectedAnswers.value.get(i) || '',
+    answer: getAnswer(i),
   }))
 
   emit('submit', props.toolCallId, answers)
-}
-
-function getSelectedAnswer(questionIndex: number): string | undefined {
-  return selectedAnswers.value.get(questionIndex)
-}
-
-function isOptionSelected(questionIndex: number, option: string): boolean {
-  return !customActive.value.get(questionIndex) && selectedAnswers.value.get(questionIndex) === option
-}
-
-function isCustomActive(questionIndex: number): boolean {
-  return customActive.value.get(questionIndex) || false
 }
 </script>
 
@@ -106,6 +139,7 @@ function isCustomActive(questionIndex: number): boolean {
         <div class="flex items-start gap-2 mb-2.5">
           <div class="i-carbon-help h-4 w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
           <span class="text-sm font-medium text-foreground">{{ q.question }}</span>
+          <span class="text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded-full leading-normal flex-shrink-0 mt-0.5">{{ q.multiple ? '多选' : '单选' }}</span>
         </div>
 
         <!-- Options -->
@@ -115,28 +149,47 @@ function isCustomActive(questionIndex: number): boolean {
             :key="oIdx"
             class="flex items-center gap-2 w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors duration-150"
             :class="[
-              isOptionSelected(qIdx, option)
+              (q.multiple ? isMultiSelected(qIdx, option) : (!isCustomActive(qIdx) && singleAnswers.get(qIdx) === option))
                 ? 'bg-foreground/10 text-foreground border border-foreground/20'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent',
             ]"
             :disabled="isSubmitted"
-            @click="selectOption(qIdx, option)"
+            @click="q.multiple ? toggleMulti(qIdx, option) : selectSingle(qIdx, option)"
           >
-            <div
-              class="h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 transition-colors duration-150"
-              :class="[
-                isOptionSelected(qIdx, option)
-                  ? 'border-foreground bg-foreground'
-                  : 'border-muted-foreground/40',
-              ]"
-            >
+            <!-- 多选: checkbox 样式 -->
+            <template v-if="q.multiple">
               <div
-                v-if="isOptionSelected(qIdx, option)"
-                class="h-full w-full rounded-full flex items-center justify-center"
+                class="h-3.5 w-3.5 flex-shrink-0 rounded border-2 transition-colors duration-150 flex items-center justify-center"
+                :class="[
+                  isMultiSelected(qIdx, option)
+                    ? 'border-foreground bg-foreground'
+                    : 'border-muted-foreground/40',
+                ]"
               >
-                <div class="h-1.5 w-1.5 rounded-full bg-background" />
+                <div
+                  v-if="isMultiSelected(qIdx, option)"
+                  class="i-carbon-checkmark h-2.5 w-2.5 text-background"
+                />
               </div>
-            </div>
+            </template>
+            <!-- 单选: radio 样式 -->
+            <template v-else>
+              <div
+                class="h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 transition-colors duration-150"
+                :class="[
+                  (!isCustomActive(qIdx) && singleAnswers.get(qIdx) === option)
+                    ? 'border-foreground bg-foreground'
+                    : 'border-muted-foreground/40',
+                ]"
+              >
+                <div
+                  v-if="!isCustomActive(qIdx) && singleAnswers.get(qIdx) === option"
+                  class="h-full w-full rounded-full flex items-center justify-center"
+                >
+                  <div class="h-1.5 w-1.5 rounded-full bg-background" />
+                </div>
+              </div>
+            </template>
             <span>{{ option }}</span>
           </button>
 
@@ -154,21 +207,39 @@ function isCustomActive(questionIndex: number): boolean {
               :disabled="isSubmitted"
               @click="activateCustom(qIdx)"
             >
-              <div
-                class="h-3.5 w-3.5 rounded-full border-2 transition-colors duration-150"
-                :class="[
-                  isCustomActive(qIdx)
-                    ? 'border-foreground bg-foreground'
-                    : 'border-muted-foreground/40',
-                ]"
-              >
+              <!-- 多选模式下自定义也是 checkbox -->
+              <template v-if="q.multiple">
                 <div
-                  v-if="isCustomActive(qIdx)"
-                  class="h-full w-full rounded-full flex items-center justify-center"
+                  class="h-3.5 w-3.5 rounded border-2 transition-colors duration-150 flex items-center justify-center"
+                  :class="[
+                    isCustomActive(qIdx)
+                      ? 'border-foreground bg-foreground'
+                      : 'border-muted-foreground/40',
+                  ]"
                 >
-                  <div class="h-1.5 w-1.5 rounded-full bg-background" />
+                  <div
+                    v-if="isCustomActive(qIdx)"
+                    class="i-carbon-checkmark h-2.5 w-2.5 text-background"
+                  />
                 </div>
-              </div>
+              </template>
+              <template v-else>
+                <div
+                  class="h-3.5 w-3.5 rounded-full border-2 transition-colors duration-150"
+                  :class="[
+                    isCustomActive(qIdx)
+                      ? 'border-foreground bg-foreground'
+                      : 'border-muted-foreground/40',
+                  ]"
+                >
+                  <div
+                    v-if="isCustomActive(qIdx)"
+                    class="h-full w-full rounded-full flex items-center justify-center"
+                  >
+                    <div class="h-1.5 w-1.5 rounded-full bg-background" />
+                  </div>
+                </div>
+              </template>
               <span class="text-muted-foreground">自定义回答</span>
             </button>
             <input
@@ -207,20 +278,6 @@ function isCustomActive(questionIndex: number): boolean {
       <span v-if="isSubmitted" class="text-xs text-muted-foreground">
         已提交
       </span>
-    </div>
-
-    <!-- Submitted answers preview -->
-    <div
-      v-if="isSubmitted"
-      class="px-4 py-2.5 border-t border-border bg-muted/20"
-    >
-      <div class="text-xs text-muted-foreground space-y-1">
-        <div v-for="(q, qIdx) in questions" :key="qIdx">
-          <span class="font-medium">{{ q.question }}</span>
-          <span class="mx-1">→</span>
-          <span class="text-foreground">{{ getSelectedAnswer(qIdx) }}</span>
-        </div>
-      </div>
     </div>
   </div>
 </template>

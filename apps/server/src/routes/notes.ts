@@ -33,14 +33,9 @@ notesRoutes.get('/', async (c) => {
 // POST /api/notes - 创建笔记
 notesRoutes.post('/', async (c) => {
   const body = await c.req.json()
-  const { title, content, editorState, folderId, tagNames, conversationId } = body
-
-  if (!title || typeof title !== 'string') {
-    return c.json({ error: 'Title is required' }, 400)
-  }
+  const { content, editorState, folderId, tagNames, conversationId } = body
 
   const note = await createNote({
-    title,
     content,
     editorState,
     folderId,
@@ -78,10 +73,9 @@ notesRoutes.get('/:id', async (c) => {
 notesRoutes.patch('/:id', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
-  const { title, content, editorState, folderId, tagNames } = body
+  const { content, editorState, folderId, tagNames } = body
 
   const updated = await updateNote(id, {
-    title,
     content,
     editorState,
     folderId,

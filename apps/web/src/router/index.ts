@@ -9,9 +9,9 @@ const router = createRouter({
       component: () => import('@/views/ChatView.vue'),
     },
     {
-      path: '/knowledge',
-      name: 'knowledge',
-      component: () => import('@/views/KnowledgeView.vue'),
+      path: '/memories',
+      name: 'memories',
+      component: () => import('@/views/MemoriesView.vue'),
     },
     {
       path: '/settings',

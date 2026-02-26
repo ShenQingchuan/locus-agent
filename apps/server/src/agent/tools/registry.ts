@@ -1,11 +1,13 @@
 import type { Tool } from 'ai'
 import type { BashResult } from './bash.js'
+import type { GlobResult } from './glob.js'
 import type { ReadFileResult } from './read.js'
 import type { StrReplaceResult } from './str-replace.js'
 import type { WriteFileResult } from './write.js'
 import { mcpManager } from '../mcp/manager.js'
 import { askQuestionTool } from './ask_question.js'
 import { bashTool, executeBash, formatBashResult } from './bash.js'
+import { executeGlob, formatGlobResult, globTool } from './glob.js'
 import { executeReadFile, formatReadResult, readFileTool } from './read.js'
 import { executeStrReplace, formatStrReplaceResult, strReplaceTool } from './str-replace.js'
 import { executeWriteFile, formatWriteResult, writeFileTool } from './write.js'
@@ -23,6 +25,7 @@ export interface ToolOutputCallbacks {
 export const tools = {
   bash: bashTool,
   read_file: readFileTool,
+  glob: globTool,
   str_replace: strReplaceTool,
   write_file: writeFileTool,
   ask_question: askQuestionTool,
@@ -72,6 +75,10 @@ const toolExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = {
     const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
     return formatReadResult(result)
   },
+  glob: async (args) => {
+    const result = await executeGlob(args as Parameters<typeof executeGlob>[0])
+    return formatGlobResult(result)
+  },
   str_replace: async (args) => {
     const result = await executeStrReplace(args as Parameters<typeof executeStrReplace>[0])
     return formatStrReplaceResult(result)
@@ -89,6 +96,7 @@ const toolExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = {
 const toolRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   bash: executeBash as ToolExecutor,
   read_file: executeReadFile as ToolExecutor,
+  glob: executeGlob as ToolExecutor,
   str_replace: executeStrReplace as ToolExecutor,
   write_file: executeWriteFile as ToolExecutor,
 }
@@ -164,4 +172,4 @@ export function getAvailableTools(): string[] {
 }
 
 // Re-export types for external consumers
-export type { BashResult, ReadFileResult, StrReplaceResult, WriteFileResult }
+export type { BashResult, GlobResult, ReadFileResult, StrReplaceResult, WriteFileResult }

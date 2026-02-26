@@ -40,19 +40,17 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     lastSavedAt.value = null
   }
 
-  /** 创建新笔记（需在 mutation 后 invalidate notes，并用 setQueryData 填充缓存） */
-  async function createNote(title?: string, folderId?: string | null) {
+  /** 创建新记忆（需在 mutation 后 invalidate notes，并用 setQueryData 填充缓存） */
+  async function createNote(folderId?: string | null) {
     const note = await api.createNote({
-      title: title || '无标题笔记',
       folderId: folderId ?? selectedFolderId.value,
     })
     currentNoteId.value = note.id
     return note
   }
 
-  /** 保存当前笔记（返回更新后的 note，用于 setQueryData） */
+  /** 保存当前记忆（返回更新后的 note，用于 setQueryData） */
   async function saveCurrentNote(data: {
-    title?: string
     content?: string
     editorState?: Record<string, unknown> | null
     tagNames?: string[]

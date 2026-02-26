@@ -122,6 +122,8 @@ export interface QuestionPendingEvent {
     question: string
     /** 预设选项 */
     options: string[]
+    /** 是否允许多选 */
+    multiple?: boolean
   }>
 }
 

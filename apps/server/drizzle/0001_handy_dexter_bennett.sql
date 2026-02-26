@@ -1,1 +1,0 @@
-ALTER TABLE `conversations` ADD `confirm_mode` integer DEFAULT true NOT NULL;

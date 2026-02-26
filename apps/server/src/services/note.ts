@@ -1,5 +1,5 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
-import { and, desc, eq, inArray, like } from 'drizzle-orm'
+import { desc, eq, inArray, like } from 'drizzle-orm'
 import { db, noteConversations, noteLinks, notes, noteTags, tags } from '../db/index.js'
 import { getOrCreateTag } from './tag.js'
 
@@ -10,7 +10,6 @@ export interface NoteWithTags extends Note {
 }
 
 export interface CreateNoteInput {
-  title: string
   content?: string
   editorState?: Record<string, unknown> | null
   folderId?: string | null
@@ -20,7 +19,6 @@ export interface CreateNoteInput {
 }
 
 export interface UpdateNoteInput {
-  title?: string
   content?: string
   editorState?: Record<string, unknown> | null
   folderId?: string | null
@@ -38,7 +36,6 @@ export async function createNote(input: CreateNoteInput): Promise<NoteWithTags> 
 
   const newNote: NewNote = {
     id,
-    title: input.title,
     content: input.content ?? '',
     editorState: input.editorState ?? null,
     folderId: input.folderId ?? null,
@@ -146,8 +143,6 @@ export async function updateNote(
 
   const updates: Partial<NewNote> & { updatedAt: Date } = { updatedAt: new Date() }
 
-  if (input.title !== undefined)
-    updates.title = input.title
   if (input.content !== undefined)
     updates.content = input.content
   if (input.editorState !== undefined)
@@ -262,7 +257,7 @@ export async function getBacklinks(noteId: string): Promise<Note[]> {
 // ==================== 搜索 ====================
 
 /**
- * 简单关键词搜索（标题 + 内容模糊匹配）
+ * 简单关键词搜索（内容模糊匹配）
  * 后续 Phase 5 会替换为 FTS5 全文搜索
  */
 export async function searchNotes(query: string): Promise<NoteWithTags[]> {
@@ -271,52 +266,18 @@ export async function searchNotes(query: string): Promise<NoteWithTags[]> {
   const result = await db
     .select()
     .from(notes)
-    .where(
-      and(
-        like(notes.title, pattern),
-      ),
-    )
-    .orderBy(desc(notes.updatedAt))
-    .limit(50)
-
-  // 也搜索内容
-  const contentResult = await db
-    .select()
-    .from(notes)
     .where(like(notes.content, pattern))
     .orderBy(desc(notes.updatedAt))
     .limit(50)
 
-  // 合并去重
-  const seen = new Set<string>()
-  const merged: Note[] = []
-  for (const note of [...result, ...contentResult]) {
-    if (!seen.has(note.id)) {
-      seen.add(note.id)
-      merged.push(note)
-    }
-  }
-
   // 附加标签
   const notesWithTags: NoteWithTags[] = []
-  for (const note of merged) {
+  for (const note of result) {
     const noteTags_ = await getNoteTags(note.id)
     notesWithTags.push({ ...note, tags: noteTags_ })
   }
 
   return notesWithTags
-}
-
-/**
- * 根据标题精确查找笔记（用于 wikilink 解析）
- */
-export async function findNoteByTitle(title: string): Promise<Note | null> {
-  const [note] = await db
-    .select()
-    .from(notes)
-    .where(eq(notes.title, title))
-
-  return note || null
 }
 
 /**

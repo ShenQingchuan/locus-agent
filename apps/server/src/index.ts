@@ -13,13 +13,11 @@ import { notesRoutes } from './routes/notes.js'
 import { settingsRoutes } from './routes/settings.js'
 import { tagsRoutes } from './routes/tags.js'
 import {
-  closeSettingsDb,
   ensureDataDir,
   getLLMSettings,
   getServerPort,
   getSettingsDbPath,
   isYoloMode,
-  openSettingsDb,
 } from './settings/index.js'
 
 /**
@@ -59,26 +57,23 @@ export function createApp(): Hono {
 // Dev mode: start server only when this file is the entry point (bun --watch src/index.ts)
 // Bun launches HTTP server from the entry file's default export
 function startDev() {
-  // 1. Load config from settings DB (~/.local/share/locus-agent/locus.db)
+  // 1. Ensure data directory and initialize DB (runs Drizzle migrations)
   ensureDataDir()
   const dbPath = getSettingsDbPath()
-  openSettingsDb(dbPath)
+  initDB({ dbPath })
 
+  // 2. Load config from settings DB (uses Drizzle db instance)
   const llmSettings = getLLMSettings()
   if (!llmSettings) {
     throw new Error('LLM settings not configured. Run `locus-agent config` to set up.')
   }
   const port = getServerPort()
   const yoloMode = isYoloMode()
-  closeSettingsDb()
 
   const VITE_DEV_PORT = 5173
   if (port === VITE_DEV_PORT) {
     throw new Error(`Server port ${port} conflicts with Vite dev server. Change it via \`locus-agent config\`.`)
   }
-
-  // 2. Initialize main app DB using the same SQLite file as the CLI
-  initDB({ dbPath })
 
   // 3. Inject configs (same as CLI mode)
   setLLMConfig(llmSettings)

@@ -18,7 +18,7 @@ const props = defineProps<{
   riskLevel?: RiskLevel
   /** 提问工具的问题数据 */
   questionData?: {
-    questions: Array<{ question: string, options: string[] }>
+    questions: Array<{ question: string, options: string[], multiple?: boolean }>
   }
 }>()
 
@@ -76,6 +76,7 @@ const statusIconClass = computed(() => {
 const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => string> = {
   bash: args => String(args.command ?? ''),
   read_file: args => String(args.file_path ?? ''),
+  glob: args => String(args.pattern ?? ''),
   str_replace: args => String(args.file_path ?? ''),
   write_file: args => String(args.file_path ?? ''),
   ask_question: (args) => {

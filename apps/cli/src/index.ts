@@ -2,15 +2,14 @@
 import { spawn } from 'node:child_process'
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
+import { initDB } from '@locus-agent/server/db'
 import {
-  closeSettingsDb,
   ensureDataDir,
   getLLMSettings,
   getServerPort,
   getSettingsDbPath,
   isSetupComplete,
   isYoloMode,
-  openSettingsDb,
   saveLLMSettings,
   setSetting,
 } from '@locus-agent/server/settings'
@@ -83,7 +82,7 @@ async function main(): Promise<void> {
 async function handleDaemon(): Promise<void> {
   ensureDataDir()
   const dbPath = getSettingsDbPath()
-  openSettingsDb(dbPath)
+  initDB({ dbPath, migrationsFolder: getMigrationsFolder() })
 
   const llmSettings = getLLMSettings()
   if (!llmSettings) {
@@ -93,7 +92,6 @@ async function handleDaemon(): Promise<void> {
 
   const port = portFlag ?? getServerPort()
   const yoloMode = isYoloMode()
-  closeSettingsDb()
 
   startServer({
     dbPath,
@@ -111,7 +109,7 @@ async function handleDaemon(): Promise<void> {
 async function handleStart(): Promise<void> {
   ensureDataDir()
   const dbPath = getSettingsDbPath()
-  openSettingsDb(dbPath)
+  initDB({ dbPath, migrationsFolder: getMigrationsFolder() })
 
   // 首次运行：交互式配置
   if (!isSetupComplete()) {
@@ -128,7 +126,6 @@ async function handleStart(): Promise<void> {
     if (isProcessAlive(oldPid)) {
       const port = portFlag ?? getServerPort()
       console.log(`Locus Agent is already running (pid ${oldPid}) at http://localhost:${port}`)
-      closeSettingsDb()
       return
     }
     // stale pid file
@@ -136,7 +133,6 @@ async function handleStart(): Promise<void> {
   }
 
   const port = portFlag ?? getServerPort()
-  closeSettingsDb()
 
   // 构造子进程参数
   const childArgs = [Bun.main, '--daemon']
@@ -194,15 +190,14 @@ function handleStop(): void {
 
 async function handleConfig(): Promise<void> {
   ensureDataDir()
-  openSettingsDb(getSettingsDbPath())
+  const dbPath = getSettingsDbPath()
+  initDB({ dbPath, migrationsFolder: getMigrationsFolder() })
 
   const existing = getLLMSettings()
   const existingPort = getServerPort()
   const settings = await runSetup(existing, existingPort)
   saveLLMSettings(settings)
   setSetting('server.port', String(settings.port))
-
-  closeSettingsDb()
 }
 
 function handleVersion(): void {
