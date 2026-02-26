@@ -115,7 +115,18 @@ watch(() => chatStore.modelName, (v) => {
   }
 }, { immediate: true })
 
-const modelPlaceholder = computed(() => DEFAULT_MODELS[chatStore.provider] ?? '')
+/**
+ * DeepSeek 默认模型根据 thinkMode 动态切换
+ * -chat 无推理，-reasoner 带思考
+ * 用户未填写时（使用 placeholder），显示对应的默认模型
+ */
+const modelPlaceholder = computed(() => {
+  if (chatStore.provider !== 'deepseek')
+    return DEFAULT_MODELS[chatStore.provider] ?? ''
+
+  // DeepSeek 根据思考模式返回不同的默认模型
+  return chatStore.thinkMode ? 'deepseek-reasoner' : 'deepseek-chat'
+})
 
 // Auto-width: use the visible text (value or placeholder) to size the input in ch units
 const modelInputWidth = computed(() => {

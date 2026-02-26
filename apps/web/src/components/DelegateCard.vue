@@ -58,53 +58,6 @@ const statusConfig = computed(() => {
   }
 })
 
-// 收集所有文本内容
-const textContent = computed(() => {
-  return props.deltas
-    .filter(d => d.type === 'text')
-    .map(d => d.content)
-    .join('')
-})
-
-// 收集思考过程
-const reasoningContent = computed(() => {
-  return props.deltas
-    .filter(d => d.type === 'reasoning')
-    .map(d => d.content)
-    .join('')
-})
-
-// 收集工具调用历史
-const toolCalls = computed(() => {
-  const calls: Array<{ toolName: string, input: string, output?: string, isError?: boolean }> = []
-  let currentCall: { toolName: string, input: string, output?: string, isError?: boolean } | null = null
-
-  for (const delta of props.deltas) {
-    if (delta.type === 'tool_start' && delta.toolName) {
-      if (currentCall) {
-        calls.push(currentCall)
-      }
-      currentCall = { toolName: delta.toolName, input: delta.content }
-    }
-    else if (delta.type === 'tool_result' && currentCall) {
-      currentCall.output = delta.content
-      currentCall.isError = delta.isError
-      calls.push(currentCall)
-      currentCall = null
-    }
-  }
-
-  if (currentCall) {
-    calls.push(currentCall)
-  }
-
-  return calls
-})
-
-const hasToolCalls = computed(() => toolCalls.value.length > 0)
-const hasTextContent = computed(() => textContent.value.length > 0)
-const hasReasoning = computed(() => reasoningContent.value.length > 0)
-
 // 是否有正在进行的工具调用（有 tool_start 但没有 tool_result）
 // 注意：如果子代理已完成，即使有未完成的工具调用，也不显示 spinner
 const hasPendingToolCall = computed(() => {
@@ -119,8 +72,85 @@ const hasPendingToolCall = computed(() => {
   return lastDelta.type === 'tool_start'
 })
 
-// 工具调用区域展开状态
-const isToolCallsExpanded = ref(true)
+// 按顺序处理 deltas，构建用于渲染的条目列表
+const timelineItems = computed(() => {
+  const items: Array<
+    | { type: 'reasoning', content: string }
+    | { type: 'tool', toolName: string, input: string, output?: string, isError?: boolean }
+    | { type: 'text', content: string }
+  > = []
+
+  let currentReasoning = ''
+  let currentText = ''
+  let currentTool: { toolName: string, input: string, output?: string, isError?: boolean } | null = null
+
+  function flushReasoning() {
+    if (currentReasoning) {
+      items.push({ type: 'reasoning', content: currentReasoning })
+      currentReasoning = ''
+    }
+  }
+
+  function flushText() {
+    if (currentText) {
+      items.push({ type: 'text', content: currentText })
+      currentText = ''
+    }
+  }
+
+  function flushTool() {
+    if (currentTool) {
+      items.push({ type: 'tool', ...currentTool })
+      currentTool = null
+    }
+  }
+
+  for (const delta of props.deltas) {
+    switch (delta.type) {
+      case 'reasoning':
+        flushTool()
+        flushText()
+        currentReasoning += delta.content
+        break
+      case 'tool_start':
+        flushReasoning()
+        flushText()
+        if (currentTool) {
+          // 上一个工具没有收到 result，先 flush 它
+          items.push({ type: 'tool', ...currentTool })
+        }
+        currentTool = { toolName: delta.toolName || 'unknown', input: delta.content }
+        break
+      case 'tool_result':
+        if (currentTool) {
+          currentTool.output = delta.content
+          currentTool.isError = delta.isError
+          flushTool()
+        }
+        break
+      case 'text':
+        flushTool()
+        flushReasoning()
+        currentText += delta.content
+        break
+    }
+  }
+
+  // Flush any remaining content
+  flushTool()
+  flushReasoning()
+  flushText()
+
+  return items
+})
+
+// 统计工具调用数量（用于 header 显示）
+const toolCallCount = computed(() => {
+  return timelineItems.value.filter(i => i.type === 'tool').length
+})
+
+// 是否有工具调用
+const hasToolCalls = computed(() => toolCallCount.value > 0)
 
 // 格式化 token 数量
 function formatTokens(count: number): string {
@@ -221,65 +251,50 @@ watch(() => props.deltas.length, () => {
           </div>
         </div>
 
-        <!-- Reasoning Process -->
-        <div v-if="hasReasoning" class="px-3 py-2 border-b border-border/50">
-          <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-2">
-            <div class="i-carbon-idea h-3 w-3" />
-            <span>思考过程</span>
-          </div>
-          <div class="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {{ reasoningContent }}
-          </div>
-        </div>
+        <!-- Timeline: 线性排列的思考、工具调用和文本 -->
+        <div class="divide-y divide-border/30">
+          <template v-for="(item, idx) in timelineItems" :key="idx">
+            <!-- Reasoning -->
+            <div v-if="item.type === 'reasoning'" class="px-3 py-2">
+              <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-2">
+                <div class="i-carbon-idea h-3 w-3" />
+                <span>思考过程</span>
+              </div>
+              <div class="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {{ item.content }}
+              </div>
+            </div>
 
-        <!-- Tool Calls History -->
-        <div v-if="hasToolCalls" class="border-b border-border/50">
-          <!-- 可点击的 Header -->
-          <div
-            class="px-3 py-2 bg-muted/20 flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground/70 cursor-pointer hover:bg-muted/30 transition-colors"
-            @click="isToolCallsExpanded = !isToolCallsExpanded"
-          >
-            <div class="flex items-center gap-1.5">
-              <div class="i-carbon-tool-box h-3 w-3" />
-              <span>工具调用 ({{ toolCalls.length }})</span>
-              <!-- Loading spinner -->
-              <div
-                v-if="hasPendingToolCall"
-                class="i-svg-spinners:bars-fade h-3 w-3 text-amber-500"
+            <!-- Tool Call -->
+            <div v-else-if="item.type === 'tool'" class="px-3 py-2">
+              <SubAgentToolCallItem
+                :tool-name="item.toolName"
+                :input="item.input"
+                :output="item.output"
+                :is-error="item.isError"
+                :parent-completed="status === 'completed' || status === 'error'"
               />
             </div>
-            <div
-              class="h-3.5 w-3.5 transition-transform duration-200 i-carbon-chevron-down"
-              :class="[isToolCallsExpanded ? 'rotate-180' : '']"
-            />
-          </div>
-          <!-- 工具调用列表 -->
-          <div v-show="isToolCallsExpanded" class="divide-y divide-border/30">
-            <SubAgentToolCallItem
-              v-for="(call, idx) in toolCalls"
-              :key="idx"
-              :tool-name="call.toolName"
-              :input="call.input"
-              :output="call.output"
-              :is-error="call.isError"
-              :parent-completed="status === 'completed' || status === 'error'"
-            />
-          </div>
+
+            <!-- Text -->
+            <div v-else-if="item.type === 'text'" class="px-3 py-3">
+              <div class="text-sm text-foreground leading-relaxed">
+                <MarkdownRender :content="item.content" />
+              </div>
+            </div>
+          </template>
         </div>
 
-        <!-- Text Output -->
-        <div v-if="hasTextContent" class="px-3 py-3">
-          <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-2">
-            <div class="i-carbon-text-align-left h-3 w-3" />
-            <span>执行结果</span>
-          </div>
-          <div class="text-sm text-foreground leading-relaxed">
-            <MarkdownRender :content="textContent" />
+        <!-- Pending tool call indicator (when streaming) -->
+        <div v-if="hasPendingToolCall" class="px-3 py-2 border-t border-border/50">
+          <div class="flex items-center gap-2 text-xs text-muted-foreground">
+            <div class="i-svg-spinners:bars-fade h-3 w-3" />
+            <span>工具执行中...</span>
           </div>
         </div>
 
         <!-- Empty State -->
-        <div v-if="!hasTextContent && !hasReasoning && !hasToolCalls && status === 'pending'" class="px-3 py-4 text-center">
+        <div v-if="timelineItems.length === 0 && status === 'pending'" class="px-3 py-4 text-center">
           <div class="i-carbon-hourglass h-5 w-5 text-muted-foreground/50 mx-auto mb-2 animate-spin" />
           <div class="text-xs text-muted-foreground">
             子代理正在处理中...
@@ -288,7 +303,13 @@ watch(() => props.deltas.length, () => {
       </div>
 
       <!-- Stats Footer (Sticky at bottom) -->
-      <div v-if="status !== 'pending' && usage" class="px-3 py-2 border-t border-border/50 bg-muted/20 flex items-center justify-end text-[10px] text-muted-foreground flex-shrink-0">
+      <div v-if="status !== 'pending' && usage" class="px-3 py-2 border-t border-border/50 bg-muted/20 flex items-center justify-between text-[10px] text-muted-foreground flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <span v-if="hasToolCalls" class="flex items-center gap-1">
+            <div class="i-carbon-tool-box h-3 w-3" />
+            <span>{{ toolCallCount }} 个工具调用</span>
+          </span>
+        </div>
         <div class="flex items-center gap-3">
           <span>输入: {{ formatTokens(usage.inputTokens) }}</span>
           <span>输出: {{ formatTokens(usage.outputTokens) }}</span>

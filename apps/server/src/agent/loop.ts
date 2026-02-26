@@ -22,7 +22,7 @@ export interface AgentLoopOptions {
   /** 工具调用开始回调 */
   onToolCallStart?: (toolCallId: string, toolName: string, args: unknown) => void | Promise<void>
   /** 工具调用结果回调 */
-  onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void | Promise<void>
+  onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean, isInterrupted?: boolean) => void | Promise<void>
   /** 思考过程增量回调 */
   onReasoningDelta?: (delta: string) => void | Promise<void>
   /** 工具等待确认回调（确认模式下使用） */
@@ -171,12 +171,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           ...(thinkingMode
             ? {
                 providerOptions: {
-                  anthropic: {
-                    thinking: { type: 'enabled', budgetTokens: 10000 },
-                  },
-                  moonshotai: {
-                    thinking: { type: 'enabled', budgetTokens: 10000 },
-                  },
+                  anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } },
+                  moonshotai: { thinking: { type: 'enabled', budgetTokens: 10000 } },
+                  deepseek: { thinking: { type: 'enabled' } },
                 },
               }
             : {}),
@@ -273,26 +270,25 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     // 累积最终文本
     finalText += iterationText
 
-    // 如果有工具调用，执行它（每轮只处理一个工具）
+    const responseData = await response.response
+    const responseMessages = responseData.messages ?? []
+
     if (pendingToolCall) {
       const tc = pendingToolCall
-
-      // 构建 assistant 消息（包含 tool-call）
-      messages.push({
-        role: 'assistant',
-        content: [{
-          type: 'tool-call' as const,
-          toolCallId: tc.toolCallId,
-          toolName: tc.toolName,
-          input: tc.args,
-        }],
-      })
+      messages.push(...responseMessages)
 
       // 执行工具
       let result: unknown
       let isError = false
+      let isInterrupted = false
 
       try {
+        // 检查是否已被中断
+        if (abortSignal?.aborted) {
+          isInterrupted = true
+          throw new Error('Tool execution was interrupted')
+        }
+
         if (!hasToolExecutor(tc.toolName)) {
           throw new Error(`Unknown tool: ${tc.toolName}`)
         }
@@ -436,7 +432,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       }
 
       if (onToolCallResult) {
-        await onToolCallResult(tc.toolCallId, tc.toolName, result, isError)
+        await onToolCallResult(tc.toolCallId, tc.toolName, result, isError, isInterrupted)
       }
 
       const resultText = typeof result === 'string' ? result : JSON.stringify(result)
@@ -458,7 +454,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       continue
     }
 
-    // 没有工具调用，检查完成原因
+    if (responseMessages.length > 0) {
+      messages.push(...responseMessages)
+    }
+
+    // 检查完成原因
     if (finishReason === 'stop' || finishReason === 'end_turn' || finishReason === 'length') {
       break
     }

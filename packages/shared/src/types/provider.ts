@@ -1,4 +1,4 @@
-export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter'
+export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek'
 
 export interface LLMProviderMeta {
   value: LLMProviderType
@@ -13,6 +13,7 @@ export const LLM_PROVIDERS: LLMProviderMeta[] = [
   { value: 'anthropic', label: 'Anthropic', icon: 'i-simple-icons:anthropic', defaultModel: 'claude-opus-4.6', defaultApiBase: 'https://api.anthropic.com' },
   { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
   { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
+  { value: 'deepseek', label: 'DeepSeek', icon: 'i-ri:deepseek-fill', defaultModel: 'deepseek-chat', defaultApiBase: 'https://api.deepseek.com' },
 ]
 
 export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntries(

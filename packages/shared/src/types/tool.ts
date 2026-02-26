@@ -27,6 +27,8 @@ export interface ToolResult {
   result: unknown
   /** 是否执行出错 */
   isError?: boolean
+  /** 是否被中断 */
+  isInterrupted?: boolean
 }
 
 /**

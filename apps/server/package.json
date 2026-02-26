@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:ai-sdk",
+    "@ai-sdk/deepseek": "catalog:ai-sdk",
     "@ai-sdk/mcp": "catalog:ai-sdk",
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",

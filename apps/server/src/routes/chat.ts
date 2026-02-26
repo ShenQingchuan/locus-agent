@@ -176,13 +176,13 @@ chatRoutes.post('/', async (c) => {
         : []
       const messages: ModelMessage[] = [...convertedHistory, createUserMessage(message)]
 
-      // 运行 Agent Loop
+      const effectiveThinkingMode = thinkingMode ?? true
       const result = await runAgentLoop({
-        model: createLLMModel(runtimeModelInfo.model),
+        model: createLLMModel(runtimeModelInfo.model, effectiveThinkingMode),
         messages,
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,
-        thinkingMode: thinkingMode ?? true,
+        thinkingMode: effectiveThinkingMode,
         conversationId,
 
         // 思考过程增量回调
@@ -218,12 +218,13 @@ chatRoutes.post('/', async (c) => {
         },
 
         // 工具调用结果回调
-        onToolCallResult: async (toolCallId, toolName, result, isError) => {
+        onToolCallResult: async (toolCallId, toolName, result, isError, isInterrupted) => {
           const toolResult: ToolResult = {
             toolCallId,
             toolName,
             result,
             isError,
+            isInterrupted,
           }
           collectedToolResults.push(toolResult)
           await stream.writeSSE(createSSEEvent({

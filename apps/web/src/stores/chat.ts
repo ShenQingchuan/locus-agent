@@ -32,7 +32,7 @@ export interface DelegateDelta {
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
-  status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question'
+  status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question' | 'interrupted'
   /** 工具执行过程中的流式输出（如 bash 的 stdout/stderr） */
   output?: string
   /** Delegate 工具的流式状态更新 */
@@ -504,10 +504,18 @@ export const useChatStore = defineStore('chat', () => {
           return toolCallState
         }
         hasMatch = true
+        // Determine status based on result flags
+        let status: ToolCallState['status'] = 'completed'
+        if (toolResult.isInterrupted) {
+          status = 'interrupted'
+        }
+        else if (toolResult.isError) {
+          status = 'error'
+        }
         return {
           ...toolCallState,
           result: toolResult,
-          status: toolResult.isError ? 'error' : 'completed',
+          status,
         }
       })
       if (hasMatch) {

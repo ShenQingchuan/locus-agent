@@ -57,6 +57,7 @@ const statusIcon = computed(() => {
     case 'awaiting-question': return 'i-carbon-help'
     case 'completed': return 'i-carbon-checkmark'
     case 'error': return 'i-carbon-close'
+    case 'interrupted': return 'i-solar:forbidden-circle-linear'
     default: return 'i-carbon-tool-box'
   }
 })
@@ -65,6 +66,7 @@ const statusIconClass = computed(() => {
   switch (props.tool.status) {
     case 'pending': return 'text-muted-foreground animate-spin'
     case 'error': return 'text-destructive'
+    case 'interrupted': return 'text-warning'
     default: return 'text-muted-foreground'
   }
 })
@@ -141,6 +143,7 @@ const defaultSummary = computed(() => {
     case 'pending': return '执行中...'
     case 'awaiting-approval': return '等待确认'
     case 'awaiting-question': return '等待回答'
+    case 'interrupted': return '调用被中断'
     case 'error': return '执行失败'
     case 'completed': {
       if (!result?.result)
@@ -187,7 +190,7 @@ const delegateArgs = computed(() => {
 const delegateMeta = computed(() => {
   if (!isDelegate.value)
     return null
-  if (props.tool.status !== 'completed' && props.tool.status !== 'error')
+  if (props.tool.status !== 'completed' && props.tool.status !== 'error' && props.tool.status !== 'interrupted')
     return null
   const raw = props.tool.result?.result
   if (!raw)
@@ -267,7 +270,7 @@ const delegateDeltasFromResult = computed((): Array<{ type: 'text' | 'reasoning'
 const questionResultPairs = computed<Array<{ question: string, answer: string }> | null>(() => {
   if (!isAskQuestion.value)
     return null
-  if (props.tool.status !== 'completed' && props.tool.status !== 'error')
+  if (props.tool.status !== 'completed' && props.tool.status !== 'error' && props.tool.status !== 'interrupted')
     return null
   const raw = props.tool.result?.result
   if (!raw || typeof raw !== 'string')
@@ -286,7 +289,7 @@ const questionResultPairs = computed<Array<{ question: string, answer: string }>
 
 /** Whether to hide the compact summary row (tool has its own result display) */
 const hideSummary = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName)
-  && (props.tool.status === 'completed' || props.tool.status === 'error'))
+  && (props.tool.status === 'completed' || props.tool.status === 'error' || props.tool.status === 'interrupted'))
 
 /** Whether this tool uses a custom inline output widget */
 const hasOutputWidget = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName))
@@ -478,7 +481,7 @@ watch(terminalOutput, () => {
       :agent-type="delegateArgs.agentType"
       :task="delegateArgs.task"
       :context="delegateArgs.context"
-      :status="tool.status === 'error' ? 'error' : tool.status === 'completed' ? 'completed' : 'pending'"
+      :status="tool.status === 'error' || tool.status === 'interrupted' ? 'error' : tool.status === 'completed' ? 'completed' : 'pending'"
       :deltas="tool.delegateDeltas?.length ? tool.delegateDeltas : delegateDeltasFromResult"
       :iterations="delegateMeta?.iterations"
       :usage="delegateMeta ? { inputTokens: delegateMeta.inputTokens, outputTokens: delegateMeta.outputTokens, totalTokens: delegateMeta.totalTokens } : undefined"

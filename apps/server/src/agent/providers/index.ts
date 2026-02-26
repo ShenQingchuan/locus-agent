@@ -1,6 +1,7 @@
 import type { LLMProviderType } from '@locus-agent/shared'
 import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import { createDeepSeek } from '@ai-sdk/deepseek'
 import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
@@ -297,12 +298,17 @@ const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
 }
 
 /**
- * 根据配置创建对应的模型实例
+ * Create model instance for the configured provider.
+ * @param modelId Model identifier
+ * @param thinkingMode When set, some providers auto-switch between chat/reasoner variants
  */
-export function createLLMModel(modelId: string = getDefaultModel()): LanguageModel {
+export function createLLMModel(
+  modelId: string = getDefaultModel(),
+  thinkingMode?: boolean,
+): LanguageModel {
   const cfg = getConfig()
   const baseURL = cfg.apiBase || PROVIDER_DEFAULT_BASE_URLS[cfg.provider]
-  const effectiveModelId = normalizeModelForProvider(modelId, cfg.provider)
+  let effectiveModelId = normalizeModelForProvider(modelId, cfg.provider)
 
   switch (cfg.provider) {
     case 'anthropic': {
@@ -311,6 +317,21 @@ export function createLLMModel(modelId: string = getDefaultModel()): LanguageMod
         ...(baseURL ? { baseURL } : {}),
       })
       return anthropic(effectiveModelId)
+    }
+    case 'deepseek': {
+      if (thinkingMode !== undefined) {
+        const isReasoner = effectiveModelId.includes('reasoner')
+        effectiveModelId = thinkingMode && !isReasoner
+          ? 'deepseek-reasoner'
+          : !thinkingMode && isReasoner
+            ? 'deepseek-chat'
+            : effectiveModelId
+      }
+      const deepseek = createDeepSeek({
+        apiKey: cfg.apiKey,
+        baseURL: baseURL || 'https://api.deepseek.com',
+      })
+      return deepseek.chat(effectiveModelId)
     }
     case 'moonshotai': {
       const moonshot = createMoonshotAI({

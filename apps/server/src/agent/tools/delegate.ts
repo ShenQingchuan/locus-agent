@@ -25,49 +25,30 @@ export interface SubAgentConfig {
 /**
  * Delegate 工具定义
  * 用于将任务委派给专门的子代理处理
+ * 注意：需要调用方提供完整的 system_prompt，系统不再内置任何预设
  */
 export const delegateTool = tool({
   description: `Delegate a specific task to a specialized sub-agent.
 
-Use this when you need specialized expertise or want to parallelize work:
-- Code review: delegate to a review agent with code quality expertise
-- Documentation: delegate to a doc writing agent
-- Testing: delegate to a test generation agent
-- Research: delegate to a research agent for deep investigation
-- Refactoring: delegate to a refactoring expert agent
+Use this when you need specialized expertise or want to parallelize work.
+You must provide a complete 'system_prompt' that defines the sub-agent's behavior, expertise, and output format.
 
-IMPORTANT: Always provide a descriptive 'agent_name' that clearly indicates what this sub-agent does for this specific task (e.g., "xx专家", "xx助手"). The name will be displayed to the user.`,
+Example system_prompt structure:
+- Define the specialist role (e.g., "You are a security auditor...")
+- Specify focus areas and tasks
+- Define output format requirements
+- Add any constraints or guidelines
+
+IMPORTANT: Always provide a descriptive 'agent_name' that clearly indicates what this sub-agent does for this specific task.`,
   inputSchema: z.object({
     agent_name: z.string().describe('A descriptive name for this sub-agent that indicates its purpose for this specific task (e.g., "React性能分析专家", "API文档编写助手"). This will be displayed to the user.'),
-    agent_type: z.enum([
-      'code_review',
-      'doc_writer',
-      'test_generator',
-      'researcher',
-      'refactor_expert',
-      'custom',
-    ]).describe('The type of sub-agent to delegate to (determines system prompt preset)'),
+    agent_type: z.string().describe('The type of sub-agent to delegate to. Can be any descriptive type like "code_review", "doc_writer", "test_generator", "security_auditor", etc. Choose the most appropriate type based on the task at hand.'),
     task: z.string().describe('The specific task description for the sub-agent'),
     context: z.string().optional().describe('Additional context, code snippets, or background information'),
-    custom_system_prompt: z.string().optional().describe('Custom system prompt when agent_type is "custom"'),
+    system_prompt: z.string().describe('The complete system prompt that defines the sub-agent\'s behavior, expertise, and output format. This is required and should be tailored to the specific task.'),
     max_iterations: z.number().optional().describe('Maximum iterations for the sub-agent (default: 10)'),
   }),
 })
-
-/**
- * 共享的子代理基础提示词
- * 强调：子代理的任务是为主代理提供信息，而不是直接给出完美答案
- */
-const SUB_AGENT_BASE_PROMPT = `IMPORTANT: You are NOT the final responder to the user. Your job is to gather and STRUCTURE information for the main agent (parent agent).
-
-Your output must be:
-- Concise and dense - prioritize information density over completeness
-- Structured data only - bullet points, tables, key-value pairs
-- No narrative text - no introductions, explanations, or conclusions
-- No markdown headers (no "##" or "###")
-- Maximum 1000 tokens - be selective, parent agent will expand
-
-The main agent will use your structured findings to write the final response.`
 
 /**
  * 子代理默认工具超时（毫秒）
@@ -76,86 +57,17 @@ The main agent will use your structured findings to write the final response.`
 const SUB_AGENT_TOOL_TIMEOUT_MS = 60_000 // 60 秒
 
 /**
- * 预定义的子代理配置
- */
-const SUB_AGENT_PRESETS: Record<string, Omit<SubAgentConfig, 'name'>> = {
-  code_review: {
-    systemPrompt: `${SUB_AGENT_BASE_PROMPT}
-
-You are a code review specialist. Focus on:
-- Bugs, security issues, performance problems
-- Code smells and anti-patterns
-- Specific line numbers for issues
-- Quick suggestions (no need for full explanations)
-
-Output format:
-- Issues: bullet list with line refs
-- Suggestions: brief code snippets
-- Severity: critical/major/minor`,
-    maxIterations: 5,
-    thinkingMode: true,
-  },
-  doc_writer: {
-    systemPrompt: `${SUB_AGENT_BASE_PROMPT}
-
-You are a documentation specialist. Generate:
-- API signatures with parameter descriptions
-- Usage examples (concise)
-- Key behavior notes
-
-Format: Markdown, no intro/outro text.`,
-    maxIterations: 3,
-    thinkingMode: false,
-  },
-  test_generator: {
-    systemPrompt: `${SUB_AGENT_BASE_PROMPT}
-
-You are a test generation specialist. Provide:
-- Test case list (what to test, not always full code)
-- Key test scenarios (happy path, edge cases, error cases)
-- Optional: critical test code snippets
-
-Focus on completeness over perfect code.`,
-    maxIterations: 5,
-    thinkingMode: true,
-  },
-  researcher: {
-    systemPrompt: `${SUB_AGENT_BASE_PROMPT}
-
-You are a research specialist. Gather:
-- Key facts and data points
-- Relevant file contents
-- Technical details and specs
-- Options/comparisons (if applicable)
-
-Structure: Bullet points, no narrative wrap-up.`,
-    maxIterations: 15,
-    thinkingMode: true,
-  },
-  refactor_expert: {
-    systemPrompt: `${SUB_AGENT_BASE_PROMPT}
-
-You are a refactoring specialist. Analyze and report:
-- Code smells found (with locations)
-- Refactoring strategy (brief)
-- Changes made (file + line refs)
-- Risks or things to verify
-
-Be tactical, not academic.`,
-    maxIterations: 10,
-    thinkingMode: true,
-  },
-}
-
-/**
  * Delegate 工具执行参数
+ * LLM 在调用时需要提供完整的 system_prompt，不再有任何内置预设
  */
 export interface DelegateArgs {
   agent_name: string
-  agent_type: keyof typeof SUB_AGENT_PRESETS | 'custom'
+  /** 子代理类型描述，用于标识和展示 */
+  agent_type: string
   task: string
   context?: string
-  custom_system_prompt?: string
+  /** 完整的系统提示词，由 LLM 在运行时根据任务需求自行定义 */
+  system_prompt: string
   max_iterations?: number
 }
 
@@ -195,24 +107,18 @@ function buildSubAgentMessages(args: DelegateArgs): ModelMessage[] {
 
 /**
  * 获取子代理配置
+ * 完全由调用方提供的 system_prompt 决定子代理的行为
  */
 function getSubAgentConfig(
   args: DelegateArgs,
   defaultModel: LanguageModel,
 ): SubAgentConfig {
-  const preset = args.agent_type === 'custom'
-    ? {
-        systemPrompt: args.custom_system_prompt || 'You are a helpful assistant.',
-        maxIterations: args.max_iterations ?? 10,
-        thinkingMode: true,
-      }
-    : SUB_AGENT_PRESETS[args.agent_type]
-
   return {
     name: args.agent_name || args.agent_type,
-    ...preset,
+    systemPrompt: args.system_prompt,
     model: defaultModel,
-    maxIterations: args.max_iterations ?? preset.maxIterations,
+    maxIterations: args.max_iterations ?? 10,
+    thinkingMode: true,
   }
 }
 

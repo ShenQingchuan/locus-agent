@@ -87,7 +87,7 @@ async function deleteSetting(key: string): Promise<void> {
   await db.delete(settingsTable).where(eq(settingsTable.key, key))
 }
 
-const ALL_PROVIDERS: LLMProviderType[] = ['openai', 'anthropic', 'moonshotai', 'openrouter']
+const ALL_PROVIDERS: LLMProviderType[] = ['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek']
 
 async function buildConfigResponse(): Promise<{
   setupCompleted: boolean
@@ -164,7 +164,7 @@ settingsRoutes.get('/config', async (c) => {
 })
 
 const updateConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'moonshotai', 'openrouter']).optional(),
+  provider: z.enum(['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek']).optional(),
   apiKey: z.string().optional(),
   apiBase: z.union([z.string(), z.null()]).optional(),
   model: z.union([z.string(), z.null()]).optional(),
