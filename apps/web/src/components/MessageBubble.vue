@@ -93,46 +93,43 @@ function estimateTokensFromText(text: string, modelHint?: string): number {
   return countTextTokens(text, modelHint)
 }
 
-// Calculate token count for this message (hide while streaming)
+// Estimate context-window contribution of this message (consistent with ring).
+// Includes assistant text, tool calls, AND tool results since they are
+// visually part of the same message bubble.
 const messageTokens = computed<number | null>(() => {
   const msg = props.message
 
   if (msg.isStreaming)
     return null
 
-  if (msg.role === 'assistant') {
-    if (msg.usage) {
-      // Show generated tokens for this assistant message body.
-      if (msg.usage.completionTokens > 0)
-        return msg.usage.completionTokens
-      return msg.usage.totalTokens
-    }
+  const hint = estimateModelHint.value
 
-    // Estimate for assistant messages without usage info
-    let estimate = estimateTokensFromText(msg.content, estimateModelHint.value)
-    if (msg.reasoning) {
-      estimate += estimateTokensFromText(msg.reasoning, estimateModelHint.value)
-    }
+  if (msg.role === 'assistant') {
+    // reasoning is NOT sent back as context (messagesToCoreMessages strips it),
+    // so only count content + tool calls + tool results here.
+    let estimate = estimateTokensFromText(msg.content, hint)
     if (msg.toolCalls && msg.toolCalls.length > 0) {
-      for (const toolCallState of msg.toolCalls) {
-        estimate += estimateTokensFromText(toolCallState.toolCall.toolCallId, estimateModelHint.value)
-        estimate += estimateTokensFromText(toolCallState.toolCall.toolName, estimateModelHint.value)
-        estimate += countUnknownTokens(toolCallState.toolCall.args, estimateModelHint.value)
+      for (const tc of msg.toolCalls) {
+        estimate += estimateTokensFromText(tc.toolCall.toolCallId, hint)
+        estimate += estimateTokensFromText(tc.toolCall.toolName, hint)
+        estimate += countUnknownTokens(tc.toolCall.args, hint)
+        if (tc.result) {
+          estimate += estimateTokensFromText(tc.result.toolCallId, hint)
+          estimate += estimateTokensFromText(tc.result.toolName, hint)
+          estimate += countUnknownTokens(tc.result.result, hint)
+        }
       }
     }
     return estimate > 0 ? estimate : null
   }
 
-  const estimate = estimateTokensFromText(msg.content, estimateModelHint.value)
+  const estimate = estimateTokensFromText(msg.content, hint)
   return estimate > 0 ? estimate : null
 })
 
 const isEstimatedTokens = computed(() => {
-  const msg = props.message
-  if (msg.isStreaming)
+  if (props.message.isStreaming)
     return false
-  if (msg.role === 'assistant')
-    return !msg.usage
   return true
 })
 
@@ -144,14 +141,25 @@ const messageTokensText = computed(() => {
     : `${messageTokens.value} tokens`
 })
 
+const reasoningTokens = computed<number | null>(() => {
+  const msg = props.message
+  if (msg.role !== 'assistant' || !msg.reasoning)
+    return null
+  return estimateTokensFromText(msg.reasoning, estimateModelHint.value) || null
+})
+
 const messageTokensTitle = computed<string | undefined>(() => {
   const msg = props.message
   if (msg.isStreaming)
     return undefined
-  if (msg.role === 'assistant' && msg.usage) {
-    return `输出: ${msg.usage.completionTokens} · 输入: ${msg.usage.promptTokens} · 总计: ${msg.usage.totalTokens}`
+  const parts: string[] = ['上下文贡献估算']
+  if (reasoningTokens.value) {
+    parts.push(`思考: ~${reasoningTokens.value}（不计入上下文）`)
   }
-  return isEstimatedTokens.value ? '估算值' : undefined
+  if (msg.role === 'assistant' && msg.usage) {
+    parts.push(`API 用量 — 输出: ${msg.usage.completionTokens} · 输入: ${msg.usage.promptTokens} · 总计: ${msg.usage.totalTokens}`)
+  }
+  return parts.join(' · ')
 })
 
 const assistantModelLabel = computed<string | null>(() => {

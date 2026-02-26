@@ -98,19 +98,12 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
 /**
  * Tools that render their output via a custom inline widget.
  * When listed here:
- *   - The output is shown inline
- *   - The modal result section is hidden (no duplicate display)
+ *   - The output is shown inline via the special widget
+ *   - The compact summary row is hidden (no redundant display)
+ *   - The modal result section is hidden
  * To add a new tool with custom output, just add its name to this set.
  */
 const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
-
-/**
- * Tools that hide the compact summary row after completion.
- * These tools have their own result display (e.g. question-answer block),
- * so the one-line summary would be redundant.
- * To add a new tool, just add its name to this set.
- */
-const toolsWithHiddenSummary = new Set<string>(['ask_question', 'delegate'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -292,7 +285,7 @@ const questionResultPairs = computed<Array<{ question: string, answer: string }>
 })
 
 /** Whether to hide the compact summary row (tool has its own result display) */
-const hideSummary = computed(() => toolsWithHiddenSummary.has(props.tool.toolCall.toolName)
+const hideSummary = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName)
   && (props.tool.status === 'completed' || props.tool.status === 'error'))
 
 /** Whether this tool uses a custom inline output widget */

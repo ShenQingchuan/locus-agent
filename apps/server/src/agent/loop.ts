@@ -368,12 +368,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
               isSubAgentResult: true,
             }
 
-            // 从主会话的 token 统计中减去子代理使用的 token
-            // 这样子代理的 token 不会计入主会话上下文限制
-            const subAgentInputTokens = delegateResult.usage.inputTokens
-            const subAgentOutputTokens = delegateResult.usage.outputTokens
-            totalInputTokens -= subAgentInputTokens
-            totalOutputTokens -= subAgentOutputTokens
+            // 子代理 token 由其独立的 runAgentLoop 统计，
+            // 不在主循环的 totalInputTokens/totalOutputTokens 中，无需减除
           }
           else {
             throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
