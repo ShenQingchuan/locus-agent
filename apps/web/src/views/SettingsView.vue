@@ -223,7 +223,7 @@ function parseHeadersText(text: string): Record<string, string> | null {
   return Object.keys(headers).length > 0 ? headers : null
 }
 
-function addServer() {
+async function addServer() {
   const name = newServer.value.name.trim()
   if (!name) {
     toast.error('名称不能为空')
@@ -258,12 +258,43 @@ function addServer() {
   resetAddForm()
   showAddForm.value = false
   syncJsonText()
+
+  // 自动保存并生效
+  isMcpSaving.value = true
+  try {
+    const result = await updateMCPConfig({ mcpServers: mcpServers.value })
+    if (!result.success) {
+      toast.error(result.message || '保存失败')
+      return
+    }
+    toast.success(`已添加 ${name}`)
+    if (result.status)
+      mcpStatus.value = result.status
+  }
+  finally {
+    isMcpSaving.value = false
+  }
 }
 
-function removeServer(name: string) {
+async function removeServer(name: string) {
   delete mcpServers.value[name]
   mcpServers.value = { ...mcpServers.value }
   syncJsonText()
+
+  // 自动保存并生效
+  isMcpSaving.value = true
+  try {
+    const result = await updateMCPConfig({ mcpServers: mcpServers.value })
+    if (!result.success) {
+      toast.error(result.message || '删除失败')
+      return
+    }
+    if (result.status)
+      mcpStatus.value = result.status
+  }
+  finally {
+    isMcpSaving.value = false
+  }
 }
 
 function toggleToolsExpanded(name: string) {
@@ -612,11 +643,12 @@ async function saveConfig() {
                 <div class="flex items-center gap-1">
                   <button
                     class="btn-ghost btn-icon"
-                    title="JSON 编辑"
+                    :title="mcpJsonMode ? '切换到列表' : '切换到 JSON 编辑'"
                     :class="{ 'text-primary': mcpJsonMode }"
                     @click="mcpJsonMode = !mcpJsonMode; syncJsonText()"
                   >
-                    <div class="i-carbon-code h-4 w-4" />
+                    <div v-if="mcpJsonMode" class="i-material-symbols:format-list-bulleted-rounded h-4 w-4" />
+                    <div v-else class="i-carbon-code h-4 w-4" />
                   </button>
                   <button
                     class="btn-ghost btn-icon"
@@ -643,6 +675,16 @@ async function saveConfig() {
                   <p class="text-xs text-muted-foreground/60 mt-1">
                     可直接粘贴 Cursor / Claude Code 的 mcp.json 内容。
                   </p>
+                  <div class="mt-3 flex items-center justify-end">
+                    <button
+                      class="btn-primary btn-sm"
+                      :disabled="isMcpSaving"
+                      @click="saveMCP"
+                    >
+                      <span v-if="isMcpSaving" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
+                      保存 MCP 配置
+                    </button>
+                  </div>
                 </template>
 
                 <!-- 列表模式 -->
@@ -682,10 +724,6 @@ async function saveConfig() {
                             <span class="text-muted-foreground mx-1">·</span>
                             <span class="text-muted-foreground">{{ mcpStatusOf(name as string)!.tools.length }} 工具</span>
                           </template>
-                          <template v-if="mcpStatusOf(name as string)?.error">
-                            <span class="text-muted-foreground mx-1">·</span>
-                            <span class="text-red-500/80 truncate" :title="mcpStatusOf(name as string)!.error">{{ mcpStatusOf(name as string)!.error }}</span>
-                          </template>
                         </div>
 
                         <!-- 展开工具 -->
@@ -724,6 +762,14 @@ async function saveConfig() {
                             <div class="i-carbon-trash-can h-3.5 w-3.5" />
                           </button>
                         </div>
+                      </div>
+
+                      <!-- 错误信息 -->
+                      <div
+                        v-if="mcpStatusOf(name as string)?.error"
+                        class="border-t border-border px-3 py-2 text-xs text-red-500/80 break-words"
+                      >
+                        {{ mcpStatusOf(name as string)!.error }}
                       </div>
 
                       <!-- 展开的工具列表 -->
@@ -840,17 +886,7 @@ async function saveConfig() {
                 </template>
               </div>
 
-              <!-- MCP 保存按钮 -->
-              <div class="mt-4 flex items-center justify-end">
-                <button
-                  class="btn-primary btn-sm"
-                  :disabled="isMcpSaving"
-                  @click="saveMCP"
-                >
-                  <span v-if="isMcpSaving" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
-                  保存 MCP 配置
-                </button>
-              </div>
+
             </section>
 
             <!-- Whitelist Management -->

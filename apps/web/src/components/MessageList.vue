@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Message } from '@/stores/chat'
-import { useScroll } from '@vueuse/core'
 import { nextTick, ref, watch } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 
@@ -11,80 +10,120 @@ const props = defineProps<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
-const { y, arrivedState } = useScroll(containerRef, { behavior: 'smooth' })
-
-// Track if user has manually scrolled up
-const userScrolledUp = ref(false)
-const lastScrollTop = ref(0)
 const previousMessagesLength = ref(0)
 
-// Watch for scroll position to detect manual scrolling
-watch(() => y.value, (currentY) => {
-  if (containerRef.value) {
-    const scrollTop = currentY
-    const scrollHeight = containerRef.value.scrollHeight
-    const clientHeight = containerRef.value.clientHeight
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50
+// --- Smart scroll state ---
+// Whether the user has intentionally scrolled away from the bottom
+const userScrolledUp = ref(false)
+// Guard: ignore scroll events that we triggered programmatically
+let isProgrammaticScroll = false
+// Debounce handle for rAF-based auto-scroll
+let scrollRafId: number | null = null
 
-    if (scrollTop < lastScrollTop.value && !isAtBottom) {
-      userScrolledUp.value = true
-    }
-    else if (isAtBottom) {
-      userScrolledUp.value = false
-    }
+// Threshold (px) to consider "at bottom"
+const BOTTOM_THRESHOLD = 80
 
-    lastScrollTop.value = scrollTop
+function isAtBottom(): boolean {
+  const el = containerRef.value
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD
+}
+
+// Reactive flag for template (scroll-to-bottom button visibility)
+const showScrollButton = ref(false)
+
+// --- Detect user scroll intent via native event ---
+function onScroll() {
+  // Skip scroll events we fired ourselves
+  if (isProgrammaticScroll) return
+
+  const atBottom = isAtBottom()
+  showScrollButton.value = !atBottom
+
+  if (atBottom) {
+    // User scrolled back to bottom (manually) → re-enable auto-scroll
+    userScrolledUp.value = false
   }
-})
+  else {
+    // User is not at bottom → they scrolled up, respect their intent
+    userScrolledUp.value = true
+  }
+}
 
-// Auto-scroll to bottom when new messages arrive or content updates
+// --- Scroll to bottom (instant, no animation) ---
+// During streaming, content changes every few ms. Smooth scroll animations
+// get queued up and fight each other, causing jank. We always use instant
+// scroll and coalesce via requestAnimationFrame so we scroll at most once
+// per frame — this is buttery smooth.
+function scrollToBottom(instant = true) {
+  const container = containerRef.value
+  if (!container) return
+
+  isProgrammaticScroll = true
+  if (instant) {
+    container.scrollTop = container.scrollHeight - container.clientHeight
+  }
+  else {
+    container.scrollTo({ top: container.scrollHeight - container.clientHeight, behavior: 'smooth' })
+  }
+  showScrollButton.value = false
+
+  // Release the guard after the browser has had a chance to fire scroll events
+  requestAnimationFrame(() => {
+    isProgrammaticScroll = false
+  })
+}
+
+// Coalesced version: at most one scroll per animation frame
+function scheduleScrollToBottom() {
+  if (scrollRafId !== null) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null
+    scrollToBottom(true)
+  })
+}
+
+// --- Auto-scroll on content change ---
 watch(
-  () => [props.messages.length, props.messages[props.messages.length - 1]?.content],
-  async () => {
-    // 重置 previousMessagesLength 当消息被清空时（会话切换）
-    if (props.messages.length === 0) {
+  // Watch message count + last message content length (cheap, avoids deep)
+  () => {
+    const len = props.messages.length
+    const last = len > 0 ? props.messages[len - 1] : null
+    return [len, last?.content?.length ?? 0] as const
+  },
+  async ([newLen], [oldLen]) => {
+    // Session switched / cleared
+    if (newLen === 0) {
       previousMessagesLength.value = 0
+      userScrolledUp.value = false
       return
     }
 
-    // Only auto-scroll if user hasn't manually scrolled up
-    if (!userScrolledUp.value || props.isStreaming) {
-      await nextTick()
-      // 首次加载（从 0 变为有消息）时立即滚动，其他情况平滑滚动
-      const isInitialLoad = previousMessagesLength.value === 0 && props.messages.length > 0
-      if (isInitialLoad)
-        scrollToBottom(false)
-      else
-        scrollToBottom(true)
+    const isInitialLoad = previousMessagesLength.value === 0 && newLen > 0
+    previousMessagesLength.value = newLen
 
-      previousMessagesLength.value = props.messages.length
+    // If user scrolled up, respect it — don't auto-scroll
+    if (userScrolledUp.value && !isInitialLoad) return
+
+    await nextTick()
+
+    if (isInitialLoad) {
+      // First load / session switch: instant scroll with retries for lazy DOM
+      scrollToBottom(true)
+      // Retry for images / code blocks that render async
+      ;[50, 150, 300].forEach(delay => setTimeout(() => scrollToBottom(true), delay))
+    }
+    else {
+      // Streaming or new message: coalesce to one scroll per frame
+      scheduleScrollToBottom()
     }
   },
-  { deep: true },
 )
 
-function scrollToBottom(smooth = true) {
-  const container = containerRef.value
-  if (!container)
-    return
-
-  if (smooth) {
-    y.value = container.scrollHeight
-    return
-  }
-
-  const scrollNow = () => {
-    const current = containerRef.value
-    if (!current)
-      return
-
-    current.scrollTop = current.scrollHeight - current.clientHeight
-  }
-
-  scrollNow()
-  ;[50, 150, 300].forEach((delay) => {
-    setTimeout(scrollNow, delay)
-  })
+// User clicks the "scroll to bottom" button
+function handleScrollToBottomClick() {
+  userScrolledUp.value = false
+  scrollToBottom(false) // smooth scroll for explicit user action
 }
 
 // Expose scroll to bottom for external use
@@ -96,6 +135,7 @@ defineExpose({ scrollToBottom })
     <div
       ref="containerRef"
       class="h-full overflow-y-auto px-4 py-4 bg-background"
+      @scroll.passive="onScroll"
     >
       <div class="max-w-3xl mx-auto">
         <!-- Empty state -->
@@ -150,10 +190,10 @@ defineExpose({ scrollToBottom })
       <div class="max-w-3xl mx-auto relative h-full">
         <Transition name="fade">
           <button
-            v-if="!arrivedState.bottom && messages.length > 0"
+            v-if="showScrollButton && messages.length > 0"
             class="pointer-events-auto absolute bottom-3 -right-14 z-50 h-9 w-9 rounded-full border border-border bg-background text-foreground shadow-md flex items-center justify-center hover:bg-muted transition-all duration-200"
             title="滚动到底部"
-            @click="scrollToBottom(true); userScrolledUp = false"
+            @click="handleScrollToBottomClick"
           >
             <div class="i-carbon-arrow-down h-4 w-4" />
           </button>

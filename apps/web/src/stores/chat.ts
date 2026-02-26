@@ -32,6 +32,11 @@ export type MessagePart
     | { type: 'text', content: string }
     | { type: 'tool-call', toolCallIndex: number }
 
+export interface QueuedMessage {
+  id: string
+  content: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -65,6 +70,11 @@ export const useChatStore = defineStore('chat', () => {
   const currentStreamingMessageId = ref<string | null>(null)
   const pendingApprovals = ref<Map<string, PendingApproval>>(new Map())
   const pendingQuestions = ref<Map<string, PendingQuestion>>(new Map())
+
+  // Message queue: messages queued while LLM is busy (not yet added to messages list)
+  const messageQueue = ref<QueuedMessage[]>([])
+  /** Whether the queue processor is currently draining queued messages */
+  const isProcessingQueue = ref(false)
 
   // Whitelist state
   const whitelistRules = ref<WhitelistRule[]>([])
@@ -112,6 +122,7 @@ export const useChatStore = defineStore('chat', () => {
   const hasError = computed(() => error.value !== null)
   const isStreaming = computed(() => currentStreamingMessageId.value !== null)
   const hasPendingApprovals = computed(() => pendingApprovals.value.size > 0)
+  const queuedMessageCount = computed(() => messageQueue.value.length)
 
   const currentConversation = computed(() =>
     conversations.value.find(c => c.id === currentConversationId.value),
@@ -612,6 +623,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearMessages() {
     messages.value = []
+    messageQueue.value = []
     error.value = null
     currentStreamingMessageId.value = null
     clearPendingApprovals()
@@ -678,9 +690,25 @@ export const useChatStore = defineStore('chat', () => {
     return out
   }
 
+  /**
+   * 发送消息（或入队）
+   * - 如果 LLM 空闲，直接发送
+   * - 如果 LLM 正忙（isLoading），将消息放入队列，等待当前请求结束后自动发送
+   *
+   * historyMessages 仅由 edit/retry 逻辑在空闲时提供，队列模式下不支持。
+   */
   async function sendMessage(content: string, historyMessages?: CoreMessage[]) {
-    if (!content.trim() || isLoading.value)
+    if (!content.trim())
       return
+
+    // 如果当前正在加载（LLM 忙），把消息加入队列（不添加到消息列表）
+    if (isLoading.value && !historyMessages) {
+      const queueItem = { id: crypto.randomUUID(), content }
+      fetch("http://localhost:51961/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: "queue-push", data: { contentType: typeof content, content, queueItem } }) }).catch(() => {});
+      messageQueue.value.push(queueItem)
+      fetch("http://localhost:51961/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: "queue-after-push", data: { queueLength: messageQueue.value.length, firstItem: messageQueue.value[0], rawQueue: JSON.stringify(messageQueue.value) } }) }).catch(() => {});
+      return
+    }
 
     clearError()
 
@@ -779,6 +807,57 @@ export const useChatStore = defineStore('chat', () => {
       currentStreamingMessageId.value = null
       setLoading(false)
     }
+
+    // 当前请求结束后，处理队列中积压的消息
+    await processMessageQueue()
+  }
+
+  /**
+   * 处理消息队列：逐条发送积压的消息
+   *
+   * 排队消息不在 messages 列表中，由 UI 的队列面板单独展示。
+   * 每条消息依次通过 sendMessage 发送，每条拥有独立的用户气泡和 LLM 回复。
+   * 注意：sendMessage 内部结束后也会调用 processMessageQueue，
+   * 但 isProcessingQueue 守卫可防止递归重入。
+   */
+  async function processMessageQueue() {
+    if (isProcessingQueue.value || isLoading.value || messageQueue.value.length === 0)
+      return
+
+    isProcessingQueue.value = true
+
+    try {
+      // 逐条取出并发送：每次从队首弹出一条，等待该条完成后再取下一条
+      while (messageQueue.value.length > 0) {
+        const next = messageQueue.value.shift()!
+        // sendMessage 结束时会再次调用 processMessageQueue，
+        // 但 isProcessingQueue 为 true 会直接 return，不会递归。
+        await sendMessage(next.content)
+      }
+    }
+    finally {
+      isProcessingQueue.value = false
+    }
+  }
+
+  /**
+   * 从队列中移除指定 id 的消息
+   */
+  function removeFromQueue(id: string) {
+    const index = messageQueue.value.findIndex(m => m.id === id)
+    if (index !== -1) {
+      messageQueue.value.splice(index, 1)
+    }
+  }
+
+  /**
+   * 编辑队列中指定 id 的消息内容
+   */
+  function editQueueItem(id: string, newContent: string) {
+    const item = messageQueue.value.find(m => m.id === id)
+    if (item) {
+      item.content = newContent
+    }
   }
 
   async function stopGeneration() {
@@ -787,6 +866,10 @@ export const useChatStore = defineStore('chat', () => {
       updateMessage(currentStreamingMessageId.value, { isStreaming: false })
       currentStreamingMessageId.value = null
       setLoading(false)
+
+      // abort 结束后处理积压的队列消息
+      // sendMessage 内部的 processMessageQueue 可能因为 abort 时序而跳过
+      await processMessageQueue()
     }
   }
 
@@ -1005,6 +1088,10 @@ export const useChatStore = defineStore('chat', () => {
     pendingQuestions,
     whitelistRules,
 
+    // Message queue state
+    messageQueue,
+    isProcessingQueue,
+
     // Edit message state
     editingMessageId,
     editingContent,
@@ -1016,6 +1103,7 @@ export const useChatStore = defineStore('chat', () => {
     hasError,
     isStreaming,
     hasPendingApprovals,
+    queuedMessageCount,
     currentConversation,
     contextTokensUsed,
     contextUsagePercentage,
@@ -1049,6 +1137,8 @@ export const useChatStore = defineStore('chat', () => {
     clearError,
     newConversation,
     sendMessage,
+    removeFromQueue,
+    editQueueItem,
     stopGeneration,
     handleToolApproval,
     approveToolExecution,

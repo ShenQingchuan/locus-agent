@@ -218,7 +218,6 @@ function handleNewChat() {
       <!-- Input area -->
       <footer class="flex-shrink-0 border-t border-border bg-background px-4 py-4">
         <ChatInput
-          :disabled="chatStore.isLoading && !chatStore.isStreaming"
           :is-streaming="chatStore.isStreaming"
           @send="handleSend"
           @stop="handleStop"

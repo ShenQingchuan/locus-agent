@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
+import type { QueuedMessage } from '@/stores/chat'
 import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
@@ -26,6 +27,47 @@ const { textarea, input } = useTextareaAutosize()
 const whitelistOpen = ref(false)
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
+
+// Queue item inline editing
+const editingQueueId = ref<string | null>(null)
+const editingQueueContent = ref('')
+
+function startEditQueueItem(item: QueuedMessage) {
+  editingQueueId.value = item.id
+  editingQueueContent.value = item.content
+  nextTick(() => {
+    const el = document.getElementById(`queue-edit-${item.id}`)
+    if (el) el.focus()
+  })
+}
+
+function saveEditQueueItem(id: string) {
+  const trimmed = editingQueueContent.value.trim()
+  if (trimmed) {
+    chatStore.editQueueItem(id, trimmed)
+  }
+  else {
+    chatStore.removeFromQueue(id)
+  }
+  editingQueueId.value = null
+  editingQueueContent.value = ''
+}
+
+function cancelEditQueueItem() {
+  editingQueueId.value = null
+  editingQueueContent.value = ''
+}
+
+function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
+  if (event.isComposing) return
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    saveEditQueueItem(id)
+  }
+  else if (event.key === 'Escape') {
+    cancelEditQueueItem()
+  }
+}
 
 const modeItems = computed<DropdownItem[]>(() => [
   {
@@ -143,6 +185,7 @@ function handleSubmit() {
     return
   }
 
+  // 允许在 streaming 期间发送（消息会进入队列）
   emit('send', input.value)
   input.value = ''
 }
@@ -178,12 +221,57 @@ function handleKeydown(event: KeyboardEvent) {
     <div
       class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50"
     >
+      <!-- Queue panel: shows pending messages above the textarea -->
+      <div
+        v-if="chatStore.messageQueue.length > 0"
+        class="flex flex-col gap-1 px-3 pt-3 pb-1 border-b border-border/40"
+      >
+        <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+          <div class="i-bx:bxs-hourglass h-3.5 w-3.5 text-primary" />
+          <span>{{ chatStore.messageQueue.length }} 条消息排队中</span>
+        </div>
+        <div
+          v-for="item in chatStore.messageQueue"
+          :key="item.id"
+          class="flex items-center gap-2 group rounded-md bg-muted/50 px-2.5 py-1.5"
+        >
+          <!-- Inline edit mode -->
+          <template v-if="editingQueueId === item.id">
+            <input
+              :id="`queue-edit-${item.id}`"
+              v-model="editingQueueContent"
+              class="flex-1 bg-transparent text-xs text-foreground outline-none border-b border-primary/50 py-0.5"
+              @keydown="handleQueueEditKeydown($event, item.id)"
+              @blur="saveEditQueueItem(item.id)"
+            >
+          </template>
+          <!-- Display mode -->
+          <template v-else>
+            <span class="flex-1 text-xs text-foreground/80 truncate">{{ item.content }}</span>
+            <button
+              class="flex-shrink-0 flex items-center justify-center h-4.5 w-4.5 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all duration-150"
+              title="编辑此消息"
+              @click="startEditQueueItem(item)"
+            >
+              <div class="i-carbon-edit h-3 w-3" />
+            </button>
+            <button
+              class="flex-shrink-0 flex items-center justify-center h-4.5 w-4.5 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all duration-150"
+              title="移除此消息"
+              @click="chatStore.removeFromQueue(item.id)"
+            >
+              <div class="i-carbon-close h-3 w-3" />
+            </button>
+          </template>
+        </div>
+      </div>
+
       <!-- Textarea -->
       <textarea
         ref="textarea"
         v-model="input"
         class="w-full resize-none bg-transparent px-4 pt-4 min-h-[80px] pb-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        :placeholder="isEditing ? '编辑消息…' : '输入消息…'"
+        :placeholder="isEditing ? '编辑消息…' : isStreaming ? '输入消息（将在当前回答结束后发送）…' : '输入消息…'"
         rows="1"
         :disabled="disabled"
         @keydown="handleKeydown"
@@ -254,6 +342,7 @@ function handleKeydown(event: KeyboardEvent) {
             <span>取消编辑</span>
           </button>
 
+          <!-- Stop button: shown during streaming -->
           <button
             v-if="isStreaming"
             class="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/90 text-destructive-foreground hover:bg-destructive transition-colors duration-150"
@@ -263,8 +352,8 @@ function handleKeydown(event: KeyboardEvent) {
             <div class="i-carbon-stop-filled h-4 w-4" />
           </button>
 
+          <!-- Send button: always visible, enabled when there's text to send -->
           <button
-            v-else
             class="flex items-center justify-center h-8 w-8 rounded-lg transition-colors duration-150"
             :class="[
               input.trim() && !disabled
@@ -272,7 +361,7 @@ function handleKeydown(event: KeyboardEvent) {
                 : 'bg-muted text-muted-foreground cursor-not-allowed',
             ]"
             :disabled="!input.trim() || disabled"
-            :title="isEditing ? '保存并发送' : '发送消息'"
+            :title="isEditing ? '保存并发送' : isStreaming ? '排队发送' : '发送消息'"
             @click="handleSubmit"
           >
             <div class="i-material-symbols:send-rounded h-5 w-5" />
