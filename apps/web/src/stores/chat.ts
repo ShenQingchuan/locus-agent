@@ -766,9 +766,9 @@ export const useChatStore = defineStore('chat', () => {
     // 如果当前正在加载（LLM 忙），把消息加入队列（不添加到消息列表）
     if (isLoading.value && !historyMessages) {
       const queueItem = { id: crypto.randomUUID(), content }
-      fetch("http://localhost:51961/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: "queue-push", data: { contentType: typeof content, content, queueItem } }) }).catch(() => {});
+      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-push', data: { contentType: typeof content, content, queueItem } }) }).catch(() => {})
       messageQueue.value.push(queueItem)
-      fetch("http://localhost:51961/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: "queue-after-push", data: { queueLength: messageQueue.value.length, firstItem: messageQueue.value[0], rawQueue: JSON.stringify(messageQueue.value) } }) }).catch(() => {});
+      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-after-push', data: { queueLength: messageQueue.value.length, firstItem: messageQueue.value[0], rawQueue: JSON.stringify(messageQueue.value) } }) }).catch(() => {})
       return
     }
 

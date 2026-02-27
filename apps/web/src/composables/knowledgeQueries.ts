@@ -1,4 +1,4 @@
-import type { ComputedRef } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import { useQuery } from '@pinia/colada'
 import * as api from '@/api/knowledge'
 
@@ -64,5 +64,28 @@ export function useSearchNotesQuery(searchQuery: ComputedRef<string>) {
     query: () => api.searchNotes(searchQuery.value),
     staleTime: STALE_TIME,
     enabled: () => searchQuery.value.trim().length > 0,
+  })
+}
+
+/**
+ * 记忆统计查询
+ */
+export function useMemoryStatsQuery() {
+  return useQuery({
+    key: ['notes', 'stats'],
+    query: api.fetchMemoryStats,
+    staleTime: STALE_TIME,
+  })
+}
+
+/**
+ * 按标签名搜索记忆（按需触发）
+ */
+export function useSearchByTagsQuery(tagNames: Ref<string[]>) {
+  return useQuery({
+    key: () => ['notes', 'search-by-tags', ...tagNames.value],
+    query: () => api.searchByTags(tagNames.value),
+    staleTime: STALE_TIME,
+    enabled: () => tagNames.value.length > 0,
   })
 }

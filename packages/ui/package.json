@@ -18,10 +18,12 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "peerDependencies": {
+    "@tanstack/vue-virtual": "^3.0.0",
     "@vueuse/core": "^14.0.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@tanstack/vue-virtual": "catalog:vue-family",
     "@vue/tsconfig": "catalog:vue-family",
     "@vueuse/core": "catalog:vue-family",
     "typescript": "catalog:dev-tools",

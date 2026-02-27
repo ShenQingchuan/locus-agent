@@ -2,11 +2,13 @@
 import { useDark, useToggle } from '@vueuse/core'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
 
 const router = useRouter()
 const route = useRoute()
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+const { openSearch } = useGlobalSearch()
 
 const currentModule = computed(() => {
   if (route.name === 'memories')
@@ -42,8 +44,19 @@ const navItems: NavItem[] = [
 
 <template>
   <nav class="flex flex-col items-center w-12 h-full bg-sidebar-background border-r border-sidebar-border flex-shrink-0">
+    <!-- Search button -->
+    <div class="flex flex-col items-center pt-3 pb-1">
+      <button
+        class="flex-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors duration-150"
+        title="搜索"
+        @click="openSearch"
+      >
+        <div class="i-ic:round-search h-5 w-5" />
+      </button>
+    </div>
+
     <!-- Top nav items -->
-    <div class="flex flex-col items-center gap-1 pt-3">
+    <div class="flex flex-col items-center gap-1">
       <button
         v-for="item in navItems"
         :key="item.key"

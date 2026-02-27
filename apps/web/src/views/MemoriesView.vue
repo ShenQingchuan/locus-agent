@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { NoteWithTags } from '@locus-agent/shared'
-import { useToast } from '@locus-agent/ui'
+import type { TreeNode } from '@locus-agent/ui'
+import type { TagTreeData } from '@/utils/tagTree'
+import { Tree, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
-import { useDebounceFn } from '@vueuse/core'
-import { computed, ref } from 'vue'
+import { onClickOutside, useDebounceFn } from '@vueuse/core'
+import { computed, nextTick, ref, watch } from 'vue'
 import * as api from '@/api/knowledge'
 import AppNavRail from '@/components/AppNavRail.vue'
 import AddTagsModal from '@/components/knowledge/AddTagsModal.vue'
@@ -13,11 +15,14 @@ import {
   useSearchNotesQuery,
   useTagsQuery,
 } from '@/composables/knowledgeQueries'
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { buildTagTree } from '@/utils/tagTree'
 
 const store = useKnowledgeStore()
 const toast = useToast()
 const queryCache = useQueryCache()
+const { pendingHighlightNoteId, pendingTagSelection } = useGlobalSearch()
 
 const selectedTagId = computed(() => store.selectedTagId)
 
@@ -39,6 +44,44 @@ const isLoading = computed(() =>
   store.searchQuery.trim() ? isSearchLoading.value : isNotesLoading.value,
 )
 const tagsList = computed(() => tags.value ?? [])
+
+// ==================== 标签树 ====================
+
+const tagTree = computed(() => buildTagTree(tagsList.value))
+
+/**
+ * IDs of tree nodes to expand by default.
+ * Expand all root-level nodes that have children.
+ */
+const defaultExpandedTagIds = computed(() =>
+  tagTree.value
+    .filter(n => n.children && n.children.length > 0)
+    .map(n => n.id),
+)
+
+/** Active tag's full path (tree node ID) for highlighting */
+const activeTagPath = ref<string | null>(null)
+
+function handleTagTreeSelect(node: TreeNode) {
+  const data = node.data as TagTreeData
+  if (data.tagId) {
+    // Leaf node with a real tag — toggle filter
+    if (store.selectedTagId === data.tagId) {
+      store.selectTag(null)
+      activeTagPath.value = null
+    }
+    else {
+      store.selectTag(data.tagId)
+      activeTagPath.value = node.id
+    }
+  }
+  else {
+    // Virtual parent node — find the first real descendant tag to filter on,
+    // or just clear
+    activeTagPath.value = activeTagPath.value === node.id ? null : node.id
+    store.selectTag(null)
+  }
+}
 
 // ==================== 侧边栏收起 ====================
 
@@ -86,6 +129,15 @@ async function handlePublish() {
   }
 }
 
+// ==================== 高亮记忆卡片 ====================
+
+const highlightedNoteId = ref<string | null>(null)
+const highlightedCardRef = ref<HTMLElement | null>(null)
+
+onClickOutside(highlightedCardRef, () => {
+  highlightedNoteId.value = null
+})
+
 // ==================== 卡片编辑 ====================
 
 const editingNoteId = ref<string | null>(null)
@@ -108,6 +160,7 @@ const lastSavedText = computed(() => {
 })
 
 function startEditing(note: NoteWithTags) {
+  highlightedNoteId.value = null
   editingNoteId.value = note.id
   editingData.value = null
   lastSavedAt.value = null
@@ -117,10 +170,6 @@ function cancelEditing() {
   editingNoteId.value = null
   editingData.value = null
   lastSavedAt.value = null
-}
-
-function handleEditChange(data: { editorState: Record<string, unknown>, content: string }) {
-  editingData.value = data
 }
 
 interface EditSaveTask {
@@ -239,24 +288,49 @@ async function handleSaveTags(tagNames: string[]) {
   }
 }
 
-// ==================== 搜索 ====================
+// ==================== 全局搜索 → 本页响应 ====================
 
-const searchInput = ref('')
-const debouncedSearch = useDebounceFn((val: string) => {
-  store.search(val)
-}, 300)
+// When a note is selected from global search, highlight it
+watch(pendingHighlightNoteId, (noteId) => {
+  if (!noteId)
+    return
+  // Clear filters so the note is visible in the stream
+  store.search('')
+  store.selectTag(null)
+  activeTagPath.value = null
+  highlightedNoteId.value = noteId
+  nextTick(() => {
+    const el = document.querySelector(`[data-note-id="${noteId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Consume the signal
+    pendingHighlightNoteId.value = null
+  })
+})
 
-function handleSearch() {
-  debouncedSearch(searchInput.value)
-}
+// When a tag is selected from global search, filter by it
+watch(pendingTagSelection, (sel) => {
+  if (!sel)
+    return
+  store.selectTag(sel.tagId)
+  activeTagPath.value = sel.tagName
+  store.search('')
+  // Consume the signal
+  pendingTagSelection.value = null
+})
 
 // ==================== 标签过滤 ====================
 
 function selectTag(tagId: string | null) {
-  if (store.selectedTagId === tagId)
+  if (store.selectedTagId === tagId) {
     store.selectTag(null)
-  else
+    activeTagPath.value = null
+  }
+  else {
     store.selectTag(tagId)
+    // Find the tag's path for tree highlighting
+    const tag = tagsList.value.find(t => t.id === tagId)
+    activeTagPath.value = tag?.name ?? null
+  }
 }
 
 // ==================== 工具函数 ====================
@@ -304,25 +378,11 @@ function getPreviewText(note: NoteWithTags): string {
         :class="sidebarCollapsed ? 'border-r-0' : ''"
       >
         <div class="w-52 h-full flex flex-col">
-          <!-- Search -->
-          <div class="p-3 border-b border-border">
-            <div class="relative">
-              <div class="i-carbon-search absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                v-model="searchInput"
-                type="text"
-                placeholder="搜索..."
-                class="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                @input="handleSearch"
-              >
-            </div>
-          </div>
-
           <!-- All memories button -->
           <div class="px-2 pt-2">
             <button
               class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
-              :class="!store.selectedTagId
+              :class="!store.selectedTagId && !activeTagPath
                 ? 'bg-accent text-accent-foreground font-medium'
                 : 'text-foreground hover:bg-accent/50'"
               @click="selectTag(null)"
@@ -333,25 +393,40 @@ function getPreviewText(note: NoteWithTags): string {
             </button>
           </div>
 
-          <!-- Tags -->
-          <div class="flex-1 overflow-y-auto px-2 pt-3 pb-2">
+          <!-- Tag tree -->
+          <div class="flex-1 overflow-hidden px-2 pt-3 pb-2 flex flex-col">
             <div class="px-3 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
               标签
             </div>
-            <template v-if="tagsList.length > 0">
-              <button
-                v-for="tag in tagsList"
-                :key="tag.id"
-                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
-                :class="store.selectedTagId === tag.id
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-foreground hover:bg-accent/50'"
-                @click="selectTag(tag.id)"
-              >
-                <div class="i-carbon-tag h-3.5 w-3.5 opacity-50 flex-shrink-0" />
-                <span class="truncate">{{ tag.name }}</span>
-                <span class="ml-auto text-xs text-muted-foreground/60">{{ tag.noteCount }}</span>
-              </button>
+            <template v-if="tagTree.length > 0">
+              <div class="flex-1 overflow-y-auto">
+                <Tree
+                  :nodes="tagTree"
+                  :item-height="30"
+                  :indent="12"
+                  :default-expanded="defaultExpandedTagIds"
+                  container-class="h-full"
+                  @select="handleTagTreeSelect"
+                >
+                  <template #default="{ node, hasChildren }">
+                    <div
+                      class="flex items-center gap-1.5 flex-1 min-w-0 py-0.5 px-1 rounded text-sm transition-colors"
+                      :class="activeTagPath === node.id || store.selectedTagId === (node.data as TagTreeData).tagId
+                        ? 'text-accent-foreground font-medium'
+                        : 'text-foreground'"
+                    >
+                      <div
+                        class="h-3.5 w-3.5 opacity-50 flex-shrink-0"
+                        :class="hasChildren ? 'i-carbon-folder' : 'i-carbon-tag'"
+                      />
+                      <span class="truncate">{{ node.label }}</span>
+                      <span class="ml-auto text-[11px] text-muted-foreground/60 flex-shrink-0">
+                        {{ (node.data as TagTreeData).noteCount }}
+                      </span>
+                    </div>
+                  </template>
+                </Tree>
+              </div>
             </template>
             <div v-else class="px-3 py-4 text-xs text-muted-foreground/60 text-center">
               暂无标签
@@ -374,8 +449,8 @@ function getPreviewText(note: NoteWithTags): string {
               :class="sidebarCollapsed ? 'i-carbon-side-panel-open' : 'i-carbon-side-panel-close'"
             />
           </button>
-          <span v-if="store.selectedTagId" class="ml-2 text-xs text-muted-foreground">
-            #{{ tagsList.find(t => t.id === store.selectedTagId)?.name }}
+          <span v-if="store.selectedTagId || activeTagPath" class="ml-2 text-xs text-muted-foreground">
+            #{{ store.selectedTagId ? tagsList.find(t => t.id === store.selectedTagId)?.name : activeTagPath }}
           </span>
         </div>
 
@@ -451,12 +526,17 @@ function getPreviewText(note: NoteWithTags): string {
               <div
                 v-for="note in notes"
                 :key="note.id"
+                :data-note-id="note.id"
                 class="break-inside-avoid mb-3"
                 :class="editingNoteId === note.id ? 'hidden' : ''"
               >
                 <div
-                  class="group rounded-lg border border-border/60 bg-card transition-all hover:border-border hover:shadow-sm cursor-pointer"
-                  @click="startEditing(note)"
+                  :ref="(el) => { if (highlightedNoteId === note.id) highlightedCardRef = el as HTMLElement }"
+                  class="group rounded-lg border transition-all cursor-pointer"
+                  :class="highlightedNoteId === note.id
+                    ? 'border-primary/20 bg-primary/5 shadow-sm ring-0.5 ring-primary/10'
+                    : 'border-border/60 bg-card hover:border-border hover:shadow-sm'"
+                  @click="() => { highlightedNoteId = null; startEditing(note) }"
                 >
                   <div class="px-3 pt-3 pb-2">
                     <div class="text-[13px] text-foreground leading-relaxed whitespace-pre-wrap break-words line-clamp-8">
@@ -479,14 +559,14 @@ function getPreviewText(note: NoteWithTags): string {
                     </div>
                     <div class="flex items-center gap-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        class="p-1 rounded text-muted-foreground/40 hover:text-foreground hover:bg-accent/50 transition-colors"
+                        class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                         title="标签"
                         @click.stop="openTagsModal(note.id)"
                       >
                         <div class="i-carbon-tag h-3 w-3" />
                       </button>
                       <button
-                        class="p-1 rounded text-muted-foreground/40 hover:text-destructive hover:bg-accent/50 transition-colors"
+                        class="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
                         title="删除"
                         @click.stop="handleDeleteNote(note.id)"
                       >
@@ -542,7 +622,6 @@ function getPreviewText(note: NoteWithTags): string {
   background: transparent;
   padding-left: 0.5rem;
 }
-
 
 /* Smaller headings inside memories editors */
 .composer-editor :deep(.note-editor-content h1),

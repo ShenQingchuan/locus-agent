@@ -2,10 +2,12 @@ import { Hono } from 'hono'
 import {
   createNote,
   deleteNote,
+  getMemoryStats,
   getNoteConversationIds,
   getNoteWithTags,
   listNotes,
-  searchNotes,
+  searchNotesByTags,
+  searchNotesHybrid,
   updateNote,
 } from '../services/note.js'
 
@@ -44,6 +46,23 @@ notesRoutes.post('/', async (c) => {
   return c.json(note, 201)
 })
 
+// GET /api/notes/stats - 获取记忆统计摘要
+notesRoutes.get('/stats', async (c) => {
+  const stats = await getMemoryStats()
+  return c.json(stats)
+})
+
+// POST /api/notes/search-by-tags - 按标签搜索记忆
+notesRoutes.post('/search-by-tags', async (c) => {
+  const body = await c.req.json()
+  const { tags } = body
+  if (!Array.isArray(tags)) {
+    return c.json({ error: 'tags must be an array' }, 400)
+  }
+  const result = await searchNotesByTags(tags)
+  return c.json({ notes: result })
+})
+
 // GET /api/notes/search - 搜索笔记
 notesRoutes.get('/search', async (c) => {
   const q = c.req.query('q')
@@ -51,7 +70,7 @@ notesRoutes.get('/search', async (c) => {
     return c.json({ notes: [] })
   }
 
-  const result = await searchNotes(q)
+  const result = await searchNotesHybrid(q)
   return c.json({ notes: result })
 })
 

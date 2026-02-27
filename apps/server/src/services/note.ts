@@ -1,7 +1,44 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
-import { desc, eq, inArray, like } from 'drizzle-orm'
-import { db, noteConversations, notes, noteTags, tags } from '../db/index.js'
+import { count, desc, eq, inArray, like } from 'drizzle-orm'
+import { db, isVecAvailable, noteConversations, notes, noteTags, tags } from '../db/index.js'
 import { getOrCreateTag } from './tag.js'
+
+// ==================== Embedding 自动索引 ====================
+
+/**
+ * 异步生成笔记的 embedding 并存入向量数据库（fire-and-forget）
+ */
+function autoEmbedNote(noteId: string, content: string): void {
+  if (!isVecAvailable() || !content.trim())
+    return
+
+  // 延迟导入避免循环依赖
+  import('./embedding.js').then(({ embedPassage, isModelLoaded }) => {
+    if (!isModelLoaded())
+      return
+    return embedPassage(content).then((vector) => {
+      import('./vectorStore.js').then(({ upsertNoteEmbedding }) => {
+        upsertNoteEmbedding(noteId, vector)
+      })
+    })
+  }).catch((err) => {
+    console.warn('[auto-embed] Failed to embed note:', noteId, err)
+  })
+}
+
+/**
+ * 异步删除笔记的 embedding（fire-and-forget）
+ */
+function autoDeleteEmbedding(noteId: string): void {
+  if (!isVecAvailable())
+    return
+
+  import('./vectorStore.js').then(({ deleteNoteEmbedding }) => {
+    deleteNoteEmbedding(noteId)
+  }).catch(() => {
+    // 忽略错误
+  })
+}
 
 // ==================== Types ====================
 
@@ -58,7 +95,12 @@ export async function createNote(input: CreateNoteInput): Promise<NoteWithTags> 
     })
   }
 
-  return getNoteWithTags(id) as Promise<NoteWithTags>
+  const result = await getNoteWithTags(id) as NoteWithTags
+
+  // 异步生成 embedding（不阻塞响应）
+  autoEmbedNote(result.id, result.content)
+
+  return result
 }
 
 /**
@@ -160,7 +202,14 @@ export async function updateNote(
     await setNoteTags(id, input.tagNames)
   }
 
-  return getNoteWithTags(id)
+  const result = await getNoteWithTags(id)
+
+  // 内容变更时重新生成 embedding
+  if (input.content !== undefined && result) {
+    autoEmbedNote(id, result.content)
+  }
+
+  return result
 }
 
 /**
@@ -172,6 +221,10 @@ export async function deleteNote(id: string): Promise<boolean> {
     return false
 
   await db.delete(notes).where(eq(notes.id, id))
+
+  // 同步删除 embedding
+  autoDeleteEmbedding(id)
+
   return true
 }
 
@@ -210,24 +263,51 @@ async function setNoteTags(noteId: string, tagNames: string[]): Promise<void> {
 // ==================== 搜索 ====================
 
 /**
- * 简单关键词搜索（内容模糊匹配）
- * 后续 Phase 5 会替换为 FTS5 全文搜索
+ * 向量语义搜索，LIKE 子串匹配作为 fallback
+ *
+ * 当 embedding 模型已加载且 sqlite-vec 可用时，使用向量 KNN 搜索；
+ * 否则降级到 LIKE '%query%' 子串匹配。
  */
-export async function searchNotes(query: string): Promise<NoteWithTags[]> {
-  const pattern = `%${query}%`
+export async function searchNotesHybrid(query: string): Promise<NoteWithTags[]> {
+  const { isModelLoaded, embedQuery } = await import('./embedding.js')
+  const { isVecAvailable, searchByVector } = await import('./vectorStore.js')
 
+  let matchedIds: string[] = []
+
+  if (isModelLoaded() && isVecAvailable()) {
+    // 向量语义搜索
+    const queryVector = await embedQuery(query)
+    const vecResults = searchByVector(queryVector, 30)
+    matchedIds = vecResults.map(r => r.noteId)
+  }
+  else {
+    // 降级：LIKE 子串匹配
+    const pattern = `%${query}%`
+    const fallbackResults = await db
+      .select({ id: notes.id })
+      .from(notes)
+      .where(like(notes.content, pattern))
+      .limit(30)
+    matchedIds = fallbackResults.map(r => r.id)
+  }
+
+  if (matchedIds.length === 0)
+    return []
+
+  // 查询完整数据并保持向量搜索排序
   const result = await db
     .select()
     .from(notes)
-    .where(like(notes.content, pattern))
-    .orderBy(desc(notes.updatedAt))
-    .limit(50)
+    .where(inArray(notes.id, matchedIds))
 
-  // 附加标签
+  const noteMap = new Map(result.map(n => [n.id, n]))
   const notesWithTags: NoteWithTags[] = []
-  for (const note of result) {
-    const noteTags_ = await getNoteTags(note.id)
-    notesWithTags.push({ ...note, tags: noteTags_ })
+  for (const id of matchedIds) {
+    const note = noteMap.get(id)
+    if (note) {
+      const noteTags_ = await getNoteTags(note.id)
+      notesWithTags.push({ ...note, tags: noteTags_ })
+    }
   }
 
   return notesWithTags
@@ -243,4 +323,80 @@ export async function getNoteConversationIds(noteId: string): Promise<string[]> 
     .where(eq(noteConversations.noteId, noteId))
 
   return result.map(r => r.conversationId)
+}
+
+// ==================== 记忆（AI 上下文用） ====================
+
+/**
+ * 按标签名搜索记忆
+ */
+export async function searchNotesByTags(tagNames: string[]): Promise<NoteWithTags[]> {
+  if (tagNames.length === 0)
+    return []
+
+  // 查找匹配的 tag IDs（支持前缀匹配，如 "project" 匹配 "project/locus-agent"）
+  const allTags = await db.select().from(tags)
+  const matchedTagIds = allTags
+    .filter(t => tagNames.some(name =>
+      t.name === name || t.name.startsWith(`${name}/`),
+    ))
+    .map(t => t.id)
+
+  if (matchedTagIds.length === 0)
+    return []
+
+  const noteIdsWithTag = await db
+    .select({ noteId: noteTags.noteId })
+    .from(noteTags)
+    .where(inArray(noteTags.tagId, matchedTagIds))
+
+  const uniqueIds = [...new Set(noteIdsWithTag.map(r => r.noteId))]
+  if (uniqueIds.length === 0)
+    return []
+
+  const result = await db
+    .select()
+    .from(notes)
+    .where(inArray(notes.id, uniqueIds))
+    .orderBy(desc(notes.updatedAt))
+    .limit(50)
+
+  const notesWithTags: NoteWithTags[] = []
+  for (const note of result) {
+    const noteTags_ = await getNoteTags(note.id)
+    notesWithTags.push({ ...note, tags: noteTags_ })
+  }
+
+  return notesWithTags
+}
+
+/**
+ * 获取记忆统计摘要（用于 system prompt 中的概览信息）
+ */
+export async function getMemoryStats(): Promise<{
+  totalCount: number
+  tagSummary: { name: string, count: number }[]
+}> {
+  // 总记忆数
+  const [countResult] = await db
+    .select({ value: count() })
+    .from(notes)
+  const totalCount = countResult?.value ?? 0
+
+  // 各标签的记忆数（按数量降序，top 10）
+  const tagCountResults = await db
+    .select({
+      name: tags.name,
+      noteCount: count(),
+    })
+    .from(noteTags)
+    .innerJoin(tags, eq(noteTags.tagId, tags.id))
+    .groupBy(tags.name)
+    .orderBy(desc(count()))
+    .limit(10)
+
+  return {
+    totalCount,
+    tagSummary: tagCountResults.map(r => ({ name: r.name, count: r.noteCount })),
+  }
 }

@@ -1,3 +1,5 @@
+export { default as CommandPalette } from './components/CommandPalette.vue'
+export type { CommandGroup, CommandItem } from './components/CommandPalette.vue'
 // Components
 export { default as Dropdown } from './components/Dropdown.vue'
 // Re-export component prop types
@@ -6,10 +8,13 @@ export { default as List, type ListItemSelectMode } from './components/List.vue'
 export { default as ListItem, type ListItemAction } from './components/ListItem.vue'
 export { default as Select } from './components/Select.vue'
 export type { SelectOption } from './components/Select.vue'
+
 export { default as Switch } from './components/Switch.vue'
 export { default as ToastContainer } from './components/ToastContainer.vue'
-
 export { default as Tooltip } from './components/Tooltip.vue'
+export { default as Tree } from './components/Tree.vue'
+export type { FlatTreeNode, TreeNode } from './components/Tree.vue'
+export { default as VirtualList } from './components/VirtualList.vue'
 
 // Composables
 export { useToast } from './composables/useToast'

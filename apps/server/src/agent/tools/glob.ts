@@ -1,7 +1,8 @@
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { Glob } from 'bun'
+import { cwd } from 'node:process'
 import { tool } from 'ai'
+import { Glob } from 'bun'
 import { z } from 'zod'
 import { resolveToolPath } from './resolve-path.js'
 
@@ -128,7 +129,7 @@ export async function executeGlob(args: {
   const { pattern, cwd: cwdArg, limit } = args
 
   // --- Resolve search root ---
-  const resolvedCwd = cwdArg ? resolveToolPath(cwdArg) : process.cwd()
+  const resolvedCwd = cwdArg ? resolveToolPath(cwdArg) : cwd()
 
   // Validate the directory exists
   let cwdStat

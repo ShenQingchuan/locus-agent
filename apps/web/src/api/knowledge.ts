@@ -5,6 +5,7 @@ import type {
   ListFoldersResponse,
   ListNotesResponse,
   ListTagsResponse,
+  MemoryStats,
   NoteWithTags,
   SearchNotesResponse,
   Tag,
@@ -75,6 +76,18 @@ export async function deleteNote(id: string): Promise<void> {
 export async function searchNotes(query: string): Promise<NoteWithTags[]> {
   const { notes } = await request<SearchNotesResponse>(`/notes/search?q=${encodeURIComponent(query)}`)
   return notes
+}
+
+export async function searchByTags(tagNames: string[]): Promise<NoteWithTags[]> {
+  const { notes } = await request<SearchNotesResponse>('/notes/search-by-tags', {
+    method: 'POST',
+    body: JSON.stringify({ tags: tagNames }),
+  })
+  return notes
+}
+
+export async function fetchMemoryStats(): Promise<MemoryStats> {
+  return request<MemoryStats>('/notes/stats')
 }
 
 // ==================== Folders ====================

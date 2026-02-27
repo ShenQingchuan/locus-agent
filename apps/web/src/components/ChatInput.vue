@@ -37,7 +37,8 @@ function startEditQueueItem(item: QueuedMessage) {
   editingQueueContent.value = item.content
   nextTick(() => {
     const el = document.getElementById(`queue-edit-${item.id}`)
-    if (el) el.focus()
+    if (el)
+      el.focus()
   })
 }
 
@@ -59,7 +60,8 @@ function cancelEditQueueItem() {
 }
 
 function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
-  if (event.isComposing) return
+  if (event.isComposing)
+    return
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     saveEditQueueItem(id)

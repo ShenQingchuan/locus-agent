@@ -7,6 +7,7 @@ import { setServerConfig } from './config.js'
 import { initDB } from './db/index.js'
 import { chatRoutes } from './routes/chat.js'
 import { conversationsRoutes } from './routes/conversations.js'
+import { embeddingRoutes } from './routes/embedding.js'
 import { foldersRoutes } from './routes/folders.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
@@ -49,6 +50,7 @@ export function createApp(): Hono {
   app.route('/api/folders', foldersRoutes)
   app.route('/api/tags', tagsRoutes)
   app.route('/api/settings', settingsRoutes)
+  app.route('/api/embedding', embeddingRoutes)
   app.route('/api/mcp', mcpRoutes)
 
   return app

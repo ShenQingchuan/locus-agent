@@ -24,3 +24,5 @@ dist
 !.env.example
 
 **/*.tsbuildinfo
+tmp/
+.opencode/

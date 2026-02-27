@@ -8,7 +8,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { DEFAULT_MODELS, normalizeModelForProvider } from '@locus-agent/shared'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
-export type { LLMProviderType, CustomProviderMode }
+export type { CustomProviderMode, LLMProviderType }
 
 export interface LLMConfig {
   provider: LLMProviderType
@@ -325,8 +325,8 @@ export function createLLMModel(
         effectiveModelId = thinkingMode && !isReasoner
           ? 'deepseek-reasoner'
           : !thinkingMode && isReasoner
-            ? 'deepseek-chat'
-            : effectiveModelId
+              ? 'deepseek-chat'
+              : effectiveModelId
       }
       const deepseek = createDeepSeek({
         apiKey: cfg.apiKey,

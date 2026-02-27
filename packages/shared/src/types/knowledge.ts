@@ -27,6 +27,7 @@ export interface CreateNoteInput {
   folderId?: string | null
   tagNames?: string[]
   conversationId?: string
+  pinned?: boolean
 }
 
 export interface UpdateNoteInput {
@@ -34,6 +35,7 @@ export interface UpdateNoteInput {
   editorState?: Record<string, unknown> | null
   folderId?: string | null
   tagNames?: string[]
+  pinned?: boolean
 }
 
 // ==================== 文件夹 ====================
@@ -85,4 +87,9 @@ export interface ListTagsResponse {
 
 export interface SearchNotesResponse {
   notes: NoteWithTags[]
+}
+
+export interface MemoryStats {
+  totalCount: number
+  tagSummary: { name: string, count: number }[]
 }

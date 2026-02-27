@@ -85,23 +85,23 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
 
       model: ({ results }) => {
         const placeholders: Record<string, string> = {
-          openai: 'gpt-4o',
-          anthropic: 'claude-sonnet-4-20250514',
+          openai: 'gpt-5.3',
+          anthropic: 'claude-opus-4-6',
           moonshotai: 'kimi-k2.5',
           openrouter: 'moonshotai/kimi-k2.5',
           deepseek: 'deepseek-chat',
-          custom: 'gpt-4',
+          custom: 'claude-opus-4-6',
         }
         return p.text({
-          message: 'Model name (leave empty for default)',
-          placeholder: placeholders[results.provider!] || 'gpt-4',
+          message: '模型名称 (留空使用默认)',
+          placeholder: placeholders[results.provider!] || 'claude-opus-4-6',
           initialValue: existing?.model ?? '',
         })
       },
 
       port: () =>
         p.text({
-          message: 'Server port',
+          message: '服务器端口',
           placeholder: '3000',
           initialValue: String(existingPort ?? 3000),
           validate: (value) => {

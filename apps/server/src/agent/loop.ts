@@ -1,10 +1,11 @@
 import type { LanguageModel, ModelMessage } from 'ai'
 import type { QuestionAnswer, QuestionItem } from './tools/ask_question.js'
 import type { DelegateArgs, DelegateResult } from './tools/delegate.js'
+import type { ToolExecutionContext } from './tools/registry.js'
 import { streamText } from 'ai'
 import { formatQuestionAnswers } from './tools/ask_question.js'
 import { executeDelegate } from './tools/delegate.js'
-import { executeToolCall, getMergedTools, hasToolExecutor, interactiveTools } from './tools/registry.js'
+import { executeToolCall, getMergedTools, hasToolExecutor, interactiveTools, isTrustedBuiltinTool } from './tools/registry.js'
 import { isWhitelisted } from './whitelist.js'
 
 /**
@@ -83,6 +84,29 @@ After getting tool results, analyze them and provide a clear response to the use
 File editing: str_replace and write_file return the change result or confirmation. 
 You usually do not need to call read_file after a successful edit.
 Only read when the edit failed (e.g. old_string not found) or when you need to continue editing other parts of the file.
+
+## Memory System
+
+You have access to a persistent memory system via save_memory and search_memories tools.
+
+**When to save memories (save_memory):**
+- User states a preference (coding style, language, tools, conventions)
+- Important project decisions or architecture choices are made
+- You learn a lesson from a debugging session or mistake
+- The user explicitly asks you to remember something
+- Key facts about the user's environment or workflow
+
+**When to search memories (search_memories):**
+- At the start of a new task, if the topic might relate to saved preferences or past decisions
+- When the user references something you discussed before
+- When you need context about the user's project or preferences
+- When the user asks "do you remember..." or similar
+
+**Guidelines:**
+- Each memory should be concise (1-3 sentences), specific, and factual
+- Use multi-level tags like "preference/code-style", "project/my-app", "lesson/debugging"
+- Do NOT search memories on every single turn — only when relevant context would help
+- Do NOT save trivial or ephemeral information (e.g. "user said hello")
 `
 
 /**
@@ -133,6 +157,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   } = options
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
+  const toolContext: ToolExecutionContext = { conversationId }
 
   // 复制消息数组以避免修改原始数组
   const messages: ModelMessage[] = [...initialMessages]
@@ -371,18 +396,20 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
           }
         }
-        // 确认模式下，检查白名单后决定是否等待用户确认
+        // 确认模式下，检查白名单/信任工具后决定是否等待用户确认
         else if (shouldConfirm() && getToolApproval) {
+          // 信任的内置工具（如 save_memory/search_memories）无需批准
+          const isTrusted = isTrustedBuiltinTool(tc.toolName)
           // 白名单检查：如果匹配则自动放行
           const whitelistMatch = conversationId
             ? isWhitelisted(conversationId, tc.toolName, tc.args)
             : null
 
-          if (whitelistMatch) {
+          if (isTrusted || whitelistMatch) {
             // 白名单命中，自动放行（应用超时）
             const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
               ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-              : undefined)
+              : undefined, toolContext)
             result = await withTimeout(
               toolPromise,
               toolTimeoutMs,
@@ -405,7 +432,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
               // 用户确认后执行（应用超时）
               const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
                 ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-                : undefined)
+                : undefined, toolContext)
               result = await withTimeout(
                 toolPromise,
                 toolTimeoutMs,
@@ -418,7 +445,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           // 普通执行模式（应用超时）
           const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
             ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-            : undefined)
+            : undefined, toolContext)
           result = await withTimeout(
             toolPromise,
             toolTimeoutMs,

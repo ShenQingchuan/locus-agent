@@ -25,7 +25,8 @@ const BOTTOM_THRESHOLD = 80
 
 function isAtBottom(): boolean {
   const el = containerRef.value
-  if (!el) return true
+  if (!el)
+    return true
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD
 }
 
@@ -35,7 +36,8 @@ const showScrollButton = ref(false)
 // --- Detect user scroll intent via native event ---
 function onScroll() {
   // Skip scroll events we fired ourselves
-  if (isProgrammaticScroll) return
+  if (isProgrammaticScroll)
+    return
 
   const atBottom = isAtBottom()
   showScrollButton.value = !atBottom
@@ -57,7 +59,8 @@ function onScroll() {
 // per frame — this is buttery smooth.
 function scrollToBottom(instant = true) {
   const container = containerRef.value
-  if (!container) return
+  if (!container)
+    return
 
   isProgrammaticScroll = true
   if (instant) {
@@ -76,7 +79,8 @@ function scrollToBottom(instant = true) {
 
 // Coalesced version: at most one scroll per animation frame
 function scheduleScrollToBottom() {
-  if (scrollRafId !== null) return
+  if (scrollRafId !== null)
+    return
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = null
     scrollToBottom(true)
@@ -91,7 +95,7 @@ watch(
     const last = len > 0 ? props.messages[len - 1] : null
     return [len, last?.content?.length ?? 0] as const
   },
-  async ([newLen], [oldLen]) => {
+  async ([newLen]) => {
     // Session switched / cleared
     if (newLen === 0) {
       previousMessagesLength.value = 0
@@ -103,7 +107,8 @@ watch(
     previousMessagesLength.value = newLen
 
     // If user scrolled up, respect it — don't auto-scroll
-    if (userScrolledUp.value && !isInitialLoad) return
+    if (userScrolledUp.value && !isInitialLoad)
+      return
 
     await nextTick()
 
