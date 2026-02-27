@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LLMProviderType, MCPServerConfig, MCPServerStatus, WhitelistRule } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType, MCPServerConfig, MCPServerStatus, WhitelistRule } from '@locus-agent/shared'
 import { DEFAULT_API_BASES, getRiskLevel, LLM_PROVIDERS } from '@locus-agent/shared'
 import { Switch, useToast } from '@locus-agent/ui'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -14,10 +14,13 @@ import {
   updateMCPConfig,
   updateSettingsConfig,
 } from '@/api/chat'
+import AppNavRail from '@/components/AppNavRail.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import { useChatStore } from '@/stores/chat'
 
 const router = useRouter()
 const toast = useToast()
+const chatStore = useChatStore()
 
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -32,8 +35,11 @@ const form = ref({
   provider: 'openai' as LLMProviderType,
   apiKey: '',
   apiBase: '',
+  customMode: 'openai-compatible' as CustomProviderMode,
   port: 3000,
 })
+
+const isCustomProvider = computed(() => form.value.provider === 'custom')
 
 const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label }))
 
@@ -51,14 +57,20 @@ const apiKeyHelperText = computed(() => {
   return hasExistingApiKey.value ? '' : '首次配置请填写 API Key'
 })
 
-const apiBasePlaceholder = computed(() => DEFAULT_API_BASES[form.value.provider])
+const apiBasePlaceholder = computed(() => {
+  if (form.value.provider === 'custom')
+    return 'https://api.example.com/v1'
+  return DEFAULT_API_BASES[form.value.provider]
+})
 
 watch(() => form.value.provider, (provider) => {
   if (isLoading.value)
     return
-  form.value.apiBase = DEFAULT_API_BASES[provider] ?? ''
+  form.value.apiBase = provider === 'custom' ? '' : (DEFAULT_API_BASES[provider] ?? '')
   form.value.apiKey = ''
   currentApiKeyMasked.value = apiKeysMasked.value[provider] ?? null
+  if (provider !== 'custom')
+    form.value.customMode = 'openai-compatible'
 })
 
 // ---------------------------------------------------------------------------
@@ -395,7 +407,8 @@ async function loadConfig() {
     }
 
     form.value.provider = config.provider
-    form.value.apiBase = config.apiBase || DEFAULT_API_BASES[config.provider] || ''
+    form.value.apiBase = config.apiBase || (config.provider === 'custom' ? '' : (DEFAULT_API_BASES[config.provider] || ''))
+    form.value.customMode = config.customMode || 'openai-compatible'
     form.value.port = config.port
 
     apiKeysMasked.value = config.apiKeys ?? {}
@@ -426,15 +439,26 @@ async function saveConfig() {
 
     const apiBase = form.value.apiBase.trim()
 
+    // 自定义提供商验证
+    if (form.value.provider === 'custom' && !apiBase) {
+      toast.error('自定义提供商必须填写 API Base URL')
+      return
+    }
+
     const payload: {
       provider: LLMProviderType
       apiKey?: string
       apiBase: string
+      customMode?: CustomProviderMode
       port: number
     } = {
       provider: form.value.provider,
       apiBase,
       port,
+    }
+
+    if (form.value.provider === 'custom') {
+      payload.customMode = form.value.customMode
     }
 
     const trimmedKey = form.value.apiKey.trim()
@@ -459,6 +483,12 @@ async function saveConfig() {
       apiKeysMasked.value = result.config.apiKeys ?? apiKeysMasked.value
       currentApiKeyMasked.value = apiKeysMasked.value[form.value.provider] ?? result.config.apiKeyMasked ?? currentApiKeyMasked.value
       runtimeInfo.value = result.config.runtime ?? runtimeInfo.value
+      // 同步 chatStore 以确保 ChatInput 显示一致的配置
+      chatStore.provider = result.config.provider
+      chatStore.modelName = result.config.model ?? ''
+      chatStore.customMode = result.config.customMode ?? 'openai-compatible'
+      if (result.config.runtime?.contextWindow)
+        chatStore.MAX_CONTEXT_TOKENS = result.config.runtime.contextWindow
     }
   }
   finally {
@@ -532,7 +562,7 @@ async function saveConfig() {
 
           <template v-else>
             <!-- LLM -->
-            <section class="card p-4">
+            <form class="card p-4" @submit.prevent="saveConfig">
               <div class="flex items-center justify-between">
                 <div>
                   <h2 class="text-sm font-medium text-foreground">
@@ -567,6 +597,35 @@ async function saveConfig() {
                   </div>
                 </div>
 
+                <!-- 自定义提供商模式选择 -->
+                <div v-if="isCustomProvider" class="grid gap-1.5">
+                  <label class="text-xs text-muted-foreground">兼容模式</label>
+                  <div class="relative">
+                    <select v-model="form.customMode" class="select-field">
+                      <option value="openai-compatible">
+                        OpenAI 兼容
+                      </option>
+                      <option value="anthropic-compatible">
+                        Anthropic 兼容
+                      </option>
+                    </select>
+                    <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    选择与你自定义服务 API 格式兼容的模式
+                  </p>
+                </div>
+
+                <!-- Hidden username field for password manager accessibility -->
+                <input
+                  type="text"
+                  :value="form.provider"
+                  autocomplete="username"
+                  class="hidden"
+                  aria-hidden="true"
+                  tabindex="-1"
+                >
+
                 <div class="grid gap-1.5">
                   <label class="text-xs text-muted-foreground">API Key</label>
                   <input
@@ -594,7 +653,7 @@ async function saveConfig() {
               <p class="mt-3 text-xs text-muted-foreground/60">
                 模型名称可在对话界面底部直接切换。
               </p>
-            </section>
+            </form>
 
             <!-- Server -->
             <section class="card p-4">
@@ -885,8 +944,6 @@ async function saveConfig() {
                   </button>
                 </template>
               </div>
-
-
             </section>
 
             <!-- Whitelist Management -->

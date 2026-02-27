@@ -1,4 +1,4 @@
-import type { LLMProviderType } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import type { LanguageModel } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createDeepSeek } from '@ai-sdk/deepseek'
@@ -8,13 +8,14 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { DEFAULT_MODELS, normalizeModelForProvider } from '@locus-agent/shared'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
-export type { LLMProviderType }
+export type { LLMProviderType, CustomProviderMode }
 
 export interface LLMConfig {
   provider: LLMProviderType
   apiKey: string
   apiBase?: string
   model?: string
+  customMode?: CustomProviderMode
 }
 
 const DEFAULT_CONTEXT_WINDOW = 128_000
@@ -346,6 +347,29 @@ export function createLLMModel(
         ...(baseURL ? { baseURL } : {}),
       })
       return openrouter(effectiveModelId)
+    }
+    case 'custom': {
+      // 自定义提供商：根据选择的模式使用对应的 SDK
+      const mode = cfg.customMode || 'openai-compatible'
+      if (!baseURL) {
+        throw new Error('自定义提供商必须配置 API Base URL')
+      }
+      if (mode === 'anthropic-compatible') {
+        const anthropic = createAnthropic({
+          apiKey: cfg.apiKey,
+          baseURL,
+        })
+        return anthropic(effectiveModelId)
+      }
+      else {
+        // openai-compatible 模式
+        const provider = createOpenAICompatible({
+          name: 'custom-provider',
+          apiKey: cfg.apiKey,
+          baseURL,
+        })
+        return provider.chatModel(effectiveModelId)
+      }
     }
     case 'openai':
     default: {

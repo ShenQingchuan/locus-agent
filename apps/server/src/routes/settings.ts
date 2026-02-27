@@ -1,4 +1,4 @@
-import type { LLMProviderType } from '../agent/providers/index.js'
+import type { CustomProviderMode, LLMProviderType } from '../agent/providers/index.js'
 import { eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -87,7 +87,7 @@ async function deleteSetting(key: string): Promise<void> {
   await db.delete(settingsTable).where(eq(settingsTable.key, key))
 }
 
-const ALL_PROVIDERS: LLMProviderType[] = ['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek']
+const ALL_PROVIDERS: LLMProviderType[] = ['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek', 'custom']
 
 async function buildConfigResponse(): Promise<{
   setupCompleted: boolean
@@ -97,6 +97,7 @@ async function buildConfigResponse(): Promise<{
   apiKeys: Partial<Record<LLMProviderType, string | null>>
   apiBase?: string
   model?: string
+  customMode?: CustomProviderMode
   port: number
   runtime?: { provider: string, model: string, contextWindow: number }
 }> {
@@ -105,6 +106,7 @@ async function buildConfigResponse(): Promise<{
     'llm.provider',
     'llm.api_base',
     'llm.model',
+    'llm.custom_mode',
     'server.port',
     ...ALL_PROVIDERS.map(p => `llm.api_key.${p}`),
   ]
@@ -114,6 +116,7 @@ async function buildConfigResponse(): Promise<{
   const apiKey = map[`llm.api_key.${provider}`]
   const apiBase = map['llm.api_base']
   const model = map['llm.model']
+  const customMode = (map['llm.custom_mode'] as CustomProviderMode) || undefined
   const port = Number(map['server.port']) || 3000
 
   // Build per-provider masked keys map
@@ -139,6 +142,7 @@ async function buildConfigResponse(): Promise<{
     apiKeys,
     apiBase: apiBase || undefined,
     model: model || undefined,
+    customMode,
     port,
     runtime,
   }
@@ -164,10 +168,11 @@ settingsRoutes.get('/config', async (c) => {
 })
 
 const updateConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek']).optional(),
+  provider: z.enum(['openai', 'anthropic', 'moonshotai', 'openrouter', 'deepseek', 'custom']).optional(),
   apiKey: z.string().optional(),
   apiBase: z.union([z.string(), z.null()]).optional(),
   model: z.union([z.string(), z.null()]).optional(),
+  customMode: z.enum(['openai-compatible', 'anthropic-compatible']).optional(),
   port: z.coerce.number().int().min(1).max(65535).optional(),
 })
 
@@ -197,6 +202,7 @@ settingsRoutes.put('/config', async (c) => {
       'llm.provider',
       'llm.api_base',
       'llm.model',
+      'llm.custom_mode',
       'server.port',
       ...ALL_PROVIDERS.map(p => `llm.api_key.${p}`),
     ]
@@ -205,6 +211,7 @@ settingsRoutes.put('/config', async (c) => {
     const currentProvider = (map['llm.provider'] || 'openai') as LLMProviderType
     const currentApiBase = map['llm.api_base']
     const currentModel = map['llm.model']
+    const currentCustomMode = (map['llm.custom_mode'] as CustomProviderMode) || undefined
     const currentPort = Number(map['server.port']) || 3000
 
     const nextProvider = (parsed.data.provider || currentProvider) as LLMProviderType
@@ -236,6 +243,7 @@ settingsRoutes.put('/config', async (c) => {
       return trimmed.length > 0 ? trimmed : undefined
     })()
 
+    const nextCustomMode = parsed.data.customMode || currentCustomMode
     const nextPort = parsed.data.port ?? currentPort
 
     // Persist settings
@@ -255,6 +263,12 @@ settingsRoutes.put('/config', async (c) => {
       else await deleteSetting('llm.model')
     }
 
+    if (parsed.data.customMode !== undefined) {
+      if (nextCustomMode)
+        await upsertSetting('llm.custom_mode', nextCustomMode)
+      else await deleteSetting('llm.custom_mode')
+    }
+
     if (parsed.data.port !== undefined) {
       await upsertSetting('server.port', String(nextPort))
     }
@@ -265,6 +279,7 @@ settingsRoutes.put('/config', async (c) => {
       apiKey: nextApiKey,
       apiBase: nextApiBase,
       model: nextModel,
+      customMode: nextCustomMode,
     })
 
     const requiresRestart = parsed.data.port !== undefined && nextPort !== currentPort

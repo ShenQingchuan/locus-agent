@@ -2,6 +2,7 @@ import type {
   AddToWhitelistPayload,
   Conversation,
   CoreMessage,
+  CustomProviderMode,
   ListConversationsResponse,
   LLMProviderType,
   MCPServersConfig,
@@ -634,6 +635,7 @@ export interface SettingsConfigResponse {
   apiKeys: Partial<Record<LLMProviderType, string | null>>
   apiBase?: string
   model?: string
+  customMode?: CustomProviderMode
   port: number
   runtime?: { provider: string, model: string, contextWindow: number }
 }
@@ -665,6 +667,7 @@ export interface UpdateSettingsConfigRequest {
   apiKey?: string
   apiBase?: string
   model?: string
+  customMode?: CustomProviderMode
   port?: number
 }
 

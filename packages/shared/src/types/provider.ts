@@ -1,4 +1,6 @@
-export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek'
+export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek' | 'custom'
+
+export type CustomProviderMode = 'openai-compatible' | 'anthropic-compatible'
 
 export interface LLMProviderMeta {
   value: LLMProviderType
@@ -14,6 +16,7 @@ export const LLM_PROVIDERS: LLMProviderMeta[] = [
   { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
   { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
   { value: 'deepseek', label: 'DeepSeek', icon: 'i-ri:deepseek-fill', defaultModel: 'deepseek-chat', defaultApiBase: 'https://api.deepseek.com' },
+  { value: 'custom', label: '自定义来源', icon: 'i-carbon-settings', defaultModel: 'gpt-4', defaultApiBase: '' },
 ]
 
 export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntries(
@@ -29,10 +32,11 @@ export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEnt
  * OpenRouter uses provider/model format (e.g. moonshotai/kimi-k2.5).
  * Direct providers use model-only format from DEFAULT_MODELS.
  * Strip provider prefix when using direct provider.
+ * Custom provider keeps the model name as-is.
  */
 export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {
   const trimmed = model.trim()
-  if (provider === 'openrouter')
+  if (provider === 'openrouter' || provider === 'custom')
     return trimmed
   const prefix = `${provider}/`
   if (trimmed.startsWith(prefix))

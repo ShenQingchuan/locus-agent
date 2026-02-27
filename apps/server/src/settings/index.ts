@@ -1,4 +1,4 @@
-import type { LLMProviderType } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import { eq } from 'drizzle-orm'
 import { db, settings as settingsTable } from '../db/index.js'
 
@@ -45,6 +45,7 @@ export interface LLMSettings {
   apiKey: string
   apiBase?: string
   model?: string
+  customMode?: CustomProviderMode
 }
 
 export function getLLMSettings(): LLMSettings | null {
@@ -57,6 +58,7 @@ export function getLLMSettings(): LLMSettings | null {
     apiKey,
     apiBase: getSetting('llm.api_base') || undefined,
     model: getSetting('llm.model') || undefined,
+    customMode: (getSetting('llm.custom_mode') as CustomProviderMode) || undefined,
   }
 }
 
@@ -67,6 +69,8 @@ export function saveLLMSettings(settings: LLMSettings): void {
     setSetting('llm.api_base', settings.apiBase)
   if (settings.model)
     setSetting('llm.model', settings.model)
+  if (settings.customMode)
+    setSetting('llm.custom_mode', settings.customMode)
   setSetting('setup.completed', 'true')
 }
 

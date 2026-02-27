@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LLMProviderType } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/stores/chat'
 import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
@@ -101,6 +101,14 @@ function handleModeSelect(key: string) {
 
 const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
 
+const isCustomProvider = computed(() => chatStore.provider === 'custom')
+
+// 兼容模式选项
+const customModeOptions = [
+  { value: 'openai-compatible' as CustomProviderMode, label: 'OpenAI', icon: 'i-simple-icons:openai' },
+  { value: 'anthropic-compatible' as CustomProviderMode, label: 'Anthropic', icon: 'i-simple-icons:anthropic' },
+]
+
 const localModel = ref('')
 
 // Remember custom model names per provider so switching away and back preserves the value
@@ -136,7 +144,11 @@ const modelInputWidth = computed(() => {
 })
 
 const debouncedSaveModel = useDebounceFn(async () => {
-  const result = await chatStore.saveModelSettings(chatStore.provider, localModel.value.trim())
+  const result = await chatStore.saveModelSettings(
+    chatStore.provider,
+    localModel.value.trim(),
+    isCustomProvider.value ? chatStore.customMode : undefined,
+  )
   if (!result.success)
     toast.error(result.message || '保存模型设置失败')
 }, 800)
@@ -151,9 +163,22 @@ async function handleProviderChange(value: string) {
   // Normalize: e.g. moonshotai/kimi-k2.5 -> kimi-k2.5 when switching to moonshotai
   const remembered = normalizeModelForProvider(customModelPerProvider.value[p] ?? '', p)
   localModel.value = remembered
-  const result = await chatStore.saveModelSettings(p, remembered)
+  // 自定义提供商时，使用当前 customMode
+  const result = await chatStore.saveModelSettings(
+    p,
+    remembered,
+    p === 'custom' ? chatStore.customMode : undefined,
+  )
   if (!result.success) {
     toast.error(result.message || '切换提供商失败')
+  }
+}
+
+async function handleCustomModeChange(value: string) {
+  const mode = value as CustomProviderMode
+  const result = await chatStore.saveModelSettings(chatStore.provider, localModel.value.trim(), mode)
+  if (!result.success) {
+    toast.error(result.message || '切换兼容模式失败')
   }
 }
 
@@ -320,6 +345,20 @@ function handleKeydown(event: KeyboardEvent) {
             arrow-direction="up"
             @update:model-value="handleProviderChange"
           />
+
+          <!-- 自定义提供商兼容模式选择 -->
+          <template v-if="isCustomProvider">
+            <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
+            <Select
+              :options="customModeOptions"
+              :model-value="chatStore.customMode"
+              placement="top-start"
+              size="sm"
+              arrow-direction="up"
+              @update:model-value="handleCustomModeChange"
+            />
+          </template>
+
           <span class="text-muted-foreground/30 text-xs flex-shrink-0">/</span>
           <input
             id="model-name-input"

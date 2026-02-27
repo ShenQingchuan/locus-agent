@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
 import type { PendingApproval, PendingQuestion, QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -125,6 +125,7 @@ export const useChatStore = defineStore('chat', () => {
   // Model provider & model name (synced with server settings)
   const provider = ref<LLMProviderType>('anthropic')
   const modelName = ref('')
+  const customMode = ref<CustomProviderMode>('openai-compatible')
   const isSavingModelSettings = ref(false)
 
   // Edit message state
@@ -218,6 +219,7 @@ export const useChatStore = defineStore('chat', () => {
       if (config) {
         provider.value = config.provider
         modelName.value = config.model ?? ''
+        customMode.value = config.customMode ?? 'openai-compatible'
         if (config.runtime?.contextWindow)
           MAX_CONTEXT_TOKENS.value = config.runtime.contextWindow
       }
@@ -227,7 +229,11 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function saveModelSettings(newProvider: LLMProviderType, newModel: string): Promise<{ success: boolean, message?: string }> {
+  async function saveModelSettings(
+    newProvider: LLMProviderType,
+    newModel: string,
+    newCustomMode?: CustomProviderMode,
+  ): Promise<{ success: boolean, message?: string }> {
     if (isSavingModelSettings.value)
       return { success: false, message: '正在保存中' }
     isSavingModelSettings.value = true
@@ -242,11 +248,20 @@ export const useChatStore = defineStore('chat', () => {
         payload.apiBase = DEFAULT_API_BASES[newProvider] ?? ''
       }
 
+      // 自定义提供商时保存兼容模式
+      if (newProvider === 'custom' && newCustomMode) {
+        payload.customMode = newCustomMode
+      }
+
       const result = await updateSettingsConfig(payload)
 
       if (result.success) {
         provider.value = newProvider
         modelName.value = newModel
+        if (newCustomMode)
+          customMode.value = newCustomMode
+        if (result.config?.customMode)
+          customMode.value = result.config.customMode
         if (result.config?.runtime?.contextWindow)
           MAX_CONTEXT_TOKENS.value = result.config.runtime.contextWindow
         return { success: true }
@@ -1127,6 +1142,7 @@ export const useChatStore = defineStore('chat', () => {
     thinkMode,
     provider,
     modelName,
+    customMode,
     isSavingModelSettings,
 
     // Current conversation state
