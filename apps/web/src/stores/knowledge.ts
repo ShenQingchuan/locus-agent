@@ -1,4 +1,4 @@
-import type { Folder } from '@locus-agent/shared'
+import type { EditorState, Folder } from '@locus-agent/shared'
 import { useDebounceFn } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -52,7 +52,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   /** 保存当前记忆（返回更新后的 note，用于 setQueryData） */
   async function saveCurrentNote(data: {
     content?: string
-    editorState?: Record<string, unknown> | null
+    editorState?: EditorState
     tagNames?: string[]
   }) {
     if (!currentNoteId.value)

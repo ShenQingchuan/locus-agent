@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, DelegateDelta, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
 import type { PendingApproval, PendingQuestion, QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -19,23 +19,13 @@ import {
 } from '@/api/chat'
 import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 
-/**
- * Delegate 工具流式状态更新
- */
-export interface DelegateDelta {
-  type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
-  content: string
-  toolName?: string
-  isError?: boolean
-}
-
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
   status: 'pending' | 'completed' | 'error' | 'awaiting-approval' | 'awaiting-question' | 'interrupted'
   /** 工具执行过程中的流式输出（如 bash 的 stdout/stderr） */
   output?: string
-  /** Delegate 工具的流式状态更新 */
+  /** Delegate tool streaming state updates */
   delegateDeltas?: DelegateDelta[]
 }
 

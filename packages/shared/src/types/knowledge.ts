@@ -2,6 +2,17 @@
  * 知识库相关类型定义
  */
 
+// ==================== 编辑器 ====================
+
+/** ProseKit editor state JSON type */
+export type EditorState = Record<string, unknown> | null
+
+/** Payload emitted when note editor content changes */
+export interface NoteEditorChange {
+  editorState: Record<string, unknown>
+  content: string
+}
+
 // ==================== 笔记 ====================
 
 export interface Note {
@@ -9,7 +20,7 @@ export interface Note {
   /** Markdown 纯文本 */
   content: string
   /** ProseKit EditorState JSON */
-  editorState?: Record<string, unknown> | null
+  editorState?: EditorState
   /** LLM-generated summary (reserved for future use, currently empty) */
   summary?: string | null
   folderId: string | null
@@ -23,7 +34,7 @@ export interface NoteWithTags extends Note {
 
 export interface CreateNoteInput {
   content?: string
-  editorState?: Record<string, unknown> | null
+  editorState?: EditorState
   folderId?: string | null
   tagNames?: string[]
   conversationId?: string
@@ -32,7 +43,7 @@ export interface CreateNoteInput {
 
 export interface UpdateNoteInput {
   content?: string
-  editorState?: Record<string, unknown> | null
+  editorState?: EditorState
   folderId?: string | null
   tagNames?: string[]
   pinned?: boolean

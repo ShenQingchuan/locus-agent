@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { EditorState, NoteEditorChange } from '@locus-agent/shared'
 import type { NodeJSON } from 'prosekit/core'
 import type { HighlightParser } from 'prosekit/extensions/code-block'
 import type { ComponentPublicInstance } from 'vue'
@@ -21,13 +22,13 @@ import 'prosekit/extensions/placeholder/style.css'
 
 const props = defineProps<{
   /** ProseKit JSON document state (from DB) */
-  editorState?: Record<string, unknown> | null
+  editorState?: EditorState
   /** Plain text content (fallback when no editorState) */
   content?: string
 }>()
 
 const emit = defineEmits<{
-  change: [data: { editorState: Record<string, unknown>, content: string }]
+  change: [data: NoteEditorChange]
 }>()
 
 // ==================== Editor Setup ====================
@@ -298,7 +299,7 @@ function extractPlainText(doc: any): string {
     <!-- Editor content area -->
     <div
       :ref="mountEditor"
-      class="note-editor-content pt-4 px-6 pb-48 focus:outline-none max-w-none"
+      class="note-editor-content pt-4 px-6 pb-30 focus:outline-none max-w-none"
     />
   </ProseKit>
 </template>
