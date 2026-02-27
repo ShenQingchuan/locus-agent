@@ -57,7 +57,7 @@ catalogs:
     '@tanstack/vue-virtual': ^3.13.2
     '@vue/tsconfig': ^0.8.1
     '@vueuse/core': ^14.2.0
-    beautiful-mermaid: ^1.0.2
+    beautiful-mermaid: ^1.1.2
     js-tiktoken: ^1.0.21
     markstream-vue: ^0.0.6
     pinia: ^3.0.4

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useDark } from '@vueuse/core'
-import { renderMermaid, THEMES } from 'beautiful-mermaid'
+import { renderMermaidSVGAsync, THEMES } from 'beautiful-mermaid'
 import { ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -30,7 +30,13 @@ watch(
 
     try {
       const theme = dark ? THEMES['github-dark'] : THEMES['github-light']
-      svgHtml.value = await renderMermaid(code, { ...theme, transparent: true })
+      svgHtml.value = await renderMermaidSVGAsync(
+        code,
+        {
+          ...theme,
+          transparent: true,
+        },
+      )
     }
     catch (e: any) {
       error.value = e.message || 'Mermaid render failed'
@@ -83,7 +89,7 @@ async function handleCopy() {
     </div>
 
     <!-- SVG output -->
-    <div v-else class="mermaid-block-body mermaid-svg-container p-4 flex justify-center" v-html="svgHtml" />
+    <div v-else class="mermaid-block-body mermaid-svg-container flex justify-center" v-html="svgHtml" />
   </div>
 </template>
 

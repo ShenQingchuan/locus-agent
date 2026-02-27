@@ -135,8 +135,8 @@ catalogs:
       specifier: ^14.2.0
       version: 14.2.0
     beautiful-mermaid:
-      specifier: ^1.0.2
-      version: 1.0.2
+      specifier: ^1.1.2
+      version: 1.1.3
     js-tiktoken:
       specifier: ^1.0.21
       version: 1.0.21
@@ -272,7 +272,7 @@ importers:
         version: 14.2.0(vue@3.5.27(typescript@5.9.3))
       beautiful-mermaid:
         specifier: catalog:vue-family
-        version: 1.0.2
+        version: 1.1.3
       js-tiktoken:
         specifier: catalog:vue-family
         version: 1.0.21
@@ -2123,8 +2123,8 @@ packages:
     resolution: {integrity: sha512-ipDqC8FrAl/76p2SSWKSI+H9tFwm7vYqXQrItCuiVPt26Km0jS+NzSsBWAaBusvSbQcfJG+JitdMm+wZAgTYqg==}
     hasBin: true
 
-  beautiful-mermaid@1.0.2:
-    resolution: {integrity: sha512-8f8xVRIuGyaI1kthEnYPqWLAGzdAyD1EuS4mL+zwhSUKVbnbFeKzQT9nXJq7YraU/ZFF4yzpRNdwLUzeEDTC5A==}
+  beautiful-mermaid@1.1.3:
+    resolution: {integrity: sha512-TItrtrAyHp1vwFfFVYauWGrquouk/6SS21Aq3RsxindSYZODcN4xYrPZD6BiZRU+o5mKJzDPz9MUSMvELdylyg==, tarball: https://registry.npmjs.org/beautiful-mermaid/-/beautiful-mermaid-1.1.3.tgz}
 
   better-sqlite3@11.10.0:
     resolution: {integrity: sha512-EwhOpyXiOEL/lKzHz9AW1msWFNzGc/z+LzeB3/jnFJpxu+th2yqvzsSWas1v9jgs9+xiXJcD5A8CJxAG2TaghQ==, tarball: https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-11.10.0.tgz}
@@ -2445,7 +2445,7 @@ packages:
     resolution: {integrity: sha512-9tfDXhJ4RKFNerfjdCcZfufu49vg620741MNs26a9+bhLThdB+plgMeou98CAaHu/WATj2iHOOHTp1hWtABj2A==}
 
   elkjs@0.11.0:
-    resolution: {integrity: sha512-u4J8h9mwEDaYMqo0RYJpqNMFDoMK7f+pu4GjcV+N8jIC7TRdORgzkfSjTJemhqONFfH6fBI3wpysgWbhgVWIXw==}
+    resolution: {integrity: sha512-u4J8h9mwEDaYMqo0RYJpqNMFDoMK7f+pu4GjcV+N8jIC7TRdORgzkfSjTJemhqONFfH6fBI3wpysgWbhgVWIXw==, tarball: https://registry.npmjs.org/elkjs/-/elkjs-0.11.0.tgz}
 
   empathic@2.0.0:
     resolution: {integrity: sha512-i6UzDscO/XfAcNYD75CfICkmfLedpyPDdozrLMmQc5ORaQcdMoc21OnlEylMIqI7U8eniKrPMxxtj8k0vhmJhA==}
@@ -2459,11 +2459,11 @@ packages:
     engines: {node: '>=10.13.0'}
 
   entities@4.5.0:
-    resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
+    resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==, tarball: https://registry.npmjs.org/entities/-/entities-4.5.0.tgz}
     engines: {node: '>=0.12'}
 
   entities@7.0.1:
-    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
+    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==, tarball: https://registry.npmjs.org/entities/-/entities-7.0.1.tgz}
     engines: {node: '>=0.12'}
 
   env-paths@3.0.0:
@@ -5967,7 +5967,7 @@ snapshots:
 
   baseline-browser-mapping@2.9.19: {}
 
-  beautiful-mermaid@1.0.2:
+  beautiful-mermaid@1.1.3:
     dependencies:
       elkjs: 0.11.0
       entities: 7.0.1
