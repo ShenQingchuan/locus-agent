@@ -1,9 +1,5 @@
-/**
- * 提问工具的回答管理
- * 类似 approval.ts，用于暂停 agent loop 等待用户回答
- */
-
 import type { QuestionAnswer } from './tools/ask_question.js'
+import { createPendingRequestStore } from './pending-request-store.js'
 
 export interface PendingQuestion {
   resolve: (answers: QuestionAnswer[]) => void
@@ -11,75 +7,47 @@ export interface PendingQuestion {
   questions: Array<{ question: string, options: string[] }>
 }
 
-/**
- * 存储待回答的提问
- * key: toolCallId
- */
-const pendingQuestions = new Map<string, PendingQuestion>()
+const questionStore = createPendingRequestStore<
+  { questions: Array<{ question: string, options: string[] }> },
+  QuestionAnswer[]
+>({
+  defaultResolveValue: [],
+})
 
-/**
- * 请求用户回答问题
- * 返回一个 Promise，当用户提交回答时 resolve
- */
+function toPendingQuestion(
+  entry: ReturnType<typeof questionStore.getAll>[number],
+): PendingQuestion {
+  return {
+    resolve: entry.resolve,
+    toolCallId: entry.requestId,
+    questions: entry.payload.questions,
+  }
+}
+
 export function requestQuestionAnswer(
   toolCallId: string,
   questions: Array<{ question: string, options: string[] }>,
 ): Promise<QuestionAnswer[]> {
-  return new Promise((resolve) => {
-    pendingQuestions.set(toolCallId, {
-      resolve,
-      toolCallId,
-      questions,
-    })
-  })
+  return questionStore.request(toolCallId, { questions })
 }
 
-/**
- * 处理用户的回答
- * @returns boolean - 是否找到并处理了对应的待回答请求
- */
 export function resolveQuestionAnswer(toolCallId: string, answers: QuestionAnswer[]): boolean {
-  const pending = pendingQuestions.get(toolCallId)
-  if (!pending) {
-    return false
-  }
-
-  pending.resolve(answers)
-  pendingQuestions.delete(toolCallId)
-  return true
+  return questionStore.resolve(toolCallId, answers)
 }
 
-/**
- * 检查是否有待回答的提问
- */
 export function hasPendingQuestion(toolCallId: string): boolean {
-  return pendingQuestions.has(toolCallId)
+  return questionStore.has(toolCallId)
 }
 
-/**
- * 获取指定 toolCallId 的待回答提问（不删除）
- */
 export function getPendingQuestion(toolCallId: string): PendingQuestion | undefined {
-  return pendingQuestions.get(toolCallId)
+  const pending = questionStore.get(toolCallId)
+  return pending ? toPendingQuestion(pending) : undefined
 }
 
-/**
- * 清除指定 toolCallId 的待回答请求
- */
 export function clearPendingQuestion(toolCallId: string): void {
-  const pending = pendingQuestions.get(toolCallId)
-  if (pending) {
-    pending.resolve([]) // 默认返回空回答
-    pendingQuestions.delete(toolCallId)
-  }
+  questionStore.clear(toolCallId)
 }
 
-/**
- * 清除所有待回答请求
- */
 export function clearAllPendingQuestions(): void {
-  for (const pending of pendingQuestions.values()) {
-    pending.resolve([])
-  }
-  pendingQuestions.clear()
+  questionStore.clearAll()
 }

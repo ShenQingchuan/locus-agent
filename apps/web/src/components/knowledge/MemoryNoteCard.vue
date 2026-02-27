@@ -40,7 +40,7 @@ function handleDelete(e: Event, noteId: string) {
       <span
         v-for="tag in note.tags.slice(0, 3)"
         :key="tag.id"
-        class="text-[11px] leading-none px-1.5 py-1 rounded-md bg-secondary/40 text-secondary-foreground/70 truncate max-w-32 font-mono"
+        class="text-[11px] leading-none px-1.5 py-1 rounded-md bg-secondary/40 text-secondary-foreground/70 truncate font-mono"
       >
         #{{ tag.name }}
       </span>

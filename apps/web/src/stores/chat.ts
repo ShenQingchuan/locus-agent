@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, DelegateDelta, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, DelegateDelta, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
 import type { PendingApproval, PendingQuestion, QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'

@@ -1,8 +1,8 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { tool } from 'ai'
 import { z } from 'zod'
-import { resolveToolPath } from './resolve-path.js'
+import { resolveWriteTarget } from './file-utils.js'
 
 /**
  * 文件写入工具定义
@@ -45,31 +45,7 @@ export async function executeWriteFile(args: {
 }): Promise<WriteFileResult> {
   const { file_path, content } = args
 
-  const resolvedPath = resolveToolPath(file_path)
-
-  // 检查文件是否已存在
-  let existed = false
-  try {
-    const fileStat = await stat(resolvedPath)
-    if (fileStat.isDirectory()) {
-      throw new Error(
-        `Path is a directory, not a file: ${file_path}. Cannot overwrite a directory.`,
-      )
-    }
-    existed = true
-  }
-  catch (error) {
-    // 文件不存在，将被创建
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-      existed = false
-    }
-    else if (error instanceof Error && error.message.includes('directory')) {
-      throw error
-    }
-    else {
-      existed = false
-    }
-  }
+  const { resolvedPath, existed } = await resolveWriteTarget(file_path)
 
   // 确保父目录存在
   await mkdir(dirname(resolvedPath), { recursive: true })

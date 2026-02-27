@@ -282,7 +282,7 @@ onKeyStroke('Escape', () => {
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          <div class="max-w-3xl mx-auto px-4 py-6">
+          <div class="max-w-4xl mx-auto px-4 py-6">
             <!-- Composer -->
             <MemoriesComposer
               ref="composerRef"

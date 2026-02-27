@@ -1,12 +1,7 @@
-import type { Buffer } from 'node:buffer'
-import { readFile, stat, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { tool } from 'ai'
 import { z } from 'zod'
-import { resolveToolPath } from './resolve-path.js'
-
-/** 文件大小上限（与 read 工具一致） */
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
-const BINARY_CHECK_SIZE = 8192
+import { readValidatedTextFile } from './file-utils.js'
 
 /**
  * 字符串替换工具定义
@@ -52,18 +47,6 @@ export interface StrReplaceResult {
 }
 
 /**
- * 检测 buffer 是否为二进制内容（扫描前 N 字节中的空字节）。
- */
-function isBinaryBuffer(buffer: Buffer): boolean {
-  const limit = Math.min(buffer.length, BINARY_CHECK_SIZE)
-  for (let i = 0; i < limit; i++) {
-    if (buffer[i] === 0)
-      return true
-  }
-  return false
-}
-
-/**
  * 统计 `needle` 在 `haystack` 中的非重叠出现次数。
  */
 function countOccurrences(haystack: string, needle: string): number {
@@ -89,43 +72,11 @@ export async function executeStrReplace(args: {
 }): Promise<StrReplaceResult> {
   const { file_path, old_string, new_string } = args
 
-  const resolvedPath = resolveToolPath(file_path)
-
-  // 文件存在性与类型检查
-  let fileStat
-  try {
-    fileStat = await stat(resolvedPath)
-  }
-  catch {
-    throw new Error(`File not found: ${file_path}`)
-  }
-
-  if (fileStat.isDirectory()) {
-    throw new Error(
-      `Path is a directory, not a file: ${file_path}. `
-      + 'Use the bash tool with `ls` to list directory contents.',
-    )
-  }
-  if (!fileStat.isFile()) {
-    throw new Error(`Not a regular file: ${file_path}`)
-  }
-
-  if (fileStat.size > MAX_FILE_SIZE_BYTES) {
-    const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1)
-    throw new Error(
-      `File is too large (${sizeMB} MB). `
-      + `Maximum supported size is ${MAX_FILE_SIZE_BYTES / (1024 * 1024)} MB.`,
-    )
-  }
-
-  const buffer = await readFile(resolvedPath)
-  if (isBinaryBuffer(buffer)) {
-    throw new Error(
-      `Binary file detected: ${file_path}. The str_replace tool only supports text files.`,
-    )
-  }
-
-  const content = buffer.toString('utf-8')
+  const { resolvedPath, text: content } = await readValidatedTextFile({
+    inputPath: file_path,
+    fileNotFoundMessage: `File not found: ${file_path}`,
+    binaryErrorMessage: `Binary file detected: ${file_path}. The str_replace tool only supports text files.`,
+  })
 
   // 唯一性校验
   const occurrences = countOccurrences(content, old_string)

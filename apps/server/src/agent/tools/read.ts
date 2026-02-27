@@ -1,8 +1,6 @@
-import type { Buffer } from 'node:buffer'
-import { readFile, stat } from 'node:fs/promises'
 import { tool } from 'ai'
 import { z } from 'zod'
-import { resolveToolPath } from './resolve-path.js'
+import { readValidatedTextFile } from './file-utils.js'
 
 /**
  * Configuration constants for the read tool.
@@ -11,13 +9,9 @@ import { resolveToolPath } from './resolve-path.js'
  *   prevents token explosion from accidentally reading huge files.
  * - HARD_MAX_LINES: absolute upper bound even when `limit` is explicitly set,
  *   guards against unreasonable requests.
- * - MAX_FILE_SIZE_BYTES: skip files larger than 10MB entirely (likely not text).
- * - BINARY_CHECK_SIZE: how many leading bytes to scan for null byte detection.
  */
 const AUTO_TRUNCATE_LINES = 2000
 const HARD_MAX_LINES = 10000
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
-const BINARY_CHECK_SIZE = 8192
 
 /**
  * Read file tool definition (Vercel AI SDK format).
@@ -72,24 +66,6 @@ export interface ReadFileResult {
 }
 
 /**
- * Detect binary content by scanning for null bytes.
- *
- * Heuristic: any null byte within the first BINARY_CHECK_SIZE bytes
- * strongly suggests this is not a text file.  This catches most common
- * binary formats (images, compiled binaries, archives, etc.) while
- * being cheap to compute.
- */
-function isBinaryBuffer(buffer: Buffer): boolean {
-  const limit = Math.min(buffer.length, BINARY_CHECK_SIZE)
-  for (let i = 0; i < limit; i++) {
-    if (buffer[i] === 0) {
-      return true
-    }
-  }
-  return false
-}
-
-/**
  * Split file text into lines, handling the common trailing-newline case.
  *
  * Most well-formed text files end with a newline, which produces an
@@ -119,36 +95,11 @@ export async function executeReadFile(args: {
 }): Promise<ReadFileResult> {
   const { file_path, offset, limit } = args
 
-  // --- Path resolution ---
-  const resolvedPath = resolveToolPath(file_path)
-
-  // --- Existence & type check ---
-  let fileStat
-  try {
-    fileStat = await stat(resolvedPath)
-  }
-  catch {
-    throw new Error(`File not found: ${file_path}`)
-  }
-
-  if (fileStat.isDirectory()) {
-    throw new Error(
-      `Path is a directory, not a file: ${file_path}. `
-      + 'Use the bash tool with `ls` to list directory contents.',
-    )
-  }
-  if (!fileStat.isFile()) {
-    throw new Error(`Not a regular file: ${file_path}`)
-  }
-
-  // --- Size guard ---
-  if (fileStat.size > MAX_FILE_SIZE_BYTES) {
-    const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1)
-    throw new Error(
-      `File is too large (${sizeMB} MB). `
-      + `Maximum supported size is ${MAX_FILE_SIZE_BYTES / (1024 * 1024)} MB.`,
-    )
-  }
+  const { resolvedPath, fileStat, text } = await readValidatedTextFile({
+    inputPath: file_path,
+    fileNotFoundMessage: `File not found: ${file_path}`,
+    binaryErrorMessage: `Binary file detected: ${file_path}. The read tool only supports text files.`,
+  })
 
   // --- Empty file ---
   if (fileStat.size === 0) {
@@ -162,17 +113,6 @@ export async function executeReadFile(args: {
     }
   }
 
-  // --- Read raw bytes for binary detection, then decode ---
-  const buffer = await readFile(resolvedPath)
-
-  if (isBinaryBuffer(buffer)) {
-    throw new Error(
-      `Binary file detected: ${file_path}. `
-      + 'The read tool only supports text files.',
-    )
-  }
-
-  const text = buffer.toString('utf-8')
   const lines = splitLines(text)
   const totalLines = lines.length
 

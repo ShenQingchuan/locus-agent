@@ -81,7 +81,7 @@ export default defineConfig({
     presetWebFonts({
       fonts: {
         sans: 'Archivo',
-        mono: 'IBM Plex Mono',
+        mono: 'Noto Sans Mono',
       },
     }),
   ],
