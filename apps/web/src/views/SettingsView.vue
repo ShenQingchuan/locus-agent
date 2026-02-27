@@ -537,7 +537,8 @@ async function saveConfig() {
       </header>
 
       <main class="flex-1 overflow-y-auto">
-        <div class="container-chat p-4 space-y-6">
+        <!-- 响应式容器：移动端保持紧凑，桌面端扩展为宽屏布局 -->
+        <div class="container-chat lg:max-w-5xl xl:max-w-6xl p-4 lg:p-6">
           <div
             v-if="isLoading"
             class="flex-col-center py-12 text-muted-foreground"
@@ -561,449 +562,456 @@ async function saveConfig() {
           </div>
 
           <template v-else>
-            <!-- LLM -->
-            <form class="card p-4" @submit.prevent="saveConfig">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-sm font-medium text-foreground">
-                    模型配置
-                  </h2>
-                  <p class="text-xs text-muted-foreground mt-1">
-                    保存后会立即影响新的对话请求。
-                  </p>
-                </div>
-                <div
-                  v-if="runtimeInfo"
-                  class="text-xs text-gray-400 text-right"
-                >
-                  <div>
-                    运行中：
-                    <span class="font-mono">{{ runtimeInfo.provider }} · {{ runtimeInfo.model }}</span>
-                  </div>
-                  <div>上下文窗口：{{ runtimeInfo.contextWindow }}</div>
-                </div>
-              </div>
-
-              <div class="mt-4 grid gap-4">
-                <div class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">提供方</label>
-                  <div class="relative">
-                    <select v-model="form.provider" class="select-field">
-                      <option v-for="opt in providerOptions" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </option>
-                    </select>
-                    <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
-
-                <!-- 自定义提供商模式选择 -->
-                <div v-if="isCustomProvider" class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">兼容模式</label>
-                  <div class="relative">
-                    <select v-model="form.customMode" class="select-field">
-                      <option value="openai-compatible">
-                        OpenAI 兼容
-                      </option>
-                      <option value="anthropic-compatible">
-                        Anthropic 兼容
-                      </option>
-                    </select>
-                    <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  </div>
-                  <p class="text-xs text-muted-foreground">
-                    选择与你自定义服务 API 格式兼容的模式
-                  </p>
-                </div>
-
-                <!-- Hidden username field for password manager accessibility -->
-                <input
-                  type="text"
-                  :value="form.provider"
-                  autocomplete="username"
-                  class="hidden"
-                  aria-hidden="true"
-                  tabindex="-1"
-                >
-
-                <div class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">API Key</label>
-                  <input
-                    v-model="form.apiKey"
-                    class="input-field font-mono"
-                    type="password"
-                    autocomplete="new-password"
-                    :placeholder="apiKeyPlaceholder"
-                  >
-                  <p v-if="apiKeyHelperText" class="text-xs text-muted-foreground">
-                    {{ apiKeyHelperText }}
-                  </p>
-                </div>
-
-                <div class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">API Base URL</label>
-                  <input
-                    v-model="form.apiBase"
-                    class="input-field"
-                    type="text"
-                    :placeholder="apiBasePlaceholder"
-                  >
-                </div>
-              </div>
-              <p class="mt-3 text-xs text-muted-foreground/60">
-                模型名称可在对话界面底部直接切换。
-              </p>
-            </form>
-
-            <!-- Server -->
-            <section class="card p-4">
-              <div>
-                <h2 class="text-sm font-medium text-foreground">
-                  服务端
-                </h2>
-                <p class="text-xs text-muted-foreground mt-1">
-                  端口修改需要重启后生效。
-                </p>
-              </div>
-
-              <div class="mt-4 grid gap-4">
-                <div class="grid gap-1.5">
-                  <label class="text-xs text-muted-foreground">端口</label>
-                  <input
-                    v-model.number="form.port"
-                    class="input-field"
-                    type="number"
-                    min="1"
-                    max="65535"
-                    placeholder="3000"
-                  >
-                </div>
-
-                <div
-                  v-if="requiresRestart"
-                  class="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
-                >
-                  端口已保存，重启服务后生效。
-                </div>
-              </div>
-            </section>
-
-            <!-- MCP Servers -->
-            <section class="card p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-sm font-medium text-foreground">
-                    MCP Servers
-                  </h2>
-                  <p class="text-xs text-muted-foreground mt-1">
-                    配置外部 MCP 工具服务，格式兼容 Cursor / Claude Code。
-                  </p>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button
-                    class="btn-ghost btn-icon"
-                    :title="mcpJsonMode ? '切换到列表' : '切换到 JSON 编辑'"
-                    :class="{ 'text-primary': mcpJsonMode }"
-                    @click="mcpJsonMode = !mcpJsonMode; syncJsonText()"
-                  >
-                    <div v-if="mcpJsonMode" class="i-material-symbols:format-list-bulleted-rounded h-4 w-4" />
-                    <div v-else class="i-carbon-code h-4 w-4" />
-                  </button>
-                  <button
-                    class="btn-ghost btn-icon"
-                    title="全部重启"
-                    :disabled="isMcpRestarting || Object.keys(mcpServers).length === 0"
-                    @click="onRestartAll"
-                  >
-                    <div class="i-carbon-renew h-4 w-4" :class="{ 'animate-spin': isMcpRestarting }" />
-                  </button>
-                </div>
-              </div>
-
-              <div class="mt-4">
-                <!-- JSON 编辑模式 -->
-                <template v-if="mcpJsonMode">
-                  <MonacoEditor
-                    v-model="mcpJsonText"
-                    language="json"
-                    @update:model-value="onJsonInput"
-                  />
-                  <p v-if="mcpJsonError" class="text-xs text-red-500 mt-1">
-                    {{ mcpJsonError }}
-                  </p>
-                  <p class="text-xs text-muted-foreground/60 mt-1">
-                    可直接粘贴 Cursor / Claude Code 的 mcp.json 内容。
-                  </p>
-                  <div class="mt-3 flex items-center justify-end">
-                    <button
-                      class="btn-primary btn-sm"
-                      :disabled="isMcpSaving"
-                      @click="saveMCP"
-                    >
-                      <span v-if="isMcpSaving" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
-                      保存 MCP 配置
-                    </button>
-                  </div>
-                </template>
-
-                <!-- 列表模式 -->
-                <template v-else>
-                  <div v-if="Object.keys(mcpServers).length === 0" class="text-xs text-muted-foreground py-4 text-center">
-                    暂无 MCP Server 配置
-                  </div>
-
-                  <div v-else class="space-y-2">
+            <!-- 桌面端两列网格布局，移动端单列 -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+              <!-- 左列：模型配置 + 服务端（紧凑表单类内容） -->
+              <div class="lg:col-span-5 space-y-4 lg:space-y-6">
+                <!-- LLM -->
+                <form class="card p-4" @submit.prevent="saveConfig">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h2 class="text-sm font-medium text-foreground">
+                        模型配置
+                      </h2>
+                      <p class="text-xs text-muted-foreground mt-1">
+                        保存后立即生效
+                      </p>
+                    </div>
                     <div
-                      v-for="(cfg, name) in mcpServers"
-                      :key="name"
-                      class="rounded-lg border border-border"
-                      :class="{ 'opacity-50': cfg.disabled }"
+                      v-if="runtimeInfo"
+                      class="text-xs text-gray-400 text-right hidden sm:block"
                     >
-                      <div class="flex items-center gap-2 px-3 py-2">
-                        <!-- 状态点 -->
-                        <div
-                          class="h-2 w-2 rounded-full flex-shrink-0"
-                          :class="{
-                            'bg-green-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connected',
-                            'bg-yellow-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connecting',
-                            'bg-red-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'error',
-                            'bg-muted-foreground/30': cfg.disabled || !mcpStatusOf(name as string) || mcpStatusOf(name as string)?.status === 'disconnected',
-                          }"
-                          :title="cfg.disabled ? '未启用' : (mcpStatusOf(name as string)?.error || statusLabel(mcpStatusOf(name as string)?.status))"
-                        />
-
-                        <!-- 主行：名字 · 状态 · 工具数 -->
-                        <div class="flex-1 min-w-0 text-xs">
-                          <span class="font-medium text-foreground">{{ name }}</span>
-                          <span class="text-muted-foreground mx-1">·</span>
-                          <span :class="cfg.disabled ? 'text-muted-foreground' : statusColor(mcpStatusOf(name as string)?.status)">
-                            {{ cfg.disabled ? '未启用' : statusLabel(mcpStatusOf(name as string)?.status) }}
-                          </span>
-                          <template v-if="mcpStatusOf(name as string)?.tools?.length">
-                            <span class="text-muted-foreground mx-1">·</span>
-                            <span class="text-muted-foreground">{{ mcpStatusOf(name as string)!.tools.length }} 工具</span>
-                          </template>
-                        </div>
-
-                        <!-- 展开工具 -->
-                        <button
-                          v-if="mcpStatusOf(name as string)?.tools?.length"
-                          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                          @click="toggleToolsExpanded(name)"
-                        >
-                          <div
-                            class="i-carbon-chevron-down h-3 w-3 transition-transform flex-shrink-0"
-                            :class="{ 'rotate-180': expandedTools.has(name) }"
-                          />
-                          <span>{{ expandedTools.has(name) ? '收起' : '展开工具列表' }}</span>
-                        </button>
-
-                        <!-- 操作 -->
-                        <div class="flex items-center gap-0.5 flex-shrink-0">
-                          <Switch
-                            :model-value="!cfg.disabled"
-                            :disabled="isMcpSaving"
-                            :title="cfg.disabled ? '启用' : '禁用'"
-                            @update:model-value="toggleDisabled(name as string)"
-                          />
-                          <button
-                            class="btn-ghost btn-icon ml-2"
-                            title="重启"
-                            @click="onRestartOne(name as string)"
-                          >
-                            <div class="i-carbon-renew h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            class="btn-ghost btn-icon text-red-400 hover:text-red-300 hover:bg-destructive/20"
-                            title="删除"
-                            @click="removeServer(name as string)"
-                          >
-                            <div class="i-carbon-trash-can h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <div>
+                        <span class="font-mono">{{ runtimeInfo.provider }}</span>
                       </div>
-
-                      <!-- 错误信息 -->
-                      <div
-                        v-if="mcpStatusOf(name as string)?.error"
-                        class="border-t border-border px-3 py-2 text-xs text-red-500/80 break-words"
-                      >
-                        {{ mcpStatusOf(name as string)!.error }}
-                      </div>
-
-                      <!-- 展开的工具列表 -->
-                      <div
-                        v-if="expandedTools.has(name) && mcpStatusOf(name as string)?.tools?.length"
-                        class="border-t border-border px-3 py-2 bg-muted/20"
-                      >
-                        <div class="text-xs text-muted-foreground mb-1.5">
-                          工具列表
-                        </div>
-                        <div class="flex flex-wrap gap-1.5">
-                          <span
-                            v-for="tool in mcpStatusOf(name as string)!.tools"
-                            :key="tool"
-                            class="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-xs font-mono text-foreground/90"
-                          >
-                            {{ tool }}
-                          </span>
-                        </div>
-                      </div>
+                      <div class="truncate max-w-[120px]">{{ runtimeInfo.model }}</div>
                     </div>
                   </div>
 
-                  <!-- 添加表单 -->
-                  <div v-if="showAddForm" class="mt-3 rounded-lg border border-border p-3 space-y-3">
+                  <div class="mt-4 grid gap-4">
                     <div class="grid gap-1.5">
-                      <label class="text-xs text-muted-foreground">名称</label>
-                      <input v-model="newServer.name" class="input-field" type="text" placeholder="my-mcp-server">
+                      <label class="text-xs text-muted-foreground">提供方</label>
+                      <div class="relative">
+                        <select v-model="form.provider" class="select-field">
+                          <option v-for="opt in providerOptions" :key="opt.value" :value="opt.value">
+                            {{ opt.label }}
+                          </option>
+                        </select>
+                        <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
                     </div>
 
-                    <!-- Transport 模式切换 -->
-                    <div class="flex gap-1 rounded-md border border-border p-0.5">
-                      <button
-                        class="flex-1 px-2 py-1 rounded text-xs transition-colors"
-                        :class="newServerMode === 'stdio' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
-                        @click="newServerMode = 'stdio'"
-                      >
-                        Stdio（本地命令）
-                      </button>
-                      <button
-                        class="flex-1 px-2 py-1 rounded text-xs transition-colors"
-                        :class="newServerMode === 'url' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
-                        @click="newServerMode = 'url'"
-                      >
-                        SSE / HTTP（远程 URL）
-                      </button>
+                    <!-- 自定义提供商模式选择 -->
+                    <div v-if="isCustomProvider" class="grid gap-1.5">
+                      <label class="text-xs text-muted-foreground">兼容模式</label>
+                      <div class="relative">
+                        <select v-model="form.customMode" class="select-field">
+                          <option value="openai-compatible">
+                            OpenAI 兼容
+                          </option>
+                          <option value="anthropic-compatible">
+                            Anthropic 兼容
+                          </option>
+                        </select>
+                        <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                      <p class="text-xs text-muted-foreground">
+                        选择与你自定义服务 API 格式兼容的模式
+                      </p>
                     </div>
 
-                    <!-- Stdio 模式 -->
-                    <template v-if="newServerMode === 'stdio'">
-                      <div class="grid gap-1.5">
-                        <label class="text-xs text-muted-foreground">命令</label>
-                        <input v-model="newServer.command" class="input-field font-mono" type="text" placeholder="npx">
-                      </div>
-                      <div class="grid gap-1.5">
-                        <label class="text-xs text-muted-foreground">参数（空格分隔）</label>
-                        <input v-model="newServer.args" class="input-field font-mono" type="text" placeholder="-y @modelcontextprotocol/server-filesystem">
-                      </div>
-                    </template>
+                    <!-- Hidden username field for password manager accessibility -->
+                    <input
+                      type="text"
+                      :value="form.provider"
+                      autocomplete="username"
+                      class="hidden"
+                      aria-hidden="true"
+                      tabindex="-1"
+                    >
 
-                    <!-- URL 模式 -->
-                    <template v-else>
-                      <div class="grid gap-1.5">
-                        <label class="text-xs text-muted-foreground">URL</label>
-                        <input v-model="newServer.url" class="input-field font-mono" type="text" placeholder="https://mcp.example.com/sse">
-                      </div>
-                      <div class="grid gap-1.5">
-                        <label class="text-xs text-muted-foreground">协议</label>
-                        <div class="relative">
-                          <select v-model="newServer.transportType" class="select-field">
-                            <option value="sse">
-                              SSE（Server-Sent Events）
-                            </option>
-                            <option value="http">
-                              Streamable HTTP
-                            </option>
-                          </select>
-                          <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        </div>
-                      </div>
-                      <div class="grid gap-1.5">
-                        <label class="text-xs text-muted-foreground">
-                          Headers
-                          <span class="text-muted-foreground/50 ml-1">（可选，每行一个 Key: Value）</span>
-                        </label>
-                        <textarea
-                          v-model="newServer.headersText"
-                          class="input-field font-mono text-xs resize-y"
-                          rows="3"
-                          spellcheck="false"
-                          placeholder="Authorization: Bearer sk-xxx&#10;X-Custom-Header: value"
-                        />
-                      </div>
-                    </template>
+                    <div class="grid gap-1.5">
+                      <label class="text-xs text-muted-foreground">API Key</label>
+                      <input
+                        v-model="form.apiKey"
+                        class="input-field font-mono"
+                        type="password"
+                        autocomplete="new-password"
+                        :placeholder="apiKeyPlaceholder"
+                      >
+                      <p v-if="apiKeyHelperText" class="text-xs text-muted-foreground">
+                        {{ apiKeyHelperText }}
+                      </p>
+                    </div>
 
-                    <div class="flex items-center justify-end gap-2 pt-1">
-                      <button class="btn-ghost btn-sm" @click="showAddForm = false; resetAddForm()">
-                        取消
-                      </button>
-                      <button class="btn-primary btn-sm" @click="addServer">
-                        添加
-                      </button>
+                    <div class="grid gap-1.5">
+                      <label class="text-xs text-muted-foreground">API Base URL</label>
+                      <input
+                        v-model="form.apiBase"
+                        class="input-field"
+                        type="text"
+                        :placeholder="apiBasePlaceholder"
+                      >
                     </div>
                   </div>
-
-                  <button
-                    v-if="!showAddForm"
-                    class="btn-ghost btn-sm mt-3 w-full"
-                    @click="showAddForm = true"
-                  >
-                    <div class="i-carbon-add h-3.5 w-3.5 mr-1" />
-                    添加 MCP Server
-                  </button>
-                </template>
-              </div>
-            </section>
-
-            <!-- Whitelist Management -->
-            <section class="card p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-sm font-semibold text-foreground">
-                    全局工具执行白名单
-                  </h2>
-                  <p class="text-xs text-muted-foreground mt-0.5">
-                    对所有会话生效的自动放行规则
+                  <p class="mt-3 text-xs text-muted-foreground/60">
+                    模型名称可在对话界面底部直接切换。
                   </p>
-                </div>
-                <button
-                  class="btn-ghost btn-icon"
-                  title="刷新"
-                  :disabled="isWlLoading"
-                  @click="loadWhitelist"
-                >
-                  <div class="i-carbon-renew h-4 w-4" :class="isWlLoading ? 'animate-spin' : ''" />
-                </button>
-              </div>
+                </form>
 
-              <div class="mt-4">
-                <div v-if="isWlLoading" class="flex-col-center py-6 text-muted-foreground">
-                  <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
-                  <span class="text-xs mt-1.5 opacity-70">加载中...</span>
-                </div>
+                <!-- Server -->
+                <section class="card p-4">
+                  <div>
+                    <h2 class="text-sm font-medium text-foreground">
+                      服务端
+                    </h2>
+                    <p class="text-xs text-muted-foreground mt-1">
+                      端口修改需重启生效
+                    </p>
+                  </div>
 
-                <div v-else-if="wlRules.length === 0" class="py-6 text-center">
-                  <div class="i-carbon-filter h-8 w-8 mx-auto text-muted-foreground/30" />
-                  <p class="text-xs text-muted-foreground/60 mt-2">
-                    暂无白名单规则
-                  </p>
-                  <p class="text-[10px] text-muted-foreground/40 mt-0.5">
-                    在工具审批时可添加
-                  </p>
-                </div>
+                  <div class="mt-4 grid gap-4">
+                    <div class="grid gap-1.5">
+                      <label class="text-xs text-muted-foreground">端口</label>
+                      <input
+                        v-model.number="form.port"
+                        class="input-field"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        placeholder="3000"
+                      >
+                    </div>
 
-                <div v-else class="flex flex-wrap gap-2">
-                  <div
-                    v-for="rule in wlRules"
-                    :key="rule.id"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted/30 group leading-none"
-                  >
-                    <code
-                      class="text-xs font-mono leading-none"
-                      :class="wlRiskLabel(rule).text === '危险' ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
-                    >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
-                    <button
-                      class="h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                      title="删除"
-                      @click="onDeleteWhitelistRule(rule.id)"
+                    <div
+                      v-if="requiresRestart"
+                      class="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
                     >
-                      <div class="i-carbon-close h-2.5 w-2.5" />
+                      端口已保存，重启服务后生效。
+                    </div>
+                  </div>
+                </section>
+
+                <!-- Whitelist Management（移到左列，内容较紧凑） -->
+                <section class="card p-4">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h2 class="text-sm font-semibold text-foreground">
+                        全局白名单
+                      </h2>
+                      <p class="text-xs text-muted-foreground mt-0.5">
+                        自动放行的工具规则
+                      </p>
+                    </div>
+                    <button
+                      class="btn-ghost btn-icon"
+                      title="刷新"
+                      :disabled="isWlLoading"
+                      @click="loadWhitelist"
+                    >
+                      <div class="i-carbon-renew h-4 w-4" :class="isWlLoading ? 'animate-spin' : ''" />
                     </button>
                   </div>
-                </div>
+
+                  <div class="mt-4">
+                    <div v-if="isWlLoading" class="flex-col-center py-6 text-muted-foreground">
+                      <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
+                      <span class="text-xs mt-1.5 opacity-70">加载中...</span>
+                    </div>
+
+                    <div v-else-if="wlRules.length === 0" class="py-6 text-center">
+                      <div class="i-carbon-filter h-8 w-8 mx-auto text-muted-foreground/30" />
+                      <p class="text-xs text-muted-foreground/60 mt-2">
+                        暂无白名单规则
+                      </p>
+                      <p class="text-[10px] text-muted-foreground/40 mt-0.5">
+                        在工具审批时可添加
+                      </p>
+                    </div>
+
+                    <div v-else class="flex flex-wrap gap-2">
+                      <div
+                        v-for="rule in wlRules"
+                        :key="rule.id"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-muted/30 group leading-none"
+                      >
+                        <code
+                          class="text-xs font-mono leading-none"
+                          :class="wlRiskLabel(rule).text === '危险' ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
+                        >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
+                        <button
+                          class="h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                          title="删除"
+                          @click="onDeleteWhitelistRule(rule.id)"
+                        >
+                          <div class="i-carbon-close h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
-            </section>
+
+              <!-- 右列：MCP Servers（内容多，占更多空间） -->
+              <div class="lg:col-span-7">
+                <section class="card p-4 h-full">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h2 class="text-sm font-medium text-foreground">
+                        MCP Servers
+                      </h2>
+                      <p class="text-xs text-muted-foreground mt-1">
+                        配置外部 MCP 工具服务，格式兼容 Cursor / Claude Code
+                      </p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        class="btn-ghost btn-icon"
+                        :title="mcpJsonMode ? '切换到列表' : '切换到 JSON 编辑'"
+                        :class="{ 'text-primary': mcpJsonMode }"
+                        @click="mcpJsonMode = !mcpJsonMode; syncJsonText()"
+                      >
+                        <div v-if="mcpJsonMode" class="i-material-symbols:format-list-bulleted-rounded h-4 w-4" />
+                        <div v-else class="i-carbon-code h-4 w-4" />
+                      </button>
+                      <button
+                        class="btn-ghost btn-icon"
+                        title="全部重启"
+                        :disabled="isMcpRestarting || Object.keys(mcpServers).length === 0"
+                        @click="onRestartAll"
+                      >
+                        <div class="i-carbon-renew h-4 w-4" :class="{ 'animate-spin': isMcpRestarting }" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    <!-- JSON 编辑模式 -->
+                    <template v-if="mcpJsonMode">
+                      <MonacoEditor
+                        v-model="mcpJsonText"
+                        language="json"
+                        @update:model-value="onJsonInput"
+                      />
+                      <p v-if="mcpJsonError" class="text-xs text-red-500 mt-1">
+                        {{ mcpJsonError }}
+                      </p>
+                      <p class="text-xs text-muted-foreground/60 mt-1">
+                        可直接粘贴 Cursor / Claude Code 的 mcp.json 内容。
+                      </p>
+                      <div class="mt-3 flex items-center justify-end">
+                        <button
+                          class="btn-primary btn-sm"
+                          :disabled="isMcpSaving"
+                          @click="saveMCP"
+                        >
+                          <span v-if="isMcpSaving" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
+                          保存 MCP 配置
+                        </button>
+                      </div>
+                    </template>
+
+                    <!-- 列表模式 -->
+                    <template v-else>
+                      <div v-if="Object.keys(mcpServers).length === 0" class="text-xs text-muted-foreground py-4 text-center">
+                        暂无 MCP Server 配置
+                      </div>
+
+                      <div v-else class="space-y-2">
+                        <div
+                          v-for="(cfg, name) in mcpServers"
+                          :key="name"
+                          class="rounded-lg border border-border"
+                          :class="{ 'opacity-50': cfg.disabled }"
+                        >
+                          <div class="flex items-center gap-2 px-3 py-2">
+                            <!-- 状态点 -->
+                            <div
+                              class="h-2 w-2 rounded-full flex-shrink-0"
+                              :class="{
+                                'bg-green-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connected',
+                                'bg-yellow-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connecting',
+                                'bg-red-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'error',
+                                'bg-muted-foreground/30': cfg.disabled || !mcpStatusOf(name as string) || mcpStatusOf(name as string)?.status === 'disconnected',
+                              }"
+                              :title="cfg.disabled ? '未启用' : (mcpStatusOf(name as string)?.error || statusLabel(mcpStatusOf(name as string)?.status))"
+                            />
+
+                            <!-- 主行：名字 · 状态 · 工具数 -->
+                            <div class="flex-1 min-w-0 text-xs">
+                              <span class="font-medium text-foreground">{{ name }}</span>
+                              <span class="text-muted-foreground mx-1">·</span>
+                              <span :class="cfg.disabled ? 'text-muted-foreground' : statusColor(mcpStatusOf(name as string)?.status)">
+                                {{ cfg.disabled ? '未启用' : statusLabel(mcpStatusOf(name as string)?.status) }}
+                              </span>
+                              <template v-if="mcpStatusOf(name as string)?.tools?.length">
+                                <span class="text-muted-foreground mx-1">·</span>
+                                <span class="text-muted-foreground">{{ mcpStatusOf(name as string)!.tools.length }} 工具</span>
+                              </template>
+                            </div>
+
+                            <!-- 展开工具 -->
+                            <button
+                              v-if="mcpStatusOf(name as string)?.tools?.length"
+                              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              @click="toggleToolsExpanded(name)"
+                            >
+                              <div
+                                class="i-carbon-chevron-down h-3 w-3 transition-transform flex-shrink-0"
+                                :class="{ 'rotate-180': expandedTools.has(name) }"
+                              />
+                              <span>{{ expandedTools.has(name) ? '收起' : '展开工具列表' }}</span>
+                            </button>
+
+                            <!-- 操作 -->
+                            <div class="flex items-center gap-0.5 flex-shrink-0">
+                              <Switch
+                                :model-value="!cfg.disabled"
+                                :disabled="isMcpSaving"
+                                :title="cfg.disabled ? '启用' : '禁用'"
+                                @update:model-value="toggleDisabled(name as string)"
+                              />
+                              <button
+                                class="btn-ghost btn-icon ml-2"
+                                title="重启"
+                                @click="onRestartOne(name as string)"
+                              >
+                                <div class="i-carbon-renew h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                class="btn-ghost btn-icon text-red-400 hover:text-red-300 hover:bg-destructive/20"
+                                title="删除"
+                                @click="removeServer(name as string)"
+                              >
+                                <div class="i-carbon-trash-can h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- 错误信息 -->
+                          <div
+                            v-if="mcpStatusOf(name as string)?.error"
+                            class="border-t border-border px-3 py-2 text-xs text-red-500/80 break-words"
+                          >
+                            {{ mcpStatusOf(name as string)!.error }}
+                          </div>
+
+                          <!-- 展开的工具列表 -->
+                          <div
+                            v-if="expandedTools.has(name) && mcpStatusOf(name as string)?.tools?.length"
+                            class="border-t border-border px-3 py-2 bg-muted/20"
+                          >
+                            <div class="text-xs text-muted-foreground mb-1.5">
+                              工具列表
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                              <span
+                                v-for="tool in mcpStatusOf(name as string)!.tools"
+                                :key="tool"
+                                class="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-xs font-mono text-foreground/90"
+                              >
+                                {{ tool }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 添加表单 -->
+                      <div v-if="showAddForm" class="mt-3 rounded-lg border border-border p-3 space-y-3">
+                        <div class="grid gap-1.5">
+                          <label class="text-xs text-muted-foreground">名称</label>
+                          <input v-model="newServer.name" class="input-field" type="text" placeholder="my-mcp-server">
+                        </div>
+
+                        <!-- Transport 模式切换 -->
+                        <div class="flex gap-1 rounded-md border border-border p-0.5">
+                          <button
+                            class="flex-1 px-2 py-1 rounded text-xs transition-colors"
+                            :class="newServerMode === 'stdio' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
+                            @click="newServerMode = 'stdio'"
+                          >
+                            Stdio（本地命令）
+                          </button>
+                          <button
+                            class="flex-1 px-2 py-1 rounded text-xs transition-colors"
+                            :class="newServerMode === 'url' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
+                            @click="newServerMode = 'url'"
+                          >
+                            SSE / HTTP（远程 URL）
+                          </button>
+                        </div>
+
+                        <!-- Stdio 模式 -->
+                        <template v-if="newServerMode === 'stdio'">
+                          <div class="grid gap-1.5">
+                            <label class="text-xs text-muted-foreground">命令</label>
+                            <input v-model="newServer.command" class="input-field font-mono" type="text" placeholder="npx">
+                          </div>
+                          <div class="grid gap-1.5">
+                            <label class="text-xs text-muted-foreground">参数（空格分隔）</label>
+                            <input v-model="newServer.args" class="input-field font-mono" type="text" placeholder="-y @modelcontextprotocol/server-filesystem">
+                          </div>
+                        </template>
+
+                        <!-- URL 模式 -->
+                        <template v-else>
+                          <div class="grid gap-1.5">
+                            <label class="text-xs text-muted-foreground">URL</label>
+                            <input v-model="newServer.url" class="input-field font-mono" type="text" placeholder="https://mcp.example.com/sse">
+                          </div>
+                          <div class="grid gap-1.5">
+                            <label class="text-xs text-muted-foreground">协议</label>
+                            <div class="relative">
+                              <select v-model="newServer.transportType" class="select-field">
+                                <option value="sse">
+                                  SSE（Server-Sent Events）
+                                </option>
+                                <option value="http">
+                                  Streamable HTTP
+                                </option>
+                              </select>
+                              <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            </div>
+                          </div>
+                          <div class="grid gap-1.5">
+                            <label class="text-xs text-muted-foreground">
+                              Headers
+                              <span class="text-muted-foreground/50 ml-1">（可选，每行一个 Key: Value）</span>
+                            </label>
+                            <textarea
+                              v-model="newServer.headersText"
+                              class="input-field font-mono text-xs resize-y"
+                              rows="3"
+                              spellcheck="false"
+                              placeholder="Authorization: Bearer sk-xxx&#10;X-Custom-Header: value"
+                            />
+                          </div>
+                        </template>
+
+                        <div class="flex items-center justify-end gap-2 pt-1">
+                          <button class="btn-ghost btn-sm" @click="showAddForm = false; resetAddForm()">
+                            取消
+                          </button>
+                          <button class="btn-primary btn-sm" @click="addServer">
+                            添加
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        v-if="!showAddForm"
+                        class="btn-ghost btn-sm mt-3 w-full"
+                        @click="showAddForm = true"
+                      >
+                        <div class="i-carbon-add h-3.5 w-3.5 mr-1" />
+                        添加 MCP Server
+                      </button>
+                    </template>
+                  </div>
+                </section>
+              </div>
+            </div>
           </template>
         </div>
       </main>

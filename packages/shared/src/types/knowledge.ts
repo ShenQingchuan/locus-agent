@@ -86,7 +86,3 @@ export interface ListTagsResponse {
 export interface SearchNotesResponse {
   notes: NoteWithTags[]
 }
-
-export interface BacklinksResponse {
-  backlinks: Note[]
-}

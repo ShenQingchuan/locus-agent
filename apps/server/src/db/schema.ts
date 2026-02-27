@@ -129,19 +129,6 @@ export const noteTags = sqliteTable('note_tags', {
   index('idx_note_tags_tag_id').on(t.tagId),
 ])
 
-/** 笔记间链接（双向链接追踪） */
-export const noteLinks = sqliteTable('note_links', {
-  sourceNoteId: text('source_note_id')
-    .notNull()
-    .references(() => notes.id, { onDelete: 'cascade' }),
-  targetNoteId: text('target_note_id')
-    .notNull()
-    .references(() => notes.id, { onDelete: 'cascade' }),
-}, t => [
-  primaryKey({ columns: [t.sourceNoteId, t.targetNoteId] }),
-  index('idx_note_links_target').on(t.targetNoteId),
-])
-
 /** 笔记-对话来源关联 */
 export const noteConversations = sqliteTable('note_conversations', {
   noteId: text('note_id')
@@ -184,8 +171,6 @@ export const notesRelations = relations(notes, ({ one, many }) => ({
     references: [folders.id],
   }),
   noteTags: many(noteTags),
-  outgoingLinks: many(noteLinks, { relationName: 'sourceLinks' }),
-  incomingLinks: many(noteLinks, { relationName: 'targetLinks' }),
   noteConversations: many(noteConversations),
 }))
 
@@ -201,19 +186,6 @@ export const noteTagsRelations = relations(noteTags, ({ one }) => ({
   tag: one(tags, {
     fields: [noteTags.tagId],
     references: [tags.id],
-  }),
-}))
-
-export const noteLinksRelations = relations(noteLinks, ({ one }) => ({
-  source: one(notes, {
-    fields: [noteLinks.sourceNoteId],
-    references: [notes.id],
-    relationName: 'sourceLinks',
-  }),
-  target: one(notes, {
-    fields: [noteLinks.targetNoteId],
-    references: [notes.id],
-    relationName: 'targetLinks',
   }),
 }))
 

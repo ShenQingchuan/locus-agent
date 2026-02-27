@@ -1,5 +1,4 @@
 import type {
-  BacklinksResponse,
   CreateFolderInput,
   CreateNoteInput,
   Folder,
@@ -76,17 +75,6 @@ export async function deleteNote(id: string): Promise<void> {
 export async function searchNotes(query: string): Promise<NoteWithTags[]> {
   const { notes } = await request<SearchNotesResponse>(`/notes/search?q=${encodeURIComponent(query)}`)
   return notes
-}
-
-export async function fetchBacklinks(noteId: string): Promise<BacklinksResponse> {
-  return request<BacklinksResponse>(`/notes/${noteId}/backlinks`)
-}
-
-export async function updateNoteLinks(noteId: string, targetNoteIds: string[]): Promise<void> {
-  await request(`/notes/${noteId}/links`, {
-    method: 'PUT',
-    body: JSON.stringify({ targetNoteIds }),
-  })
 }
 
 // ==================== Folders ====================

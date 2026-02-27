@@ -52,7 +52,7 @@ function getToastClass(type: string): string {
 <template>
   <!-- Toast 消息列表 -->
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
       <TransitionGroup name="toast">
         <div
           v-for="toast in toasts"
@@ -140,12 +140,12 @@ function getToastClass(type: string): string {
 
 .toast-enter-from {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(-100%);
 }
 
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(-100%);
 }
 
 .fade-enter-active,

@@ -16,7 +16,7 @@ export const LLM_PROVIDERS: LLMProviderMeta[] = [
   { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
   { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
   { value: 'deepseek', label: 'DeepSeek', icon: 'i-ri:deepseek-fill', defaultModel: 'deepseek-chat', defaultApiBase: 'https://api.deepseek.com' },
-  { value: 'custom', label: '自定义来源', icon: 'i-carbon-settings', defaultModel: 'gpt-4', defaultApiBase: '' },
+  { value: 'custom', label: '自定义来源', icon: 'i-icon-park-outline:magic-hat', defaultModel: 'gpt-4', defaultApiBase: '' },
 ]
 
 export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntries(

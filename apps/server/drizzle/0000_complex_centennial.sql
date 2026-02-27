@@ -40,15 +40,6 @@ CREATE TABLE `note_conversations` (
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `note_links` (
-	`source_note_id` text NOT NULL,
-	`target_note_id` text NOT NULL,
-	PRIMARY KEY(`source_note_id`, `target_note_id`),
-	FOREIGN KEY (`source_note_id`) REFERENCES `notes`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`target_note_id`) REFERENCES `notes`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_note_links_target` ON `note_links` (`target_note_id`);--> statement-breakpoint
 CREATE TABLE `note_tags` (
 	`note_id` text NOT NULL,
 	`tag_id` text NOT NULL,

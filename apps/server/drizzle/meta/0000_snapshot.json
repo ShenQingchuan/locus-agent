@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9848c9eb-8c47-454d-b28b-98f1d6918dba",
+  "id": "32cae431-7c72-48d8-bf0c-b88ab187acb0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversations": {
@@ -282,73 +282,6 @@
             "conversation_id"
           ],
           "name": "note_conversations_note_id_conversation_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "note_links": {
-      "name": "note_links",
-      "columns": {
-        "source_note_id": {
-          "name": "source_note_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_note_id": {
-          "name": "target_note_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_note_links_target": {
-          "name": "idx_note_links_target",
-          "columns": [
-            "target_note_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "note_links_source_note_id_notes_id_fk": {
-          "name": "note_links_source_note_id_notes_id_fk",
-          "tableFrom": "note_links",
-          "tableTo": "notes",
-          "columnsFrom": [
-            "source_note_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "note_links_target_note_id_notes_id_fk": {
-          "name": "note_links_target_note_id_notes_id_fk",
-          "tableFrom": "note_links",
-          "tableTo": "notes",
-          "columnsFrom": [
-            "target_note_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "note_links_source_note_id_target_note_id_pk": {
-          "columns": [
-            "source_note_id",
-            "target_note_id"
-          ],
-          "name": "note_links_source_note_id_target_note_id_pk"
         }
       },
       "uniqueConstraints": {},

@@ -1,6 +1,6 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
 import { desc, eq, inArray, like } from 'drizzle-orm'
-import { db, noteConversations, noteLinks, notes, noteTags, tags } from '../db/index.js'
+import { db, noteConversations, notes, noteTags, tags } from '../db/index.js'
 import { getOrCreateTag } from './tag.js'
 
 // ==================== Types ====================
@@ -205,53 +205,6 @@ async function setNoteTags(noteId: string, tagNames: string[]): Promise<void> {
       tagId: tag.id,
     })
   }
-}
-
-// ==================== 链接管理 ====================
-
-/**
- * 更新笔记的出链（保存时解析 wikilinks 后调用）
- */
-export async function updateNoteLinks(
-  sourceNoteId: string,
-  targetNoteIds: string[],
-): Promise<void> {
-  // 清除旧链接
-  await db.delete(noteLinks).where(eq(noteLinks.sourceNoteId, sourceNoteId))
-
-  // 插入新链接
-  for (const targetId of targetNoteIds) {
-    // 确保目标笔记存在且不是自己
-    if (targetId === sourceNoteId)
-      continue
-    const target = await getNote(targetId)
-    if (!target)
-      continue
-
-    await db.insert(noteLinks).values({
-      sourceNoteId,
-      targetNoteId: targetId,
-    })
-  }
-}
-
-/**
- * 获取反向链接（哪些笔记链接到了这个笔记）
- */
-export async function getBacklinks(noteId: string): Promise<Note[]> {
-  const links = await db
-    .select({ sourceNoteId: noteLinks.sourceNoteId })
-    .from(noteLinks)
-    .where(eq(noteLinks.targetNoteId, noteId))
-
-  if (links.length === 0)
-    return []
-
-  const sourceIds = links.map(l => l.sourceNoteId)
-  return db
-    .select()
-    .from(notes)
-    .where(inArray(notes.id, sourceIds))
 }
 
 // ==================== 搜索 ====================

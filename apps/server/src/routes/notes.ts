@@ -2,13 +2,11 @@ import { Hono } from 'hono'
 import {
   createNote,
   deleteNote,
-  getBacklinks,
   getNoteConversationIds,
   getNoteWithTags,
   listNotes,
   searchNotes,
   updateNote,
-  updateNoteLinks,
 } from '../services/note.js'
 
 export const notesRoutes = new Hono()
@@ -98,27 +96,6 @@ notesRoutes.delete('/:id', async (c) => {
     return c.json({ error: 'Note not found' }, 404)
   }
 
-  return c.json({ success: true })
-})
-
-// GET /api/notes/:id/backlinks - 获取反向链接
-notesRoutes.get('/:id/backlinks', async (c) => {
-  const id = c.req.param('id')
-  const backlinks = await getBacklinks(id)
-  return c.json({ backlinks })
-})
-
-// PUT /api/notes/:id/links - 更新笔记的出链
-notesRoutes.put('/:id/links', async (c) => {
-  const id = c.req.param('id')
-  const body = await c.req.json()
-  const { targetNoteIds } = body
-
-  if (!Array.isArray(targetNoteIds)) {
-    return c.json({ error: 'targetNoteIds must be an array' }, 400)
-  }
-
-  await updateNoteLinks(id, targetNoteIds)
   return c.json({ success: true })
 })
 
