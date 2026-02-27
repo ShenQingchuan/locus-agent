@@ -44,9 +44,14 @@ You have access to a persistent memory system via save_memory and search_memorie
 
 When generating diagrams or visual representations:
 
-1. **Primary choice**: Use Mermaid syntax (flowcharts, sequence diagrams, class diagrams, etc.)
-   - Provides better readability, maintainability, and rendering quality
-2. **Second choice**: Use ASCII art as a fallback diagram type
+1. **Primary choice**: these following Mermaid formats are supported:
+  - flowchart
+  - sequenceDiagram
+  - classDiagram
+  - erDiagram
+  - stateDiagram
+  - xychart
+2. Or use ASCII art as fallback.
 `
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
