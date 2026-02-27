@@ -60,23 +60,107 @@ export interface Message {
   }
 }
 
+type ChatError = { code: string, message: string } | null
+
+interface ConversationRuntimeState {
+  messages: Message[]
+  isLoading: boolean
+  error: ChatError
+  currentStreamingMessageId: string | null
+  pendingApprovals: Map<string, PendingApproval>
+  pendingQuestions: Map<string, PendingQuestion>
+  messageQueue: QueuedMessage[]
+  isProcessingQueue: boolean
+}
+
+function createConversationRuntimeState(): ConversationRuntimeState {
+  return {
+    messages: [],
+    isLoading: false,
+    error: null,
+    currentStreamingMessageId: null,
+    pendingApprovals: new Map(),
+    pendingQuestions: new Map(),
+    messageQueue: [],
+    isProcessingQueue: false,
+  }
+}
+
 export const useChatStore = defineStore('chat', () => {
   // Conversation management
   const conversations = ref<Conversation[]>([])
   const currentConversationId = ref<string | null>(null)
 
-  // Current conversation state
-  const messages = ref<Message[]>([])
-  const isLoading = ref(false)
-  const error = ref<{ code: string, message: string } | null>(null)
-  const currentStreamingMessageId = ref<string | null>(null)
-  const pendingApprovals = ref<Map<string, PendingApproval>>(new Map())
-  const pendingQuestions = ref<Map<string, PendingQuestion>>(new Map())
+  // Conversation runtime state (isolated per conversation)
+  const conversationRuntimeStates = ref<Record<string, ConversationRuntimeState>>({})
+  const draftRuntimeState = ref<ConversationRuntimeState>(createConversationRuntimeState())
+
+  function ensureConversationRuntimeState(conversationId: string): ConversationRuntimeState {
+    const existing = conversationRuntimeStates.value[conversationId]
+    if (existing)
+      return existing
+
+    const created = createConversationRuntimeState()
+    conversationRuntimeStates.value[conversationId] = created
+    return created
+  }
+
+  function getConversationRuntimeState(conversationId: string | null | undefined = currentConversationId.value): ConversationRuntimeState {
+    if (!conversationId)
+      return draftRuntimeState.value
+    return ensureConversationRuntimeState(conversationId)
+  }
+
+  function clearConversationRuntimeState(conversationId: string | null | undefined = currentConversationId.value) {
+    if (!conversationId) {
+      draftRuntimeState.value = createConversationRuntimeState()
+      return
+    }
+    conversationRuntimeStates.value[conversationId] = createConversationRuntimeState()
+  }
+
+  function removeConversationRuntimeState(conversationId: string) {
+    if (conversationRuntimeStates.value[conversationId]) {
+      delete conversationRuntimeStates.value[conversationId]
+    }
+  }
+
+  // Current conversation runtime state (derived)
+  const messages = computed<Message[]>({
+    get: () => getConversationRuntimeState().messages,
+    set: value => (getConversationRuntimeState().messages = value),
+  })
+  const isLoading = computed<boolean>({
+    get: () => getConversationRuntimeState().isLoading,
+    set: value => (getConversationRuntimeState().isLoading = value),
+  })
+  const error = computed<ChatError>({
+    get: () => getConversationRuntimeState().error,
+    set: value => (getConversationRuntimeState().error = value),
+  })
+  const currentStreamingMessageId = computed<string | null>({
+    get: () => getConversationRuntimeState().currentStreamingMessageId,
+    set: value => (getConversationRuntimeState().currentStreamingMessageId = value),
+  })
+  const pendingApprovals = computed<Map<string, PendingApproval>>({
+    get: () => getConversationRuntimeState().pendingApprovals,
+    set: value => (getConversationRuntimeState().pendingApprovals = value),
+  })
+  const pendingQuestions = computed<Map<string, PendingQuestion>>({
+    get: () => getConversationRuntimeState().pendingQuestions,
+    set: value => (getConversationRuntimeState().pendingQuestions = value),
+  })
 
   // Message queue: messages queued while LLM is busy (not yet added to messages list)
-  const messageQueue = ref<QueuedMessage[]>([])
+  const messageQueue = computed<QueuedMessage[]>({
+    get: () => getConversationRuntimeState().messageQueue,
+    set: value => (getConversationRuntimeState().messageQueue = value),
+  })
   /** Whether the queue processor is currently draining queued messages */
-  const isProcessingQueue = ref(false)
+  const isProcessingQueue = computed<boolean>({
+    get: () => getConversationRuntimeState().isProcessingQueue,
+    set: value => (getConversationRuntimeState().isProcessingQueue = value),
+  })
 
   // Whitelist state
   const whitelistRules = ref<WhitelistRule[]>([])
@@ -273,14 +357,21 @@ export const useChatStore = defineStore('chat', () => {
       return
 
     currentConversationId.value = id
-    clearMessages()
-    clearError()
-    loadWhitelistRules()
+    ensureConversationRuntimeState(id)
+    clearError(id)
+    loadWhitelistRules(id)
   }
 
-  function applyConversationData(data: { conversation: Conversation, messages: ApiMessage[] }) {
+  function applyConversationData(
+    data: { conversation: Conversation, messages: ApiMessage[] },
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    if (!conversationId)
+      return
+
     // Restore yolo mode from conversation settings
-    yoloMode.value = data.conversation?.confirmMode === false
+    if (conversationId === currentConversationId.value)
+      yoloMode.value = data.conversation?.confirmMode === false
 
     // Convert API messages to local Message format
     // We need to merge tool results from tool messages into assistant messages
@@ -357,18 +448,20 @@ export const useChatStore = defineStore('chat', () => {
       })
     }
 
-    messages.value = convertedMessages
+    const runtimeState = getConversationRuntimeState(conversationId)
+    runtimeState.messages = convertedMessages
   }
 
   async function removeConversation(id: string) {
     const success = await deleteConversation(id)
     if (success) {
+      removeConversationRuntimeState(id)
       conversations.value = conversations.value.filter(c => c.id !== id)
       if (currentConversationId.value === id) {
         // Switch to first available conversation or start fresh
         const firstConversation = conversations.value[0]
         if (firstConversation) {
-          await switchConversation(firstConversation.id)
+          switchConversation(firstConversation.id)
         }
         else {
           // 不自动创建，只清空当前状态，发消息时再创建
@@ -400,27 +493,41 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function addMessage(message: Omit<Message, 'id' | 'timestamp'>) {
+  function addMessage(
+    message: Omit<Message, 'id' | 'timestamp'>,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
     const newMessage: Message = {
       ...message,
       id: crypto.randomUUID(),
       timestamp: Date.now(),
     }
-    messages.value.push(newMessage)
+    runtimeState.messages.push(newMessage)
     return newMessage.id
   }
 
-  function updateMessage(id: string, updates: Partial<Message>) {
-    const index = messages.value.findIndex(m => m.id === id)
-    const existing = index !== -1 ? messages.value[index] : undefined
+  function updateMessage(
+    id: string,
+    updates: Partial<Message>,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const index = runtimeState.messages.findIndex(m => m.id === id)
+    const existing = index !== -1 ? runtimeState.messages[index] : undefined
     if (existing) {
-      messages.value[index] = { ...existing, ...updates } as Message
+      runtimeState.messages[index] = { ...existing, ...updates } as Message
     }
   }
 
-  function appendToMessage(id: string, content: string) {
-    const index = messages.value.findIndex(m => m.id === id)
-    const message = index !== -1 ? messages.value[index] : undefined
+  function appendToMessage(
+    id: string,
+    content: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const index = runtimeState.messages.findIndex(m => m.id === id)
+    const message = index !== -1 ? runtimeState.messages[index] : undefined
     if (!message)
       return
 
@@ -434,16 +541,21 @@ export const useChatStore = defineStore('chat', () => {
       parts.push({ type: 'text', content })
     }
 
-    messages.value[index] = {
+    runtimeState.messages[index] = {
       ...message,
       content: message.content + content,
       parts,
     }
   }
 
-  function appendReasoningToMessage(id: string, content: string) {
-    const index = messages.value.findIndex(m => m.id === id)
-    const message = index !== -1 ? messages.value[index] : undefined
+  function appendReasoningToMessage(
+    id: string,
+    content: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const index = runtimeState.messages.findIndex(m => m.id === id)
+    const message = index !== -1 ? runtimeState.messages[index] : undefined
     if (!message)
       return
 
@@ -457,16 +569,21 @@ export const useChatStore = defineStore('chat', () => {
       parts.push({ type: 'reasoning', content })
     }
 
-    messages.value[index] = {
+    runtimeState.messages[index] = {
       ...message,
       reasoning: (message.reasoning || '') + content,
       parts,
     }
   }
 
-  function addToolCallToMessage(id: string, toolCall: ToolCall) {
-    const index = messages.value.findIndex(m => m.id === id)
-    const message = index !== -1 ? messages.value[index] : undefined
+  function addToolCallToMessage(
+    id: string,
+    toolCall: ToolCall,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const index = runtimeState.messages.findIndex(m => m.id === id)
+    const message = index !== -1 ? runtimeState.messages[index] : undefined
     if (!message)
       return
 
@@ -479,7 +596,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!existing)
         return
       toolCalls[existingIndex] = { ...existing, toolCall }
-      messages.value[index] = {
+      runtimeState.messages[index] = {
         ...message,
         toolCalls,
       }
@@ -492,16 +609,21 @@ export const useChatStore = defineStore('chat', () => {
     const parts = [...(message.parts || [])]
     parts.push({ type: 'tool-call', toolCallIndex })
 
-    messages.value[index] = {
+    runtimeState.messages[index] = {
       ...message,
       toolCalls,
       parts,
     }
   }
 
-  function updateToolCallResult(messageId: string, toolResult: ToolResult) {
-    const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+  function updateToolCallResult(
+    messageId: string,
+    toolResult: ToolResult,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (message?.toolCalls) {
       let hasMatch = false
       const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
@@ -524,17 +646,23 @@ export const useChatStore = defineStore('chat', () => {
         }
       })
       if (hasMatch) {
-        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+        runtimeState.messages[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
     // Clear pending approval
-    pendingApprovals.value.delete(toolResult.toolCallId)
+    runtimeState.pendingApprovals.delete(toolResult.toolCallId)
   }
 
-  function appendToolCallOutput(toolCallId: string, _stream: 'stdout' | 'stderr', delta: string) {
+  function appendToolCallOutput(
+    toolCallId: string,
+    _stream: 'stdout' | 'stderr',
+    delta: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
     // Find the message containing this toolCallId (search from the end for efficiency)
-    for (let i = messages.value.length - 1; i >= 0; i--) {
-      const message = messages.value[i]
+    for (let i = runtimeState.messages.length - 1; i >= 0; i--) {
+      const message = runtimeState.messages[i]
       if (!message?.toolCalls || message.toolCalls.length === 0)
         continue
 
@@ -550,7 +678,7 @@ export const useChatStore = defineStore('chat', () => {
         ...tc,
         output: (tc.output || '') + delta,
       }
-      messages.value[i] = { ...message, toolCalls: newToolCalls }
+      runtimeState.messages[i] = { ...message, toolCalls: newToolCalls }
       return
     }
   }
@@ -558,10 +686,15 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 追加 Delegate 工具的流式状态更新
    */
-  function appendDelegateDelta(toolCallId: string, delta: DelegateDelta) {
+  function appendDelegateDelta(
+    toolCallId: string,
+    delta: DelegateDelta,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
     // Find the message containing this toolCallId (search from the end for efficiency)
-    for (let i = messages.value.length - 1; i >= 0; i--) {
-      const message = messages.value[i]
+    for (let i = runtimeState.messages.length - 1; i >= 0; i--) {
+      const message = runtimeState.messages[i]
       if (!message?.toolCalls || message.toolCalls.length === 0)
         continue
 
@@ -577,14 +710,19 @@ export const useChatStore = defineStore('chat', () => {
         ...tc,
         delegateDeltas: [...(tc.delegateDeltas || []), delta],
       }
-      messages.value[i] = { ...message, toolCalls: newToolCalls }
+      runtimeState.messages[i] = { ...message, toolCalls: newToolCalls }
       return
     }
   }
 
-  function setToolCallAwaitingApproval(messageId: string, toolCallId: string) {
-    const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+  function setToolCallAwaitingApproval(
+    messageId: string,
+    toolCallId: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (message?.toolCalls) {
       let hasMatch = false
       const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
@@ -598,14 +736,19 @@ export const useChatStore = defineStore('chat', () => {
         }
       })
       if (hasMatch) {
-        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+        runtimeState.messages[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
   }
 
-  function setToolCallAwaitingQuestion(messageId: string, toolCallId: string) {
-    const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+  function setToolCallAwaitingQuestion(
+    messageId: string,
+    toolCallId: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (message?.toolCalls) {
       let hasMatch = false
       const newToolCalls = message.toolCalls.map((toolCallState): ToolCallState => {
@@ -619,14 +762,18 @@ export const useChatStore = defineStore('chat', () => {
         }
       })
       if (hasMatch) {
-        messages.value[messageIndex] = { ...message, toolCalls: newToolCalls }
+        runtimeState.messages[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
     }
   }
 
-  function setToolCallExecuting(toolCallId: string) {
-    for (let i = 0; i < messages.value.length; i++) {
-      const message = messages.value[i]
+  function setToolCallExecuting(
+    toolCallId: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    for (let i = 0; i < runtimeState.messages.length; i++) {
+      const message = runtimeState.messages[i]
       if (!message?.toolCalls || message.toolCalls.length === 0)
         continue
 
@@ -643,55 +790,66 @@ export const useChatStore = defineStore('chat', () => {
       })
 
       if (hasMatch) {
-        messages.value[i] = { ...message, toolCalls: newToolCalls }
+        runtimeState.messages[i] = { ...message, toolCalls: newToolCalls }
         return
       }
     }
   }
 
-  function addPendingApproval(approval: PendingApproval) {
-    pendingApprovals.value.set(approval.toolCallId, approval)
+  function addPendingApproval(
+    approval: PendingApproval,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    getConversationRuntimeState(conversationId).pendingApprovals.set(approval.toolCallId, approval)
   }
 
-  function removePendingApproval(toolCallId: string) {
-    pendingApprovals.value.delete(toolCallId)
+  function removePendingApproval(
+    toolCallId: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    getConversationRuntimeState(conversationId).pendingApprovals.delete(toolCallId)
   }
 
-  function clearPendingApprovals() {
-    pendingApprovals.value.clear()
+  function clearPendingApprovals(conversationId: string | null = currentConversationId.value) {
+    getConversationRuntimeState(conversationId).pendingApprovals.clear()
   }
 
-  function addPendingQuestion(question: PendingQuestion) {
-    pendingQuestions.value.set(question.toolCallId, question)
+  function addPendingQuestion(
+    question: PendingQuestion,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    getConversationRuntimeState(conversationId).pendingQuestions.set(question.toolCallId, question)
   }
 
-  function removePendingQuestion(toolCallId: string) {
-    pendingQuestions.value.delete(toolCallId)
+  function removePendingQuestion(
+    toolCallId: string,
+    conversationId: string | null = currentConversationId.value,
+  ) {
+    getConversationRuntimeState(conversationId).pendingQuestions.delete(toolCallId)
   }
 
-  function clearPendingQuestions() {
-    pendingQuestions.value.clear()
+  function clearMessages(conversationId: string | null = currentConversationId.value) {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    runtimeState.messages = []
+    runtimeState.messageQueue = []
+    runtimeState.error = null
+    runtimeState.currentStreamingMessageId = null
+    runtimeState.isLoading = false
+    runtimeState.pendingApprovals.clear()
+    runtimeState.pendingQuestions.clear()
+    runtimeState.isProcessingQueue = false
   }
 
-  function clearMessages() {
-    messages.value = []
-    messageQueue.value = []
-    error.value = null
-    currentStreamingMessageId.value = null
-    clearPendingApprovals()
-    clearPendingQuestions()
+  function setLoading(loading: boolean, conversationId: string | null = currentConversationId.value) {
+    getConversationRuntimeState(conversationId).isLoading = loading
   }
 
-  function setLoading(loading: boolean) {
-    isLoading.value = loading
+  function setError(err: ChatError, conversationId: string | null = currentConversationId.value) {
+    getConversationRuntimeState(conversationId).error = err
   }
 
-  function setError(err: { code: string, message: string } | null) {
-    error.value = err
-  }
-
-  function clearError() {
-    error.value = null
+  function clearError(conversationId: string | null = currentConversationId.value) {
+    getConversationRuntimeState(conversationId).error = null
   }
 
   // Incremented when newConversation is called; ChatInput watches this to focus the prompt input
@@ -701,7 +859,7 @@ export const useChatStore = defineStore('chat', () => {
     // 不立即生成 ID，发消息时再创建
     currentConversationId.value = null
     yoloMode.value = false
-    clearMessages()
+    clearConversationRuntimeState(null)
     focusInputTrigger.value++
   }
 
@@ -749,34 +907,46 @@ export const useChatStore = defineStore('chat', () => {
    *
    * historyMessages 仅由 edit/retry 逻辑在空闲时提供，队列模式下不支持。
    */
-  async function sendMessage(content: string, historyMessages?: CoreMessage[]) {
+  async function sendMessage(
+    content: string,
+    historyMessages?: CoreMessage[],
+    targetConversationId?: string,
+  ): Promise<string | null> {
     if (!content.trim())
-      return
+      return null
 
-    // 如果当前正在加载（LLM 忙），把消息加入队列（不添加到消息列表）
-    if (isLoading.value && !historyMessages) {
-      const queueItem = { id: crypto.randomUUID(), content }
-      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-push', data: { contentType: typeof content, content, queueItem } }) }).catch(() => {})
-      messageQueue.value.push(queueItem)
-      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-after-push', data: { queueLength: messageQueue.value.length, firstItem: messageQueue.value[0], rawQueue: JSON.stringify(messageQueue.value) } }) }).catch(() => {})
-      return
-    }
-
-    clearError()
+    let conversationId = targetConversationId ?? currentConversationId.value
 
     // Ensure we have a conversation ID
-    if (!currentConversationId.value) {
-      currentConversationId.value = crypto.randomUUID()
+    if (!conversationId) {
+      conversationId = crypto.randomUUID()
+      // Keep current selection in sync for normal user sends.
+      if (!targetConversationId) {
+        currentConversationId.value = conversationId
+      }
     }
 
-    // Build history from current messages when not explicitly provided (normal send)
-    const historyToSend = historyMessages ?? messagesToCoreMessages(messages.value)
+    const runtimeState = getConversationRuntimeState(conversationId)
+
+    // 如果当前会话正在加载（LLM 忙），把消息加入该会话队列（不添加到消息列表）
+    if (runtimeState.isLoading && !historyMessages) {
+      const queueItem = { id: crypto.randomUUID(), content }
+      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-push', data: { contentType: typeof content, content, queueItem } }) }).catch(() => {})
+      runtimeState.messageQueue.push(queueItem)
+      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-after-push', data: { queueLength: runtimeState.messageQueue.length, firstItem: runtimeState.messageQueue[0], rawQueue: JSON.stringify(runtimeState.messageQueue) } }) }).catch(() => {})
+      return conversationId
+    }
+
+    clearError(conversationId)
+
+    // Build history from target conversation when not explicitly provided (normal send)
+    const historyToSend = historyMessages ?? messagesToCoreMessages(runtimeState.messages)
 
     // Add user message
     addMessage({
       role: 'user',
       content,
-    })
+    }, conversationId)
 
     const selectedModel = (modelName.value || DEFAULT_MODELS[provider.value] || 'unknown').trim()
     const assistantModel = `${provider.value}/${selectedModel}`
@@ -787,43 +957,43 @@ export const useChatStore = defineStore('chat', () => {
       content: '',
       model: assistantModel,
       isStreaming: true,
-    })
+    }, conversationId)
 
-    currentStreamingMessageId.value = assistantMessageId
-    setLoading(true)
+    setLoading(true, conversationId)
+    getConversationRuntimeState(conversationId).currentStreamingMessageId = assistantMessageId
 
     try {
       await streamChat({
-        conversationId: currentConversationId.value,
+        conversationId,
         message: content,
         messages: historyToSend,
         confirmMode: !yoloMode.value,
         thinkingMode: thinkMode.value,
         onReasoningDelta: (delta) => {
-          appendReasoningToMessage(assistantMessageId, delta)
+          appendReasoningToMessage(assistantMessageId, delta, conversationId)
         },
         onTextDelta: (delta) => {
-          appendToMessage(assistantMessageId, delta)
+          appendToMessage(assistantMessageId, delta, conversationId)
         },
         onToolCallStart: (toolCall) => {
-          addToolCallToMessage(assistantMessageId, toolCall)
+          addToolCallToMessage(assistantMessageId, toolCall, conversationId)
         },
         onToolCallResult: (toolResult) => {
-          updateToolCallResult(assistantMessageId, toolResult)
+          updateToolCallResult(assistantMessageId, toolResult, conversationId)
         },
         onToolPendingApproval: (approval) => {
-          addPendingApproval(approval)
-          setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId)
+          addPendingApproval(approval, conversationId)
+          setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId, conversationId)
         },
         onQuestionPending: (question) => {
-          addPendingQuestion(question)
-          setToolCallAwaitingQuestion(assistantMessageId, question.toolCallId)
+          addPendingQuestion(question, conversationId)
+          setToolCallAwaitingQuestion(assistantMessageId, question.toolCallId, conversationId)
         },
         onToolOutputDelta: (toolCallId, stream, delta) => {
-          appendToolCallOutput(toolCallId, stream, delta)
+          appendToolCallOutput(toolCallId, stream, delta, conversationId)
         },
         onDelegateDelta: (event) => {
-          appendDelegateDelta(event.toolCallId, event.delta)
+          appendDelegateDelta(event.toolCallId, event.delta, conversationId)
         },
         onDone: (_messageId, usage, model) => {
           const updates: Partial<Message> = { isStreaming: false }
@@ -833,38 +1003,43 @@ export const useChatStore = defineStore('chat', () => {
           if (usage && usage.totalTokens > 0) {
             updates.usage = usage
           }
-          updateMessage(assistantMessageId, updates)
-          currentStreamingMessageId.value = null
-          setLoading(false)
+          updateMessage(assistantMessageId, updates, conversationId)
+          const doneState = getConversationRuntimeState(conversationId)
+          doneState.currentStreamingMessageId = null
+          doneState.isLoading = false
         },
         onError: (code, message) => {
-          setError({ code, message })
+          setError({ code, message }, conversationId)
+          const errorState = getConversationRuntimeState(conversationId)
           updateMessage(assistantMessageId, {
             isStreaming: false,
-            content: messages.value.find(m => m.id === assistantMessageId)?.content || '',
-          })
-          currentStreamingMessageId.value = null
-          setLoading(false)
+            content: errorState.messages.find(m => m.id === assistantMessageId)?.content || '',
+          }, conversationId)
+          errorState.currentStreamingMessageId = null
+          errorState.isLoading = false
         },
       })
 
       // 兜底：服务端或网络异常结束但未收到 done/error 时，避免界面长期停留在 loading 态
-      if (currentStreamingMessageId.value === assistantMessageId) {
-        updateMessage(assistantMessageId, { isStreaming: false })
-        currentStreamingMessageId.value = null
-        setLoading(false)
+      if (getConversationRuntimeState(conversationId).currentStreamingMessageId === assistantMessageId) {
+        updateMessage(assistantMessageId, { isStreaming: false }, conversationId)
+        const fallbackState = getConversationRuntimeState(conversationId)
+        fallbackState.currentStreamingMessageId = null
+        fallbackState.isLoading = false
       }
     }
     catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      setError({ code: 'STREAM_ERROR', message: errorMessage })
-      updateMessage(assistantMessageId, { isStreaming: false })
-      currentStreamingMessageId.value = null
-      setLoading(false)
+      setError({ code: 'STREAM_ERROR', message: errorMessage }, conversationId)
+      updateMessage(assistantMessageId, { isStreaming: false }, conversationId)
+      const catchState = getConversationRuntimeState(conversationId)
+      catchState.currentStreamingMessageId = null
+      catchState.isLoading = false
     }
 
     // 当前请求结束后，处理队列中积压的消息
-    await processMessageQueue()
+    await processMessageQueue(conversationId)
+    return conversationId
   }
 
   /**
@@ -875,70 +1050,81 @@ export const useChatStore = defineStore('chat', () => {
    * 注意：sendMessage 内部结束后也会调用 processMessageQueue，
    * 但 isProcessingQueue 守卫可防止递归重入。
    */
-  async function processMessageQueue() {
-    if (isProcessingQueue.value || isLoading.value || messageQueue.value.length === 0)
+  async function processMessageQueue(conversationId: string | null = currentConversationId.value) {
+    if (!conversationId)
       return
 
-    isProcessingQueue.value = true
+    const runtimeState = getConversationRuntimeState(conversationId)
+    if (runtimeState.isProcessingQueue || runtimeState.isLoading || runtimeState.messageQueue.length === 0)
+      return
+
+    runtimeState.isProcessingQueue = true
 
     try {
       // 逐条取出并发送：每次从队首弹出一条，等待该条完成后再取下一条
-      while (messageQueue.value.length > 0) {
-        const next = messageQueue.value.shift()!
+      while (runtimeState.messageQueue.length > 0) {
+        const next = runtimeState.messageQueue.shift()!
         // sendMessage 结束时会再次调用 processMessageQueue，
         // 但 isProcessingQueue 为 true 会直接 return，不会递归。
-        await sendMessage(next.content)
+        await sendMessage(next.content, undefined, conversationId)
       }
     }
     finally {
-      isProcessingQueue.value = false
+      runtimeState.isProcessingQueue = false
     }
   }
 
   /**
    * 从队列中移除指定 id 的消息
    */
-  function removeFromQueue(id: string) {
-    const index = messageQueue.value.findIndex(m => m.id === id)
+  function removeFromQueue(id: string, conversationId: string | null = currentConversationId.value) {
+    const queue = getConversationRuntimeState(conversationId).messageQueue
+    const index = queue.findIndex(m => m.id === id)
     if (index !== -1) {
-      messageQueue.value.splice(index, 1)
+      queue.splice(index, 1)
     }
   }
 
   /**
    * 编辑队列中指定 id 的消息内容
    */
-  function editQueueItem(id: string, newContent: string) {
-    const item = messageQueue.value.find(m => m.id === id)
+  function editQueueItem(id: string, newContent: string, conversationId: string | null = currentConversationId.value) {
+    const item = getConversationRuntimeState(conversationId).messageQueue.find(m => m.id === id)
     if (item) {
       item.content = newContent
     }
   }
 
   async function stopGeneration() {
-    if (currentStreamingMessageId.value && currentConversationId.value) {
-      await abortChat(currentConversationId.value)
-      updateMessage(currentStreamingMessageId.value, { isStreaming: false })
-      currentStreamingMessageId.value = null
-      setLoading(false)
+    const conversationId = currentConversationId.value
+    if (!conversationId)
+      return
+
+    const runtimeState = getConversationRuntimeState(conversationId)
+    if (runtimeState.currentStreamingMessageId) {
+      await abortChat(conversationId)
+      updateMessage(runtimeState.currentStreamingMessageId, { isStreaming: false }, conversationId)
+      runtimeState.currentStreamingMessageId = null
+      runtimeState.isLoading = false
 
       // abort 结束后处理积压的队列消息
       // sendMessage 内部的 processMessageQueue 可能因为 abort 时序而跳过
-      await processMessageQueue()
+      await processMessageQueue(conversationId)
     }
   }
 
   async function handleToolApproval(toolCallId: string, approved: boolean) {
-    if (!currentConversationId.value)
+    const conversationId = currentConversationId.value
+    if (!conversationId)
       return false
 
     // Immediately update UI before awaiting the API call
-    removePendingApproval(toolCallId)
+    removePendingApproval(toolCallId, conversationId)
     if (approved)
-      setToolCallExecuting(toolCallId)
+      setToolCallExecuting(toolCallId, conversationId)
 
     const switchToYolo = approved && yoloMode.value ? true : undefined
-    const success = await approveToolCall(currentConversationId.value, toolCallId, approved, switchToYolo)
+    const success = await approveToolCall(conversationId, toolCallId, approved, switchToYolo)
     return success
   }
 
@@ -954,15 +1140,16 @@ export const useChatStore = defineStore('chat', () => {
    * 批准工具执行并同时加入白名单
    */
   async function approveAndWhitelist(toolCallId: string, payload: AddToWhitelistPayload) {
-    if (!currentConversationId.value)
+    const conversationId = currentConversationId.value
+    if (!conversationId)
       return false
 
     // 立即更新 UI
-    removePendingApproval(toolCallId)
-    setToolCallExecuting(toolCallId)
+    removePendingApproval(toolCallId, conversationId)
+    setToolCallExecuting(toolCallId, conversationId)
 
     const success = await approveToolCall(
-      currentConversationId.value,
+      conversationId,
       toolCallId,
       true,
       undefined,
@@ -980,11 +1167,12 @@ export const useChatStore = defineStore('chat', () => {
    * 提交提问回答
    */
   async function submitQuestionAnswer(toolCallId: string, answers: QuestionAnswer[]) {
+    const conversationId = currentConversationId.value
     // 移除待回答状态
-    removePendingQuestion(toolCallId)
+    removePendingQuestion(toolCallId, conversationId)
 
     // 将工具状态切换为 pending（等待服务端处理结果）
-    setToolCallExecuting(toolCallId)
+    setToolCallExecuting(toolCallId, conversationId)
 
     const success = await answerQuestion(toolCallId, answers)
     return success
@@ -993,9 +1181,11 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 加载白名单规则
    */
-  async function loadWhitelistRules() {
-    const rules = await fetchWhitelistRules(currentConversationId.value || undefined)
-    whitelistRules.value = rules
+  async function loadWhitelistRules(conversationId: string | null = currentConversationId.value) {
+    const rules = await fetchWhitelistRules(conversationId || undefined)
+    if (conversationId === currentConversationId.value) {
+      whitelistRules.value = rules
+    }
   }
 
   /**
@@ -1034,8 +1224,10 @@ export const useChatStore = defineStore('chat', () => {
    * 保存编辑后的消息并重新发送
    */
   async function saveEditMessage(messageId: string, newContent: string) {
-    const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    const conversationId = currentConversationId.value
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
       console.warn('[saveEditMessage] 未找到消息:', messageId)
       return
@@ -1056,7 +1248,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 保存之前的历史
-    const historyBeforeEdit = messages.value.slice(0, messageIndex)
+    const historyBeforeEdit = runtimeState.messages.slice(0, messageIndex)
 
     // 计算后端需要保留的消息数量
     let backendKeepCount = 0
@@ -1068,15 +1260,15 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 通知后端截断消息
-    if (currentConversationId.value) {
-      await truncateMessages(currentConversationId.value, backendKeepCount)
+    if (conversationId) {
+      await truncateMessages(conversationId, backendKeepCount)
     }
 
     // 删除前端的本地消息
-    messages.value = historyBeforeEdit
+    runtimeState.messages = historyBeforeEdit
 
     // 发送编辑后的新内容（带历史）
-    await sendMessage(newContent.trim(), messagesToCoreMessages(historyBeforeEdit))
+    await sendMessage(newContent.trim(), messagesToCoreMessages(historyBeforeEdit), conversationId ?? undefined)
   }
 
   /**
@@ -1084,8 +1276,10 @@ export const useChatStore = defineStore('chat', () => {
    * 删除该消息及之后的所有消息，然后重新发送
    */
   async function retryFromMessage(messageId: string) {
-    const messageIndex = messages.value.findIndex(m => m.id === messageId)
-    const message = messageIndex !== -1 ? messages.value[messageIndex] : undefined
+    const conversationId = currentConversationId.value
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
       console.warn('[retryFromMessage] 未找到消息:', messageId)
       return
@@ -1098,7 +1292,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 保存消息内容和之前的历史
     const content = message.content
-    const historyBeforeRetry = messages.value.slice(0, messageIndex)
+    const historyBeforeRetry = runtimeState.messages.slice(0, messageIndex)
 
     // 计算后端需要保留的消息数量
     // 前端跳过了 tool 消息，所以需要根据 assistant 的 toolCalls 推算
@@ -1111,15 +1305,15 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 通知后端截断消息
-    if (currentConversationId.value) {
-      await truncateMessages(currentConversationId.value, backendKeepCount)
+    if (conversationId) {
+      await truncateMessages(conversationId, backendKeepCount)
     }
 
     // 删除前端的本地消息
-    messages.value = historyBeforeRetry
+    runtimeState.messages = historyBeforeRetry
 
     // 重新发送消息，带上历史
-    await sendMessage(content, messagesToCoreMessages(historyBeforeRetry))
+    await sendMessage(content, messagesToCoreMessages(historyBeforeRetry), conversationId ?? undefined)
   }
 
   return {

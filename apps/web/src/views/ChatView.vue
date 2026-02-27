@@ -32,7 +32,12 @@ const { data: conversationData } = useConversationQuery(
 // 但此时 GET /api/conversations/:id 可能返回 404（会话尚未被 POST 创建），
 // 导致 data===null 分支调用 newConversation() 清空前端消息。
 watch(conversationData, (data) => {
-  if (!chatStore.currentConversationId)
+  const activeConversationId = chatStore.currentConversationId
+  if (!activeConversationId)
+    return
+
+  // Guard against stale async query results from other conversations.
+  if (data && data.conversation.id !== activeConversationId)
     return
 
   // streaming 或 loading 期间，前端消息由 sendMessage 乐观管理，不被服务端数据覆盖
@@ -40,7 +45,7 @@ watch(conversationData, (data) => {
     return
 
   if (data) {
-    chatStore.applyConversationData(data)
+    chatStore.applyConversationData(data, activeConversationId)
   }
   else if (data === null) {
     // 会话未找到，重置状态
@@ -124,10 +129,10 @@ async function handleSend(content: string) {
   if (!content.trim())
     return
 
-  await chatStore.sendMessage(content)
+  const targetConversationId = await chatStore.sendMessage(content)
   // 标记会话为已修改，刷新会话列表
-  if (chatStore.currentConversationId) {
-    dirtyConversations.add(chatStore.currentConversationId)
+  if (targetConversationId) {
+    dirtyConversations.add(targetConversationId)
   }
   queryCache.invalidateQueries({ key: ['conversations'] })
 }
