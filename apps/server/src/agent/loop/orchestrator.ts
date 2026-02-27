@@ -44,13 +44,7 @@ You have access to a persistent memory system via save_memory and search_memorie
 
 When generating diagrams or visual representations:
 
-1. **Primary choice**: these following Mermaid formats are supported:
-  - flowchart
-  - sequenceDiagram
-  - classDiagram
-  - erDiagram
-  - stateDiagram
-  - xychart
+1. **Primary choice**: Generate Mermaid diagrams, in code block format.
 2. Or use ASCII art as fallback.
 `
 

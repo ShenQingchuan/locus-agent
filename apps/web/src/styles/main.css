@@ -205,13 +205,14 @@ body {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* shadcn v2: Constrained transitions - 150-200ms, no bounce */
+/* shadcn v2: Constrained transitions - 150-200ms, no bounce.
+   transition-property defaults to none so only interactive elements animate. */
 * {
   transition-timing-function: ease;
   transition-duration: 150ms;
+  transition-property: none;
 }
 
-/* Only apply transitions to interactive states */
 button,
 a,
 input,
@@ -290,6 +291,22 @@ select,
 .markstream-vue .heading-node {
   margin-top: 1.5rem;
   margin-bottom: 1rem;
+}
+
+/* 覆盖 markstream-vue 默认 heading 字号，整体缩小一级 */
+.markstream-vue .heading-1 {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+}
+
+.markstream-vue .heading-2 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.markstream-vue .heading-3 {
+  font-size: 1.125rem;
+  line-height: 1.5rem;
 }
 
 .markstream-vue .list-node {
