@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import presetTypography from '@unocss/preset-typography'
-import { defineConfig, presetIcons, presetWebFonts, presetWind4 } from 'unocss'
+import { defineConfig, presetIcons, presetWebFonts, presetWind4, transformerDirectives } from 'unocss'
 
 const moonshotSvg = readFileSync(new URL('./public/moonshot.svg', import.meta.url), 'utf-8')
 
@@ -217,4 +217,7 @@ export default defineConfig({
     // Popover - shadcn v2: only popovers have subtle shadow
     'popover-content': 'rounded-lg border bg-popover text-popover-foreground shadow-md',
   },
+  transformers: [
+    transformerDirectives(),
+  ],
 })
