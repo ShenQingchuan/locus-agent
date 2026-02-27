@@ -73,6 +73,18 @@ mcpRoutes.get('/status', (c) => {
 })
 
 /**
+ * GET /api/mcp/logs — 获取 MCP 聚合日志（最多最近 1000 行）
+ */
+mcpRoutes.get('/logs', (c) => {
+  const limitRaw = c.req.query('limit')
+  const parsed = Number.parseInt(limitRaw ?? '', 10)
+  const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 1000) : 1000
+  return c.json({
+    lines: mcpManager.getLogs(limit),
+  })
+})
+
+/**
  * POST /api/mcp/restart — 重启所有 MCP 连接
  */
 mcpRoutes.post('/restart', async (c) => {

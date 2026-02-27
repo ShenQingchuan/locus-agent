@@ -52,7 +52,8 @@
     "drizzle-orm": "catalog:database",
     "hono": "catalog:hono-family",
     "sqlite-vec": "catalog:embedding",
-    "zod": "catalog:ai-sdk"
+    "zod": "catalog:ai-sdk",
+    "consola": "catalog:cli-tools"
   },
   "devDependencies": {
     "@types/bun": "catalog:bun-family",

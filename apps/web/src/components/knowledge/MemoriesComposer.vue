@@ -3,12 +3,11 @@ import type { NoteEditorChange } from '@locus-agent/shared'
 import { ref } from 'vue'
 import NoteEditor from './NoteEditor.vue'
 
-const composerKey = ref(0)
-const composerData = ref<NoteEditorChange | null>(null)
-
 const emit = defineEmits<{
   publish: [data: NoteEditorChange]
 }>()
+const composerKey = ref(0)
+const composerData = ref<NoteEditorChange | null>(null)
 
 defineExpose({
   composerKey,

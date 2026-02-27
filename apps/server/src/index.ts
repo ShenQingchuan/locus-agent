@@ -1,3 +1,4 @@
+import consola from 'consola'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -47,7 +48,7 @@ export function createApp(): Hono {
   // 启动时异步预加载 embedding 模型（ensureModelLoaded 内部已检查磁盘缓存）
   ensureModelLoaded().then((loaded) => {
     if (loaded)
-      console.log('[embedding] Model auto-loaded from cache on startup')
+      consola.log('[embedding] Model auto-loaded from cache on startup')
   }).catch((err) => {
     console.warn('[embedding] Failed to auto-load model on startup:', err)
   })

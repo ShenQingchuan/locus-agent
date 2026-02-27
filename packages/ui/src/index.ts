@@ -2,11 +2,11 @@ export { default as CommandPalette } from './components/CommandPalette.vue'
 export type { CommandGroup, CommandItem } from './components/CommandPalette.vue'
 // Components
 export { default as Dropdown } from './components/Dropdown.vue'
-export { default as Modal } from './components/Modal.vue'
 // Re-export component prop types
 export type { DropdownItem } from './components/Dropdown.vue'
 export { default as List, type ListItemSelectMode } from './components/List.vue'
 export { default as ListItem, type ListItemAction } from './components/ListItem.vue'
+export { default as Modal } from './components/Modal.vue'
 export { default as Select } from './components/Select.vue'
 export type { SelectOption } from './components/Select.vue'
 

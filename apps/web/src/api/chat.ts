@@ -770,6 +770,23 @@ export async function fetchMCPStatus(): Promise<MCPServerStatus[]> {
   }
 }
 
+export async function fetchMCPLogs(limit = 1000): Promise<string[]> {
+  try {
+    const safeLimit = Math.max(1, Math.min(limit, 1000))
+    const response = await fetch(`/api/mcp/logs?limit=${safeLimit}`)
+    if (!response.ok)
+      return []
+    const json = await response.json().catch(() => null) as { lines?: string[] } | null
+    if (!json?.lines || !Array.isArray(json.lines))
+      return []
+    return json.lines
+  }
+  catch (error) {
+    console.error('Failed to fetch MCP logs:', error)
+    return []
+  }
+}
+
 export async function restartMCPServer(
   name?: string,
 ): Promise<{ success: boolean, message?: string, status?: MCPServerStatus[] }> {

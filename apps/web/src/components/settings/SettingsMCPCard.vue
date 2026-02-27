@@ -4,6 +4,7 @@ import { Switch, useToast } from '@locus-agent/ui'
 import { onMounted, ref } from 'vue'
 import {
   fetchMCPConfig,
+  fetchMCPLogs,
   fetchMCPStatus,
   restartMCPServer,
   updateMCPConfig,
@@ -23,6 +24,9 @@ const mcpJsonText = ref('')
 const mcpJsonError = ref<string | null>(null)
 const isMcpSaving = ref(false)
 const isMcpRestarting = ref(false)
+const isMcpLogPanelOpen = ref(false)
+const isMcpLogsLoading = ref(false)
+const mcpLogs = ref<string[]>([])
 
 /** 已展开工具列表的 server 名称集合 */
 const expandedTools = ref<Set<string>>(new Set())
@@ -30,7 +34,7 @@ const expandedTools = ref<Set<string>>(new Set())
 /** 添加新 server 的临时表单 */
 const showAddForm = ref(false)
 const newServerMode = ref<'stdio' | 'url'>('stdio')
-const newServer = ref({ name: '', command: '', args: '', url: '', transportType: 'sse' as 'sse' | 'http', headersText: '' })
+const newServer = ref({ name: '', command: '', args: '', url: '', transportType: 'http' as 'sse' | 'http', headersText: '' })
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,6 +74,25 @@ async function loadMCP() {
   mcpServers.value = config?.mcpServers ?? {}
   mcpStatus.value = status
   syncJsonText()
+}
+
+async function loadMCPLogs() {
+  if (isMcpLogsLoading.value)
+    return
+  isMcpLogsLoading.value = true
+  try {
+    mcpLogs.value = await fetchMCPLogs(1000)
+  }
+  finally {
+    isMcpLogsLoading.value = false
+  }
+}
+
+async function toggleMCPLogsPanel() {
+  isMcpLogPanelOpen.value = !isMcpLogPanelOpen.value
+  if (isMcpLogPanelOpen.value) {
+    await loadMCPLogs()
+  }
 }
 
 function syncJsonText() {
@@ -162,7 +185,7 @@ async function onRestartOne(name: string) {
 }
 
 function resetAddForm() {
-  newServer.value = { name: '', command: '', args: '', url: '', transportType: 'sse', headersText: '' }
+  newServer.value = { name: '', command: '', args: '', url: '', transportType: 'http', headersText: '' }
   newServerMode.value = 'stdio'
 }
 
@@ -323,6 +346,14 @@ onMounted(() => {
         >
           <div v-if="mcpJsonMode" class="i-material-symbols:format-list-bulleted-rounded h-4 w-4" />
           <div v-else class="i-carbon-code h-4 w-4" />
+        </button>
+        <button
+          class="btn-ghost btn-icon"
+          :title="isMcpLogPanelOpen ? '收起 MCP 日志' : '查看 MCP 日志'"
+          :class="{ 'text-primary': isMcpLogPanelOpen }"
+          @click="toggleMCPLogsPanel"
+        >
+          <div class="i-carbon-terminal h-4 w-4" />
         </button>
         <button
           class="btn-ghost btn-icon"
@@ -505,17 +536,17 @@ onMounted(() => {
           <template v-else>
             <div class="grid gap-1.5">
               <label class="text-xs text-muted-foreground">URL</label>
-              <input v-model="newServer.url" class="input-field font-mono" type="text" placeholder="https://mcp.example.com/sse">
+              <input v-model="newServer.url" class="input-field font-mono" type="text" placeholder="https://mcp.example.com/mcp">
             </div>
             <div class="grid gap-1.5">
               <label class="text-xs text-muted-foreground">协议</label>
               <div class="relative">
                 <select v-model="newServer.transportType" class="select-field">
-                  <option value="sse">
-                    SSE（Server-Sent Events）
-                  </option>
                   <option value="http">
                     Streamable HTTP
+                  </option>
+                  <option value="sse">
+                    SSE（Server-Sent Events）
                   </option>
                 </select>
                 <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -555,6 +586,34 @@ onMounted(() => {
           添加 MCP Server
         </button>
       </template>
+
+      <div v-if="isMcpLogPanelOpen" class="mt-3 rounded-lg border border-border">
+        <div class="px-3 py-2 flex items-center justify-between">
+          <div class="text-xs font-medium text-foreground">
+            MCP 日志（最近 1000 行）
+          </div>
+          <button
+            class="btn-ghost btn-sm"
+            :disabled="isMcpLogsLoading"
+            @click="loadMCPLogs"
+          >
+            <span v-if="isMcpLogsLoading" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1.5" />
+            刷新
+          </button>
+        </div>
+        <div class="border-t border-border p-3">
+          <div v-if="isMcpLogsLoading" class="text-xs text-muted-foreground">
+            正在加载日志...
+          </div>
+          <div v-else-if="mcpLogs.length === 0" class="text-xs text-muted-foreground">
+            暂无 MCP 日志
+          </div>
+          <pre
+            v-else
+            class="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-foreground/90"
+          >{{ mcpLogs.join('\n') }}</pre>
+        </div>
+      </div>
     </div>
   </section>
 </template>

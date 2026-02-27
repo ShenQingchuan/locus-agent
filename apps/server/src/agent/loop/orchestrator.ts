@@ -39,6 +39,14 @@ You have access to a persistent memory system via save_memory and search_memorie
 - Use multi-level tags like "preference/code-style", "project/my-app", "lesson/debugging"
 - Do NOT search memories on every single turn — only when relevant context would help
 - Do NOT save trivial or ephemeral information (e.g. "user said hello")
+
+## Diagram Generation
+
+When generating diagrams or visual representations:
+
+1. **Primary choice**: Use Mermaid syntax (flowcharts, sequence diagrams, class diagrams, etc.)
+   - Provides better readability, maintainability, and rendering quality
+2. **Second choice**: Use ASCII art as a fallback diagram type
 `
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {

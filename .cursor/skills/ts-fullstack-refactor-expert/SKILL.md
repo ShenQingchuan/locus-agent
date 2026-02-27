@@ -35,7 +35,7 @@ Priority order:
 
 ## Default Workflow (Balanced)
 
-Use the full 5-step flow for medium/large refactors.  
+Use the full 5-step flow for medium/large refactors.
 For tiny edits, keep steps 1, 4, and 5 lightweight but never skip them.
 
 1) Baseline
