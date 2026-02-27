@@ -47,7 +47,7 @@ function handleTagTreeSelect(node: TreeNode) {
         @click="handleSelectAll"
       >
         <div class="i-carbon-notebook h-4 w-4 opacity-60" />
-        <span class="font-mono">全部记忆</span>
+        <span>全部记忆</span>
         <span class="ml-auto text-xs text-muted-foreground font-mono">{{ notesCount }}</span>
       </button>
     </div>

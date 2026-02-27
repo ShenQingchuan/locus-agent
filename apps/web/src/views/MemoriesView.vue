@@ -4,7 +4,7 @@ import type { TreeNode } from '@locus-agent/ui'
 import type { TagTreeData } from '@/utils/tagTree'
 import { useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
-import { onClickOutside } from '@vueuse/core'
+import { onClickOutside, onKeyStroke } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import * as api from '@/api/knowledge'
 import AppNavRail from '@/components/AppNavRail.vue'
@@ -232,6 +232,13 @@ watch(pendingTagSelection, (sel) => {
   activeTagPath.value = sel.tagName
   store.search('')
   pendingTagSelection.value = null
+})
+
+// ESC to cancel editing (only when not in modal)
+onKeyStroke('Escape', () => {
+  if (editingNoteId.value && !showAddTagsModal.value) {
+    cancelEditing()
+  }
 })
 </script>
 

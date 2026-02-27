@@ -2,7 +2,7 @@
 import type { Tag, TagWithCount } from '@locus-agent/shared'
 import type { TreeNode } from '@locus-agent/ui'
 import type { TagTreeData } from '@/utils/tagTree'
-import { Tree } from '@locus-agent/ui'
+import { Modal, Tree } from '@locus-agent/ui'
 import { computed, ref, watch } from 'vue'
 import { buildTagTree } from '@/utils/tagTree'
 
@@ -97,119 +97,112 @@ function handleSave() {
   emit('close')
 }
 
-function handleCancel() {
+function handleClose() {
   emit('close')
 }
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      @click.self="handleCancel"
-    >
-      <div
-        class="w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-lg max-h-[80vh] flex flex-col"
-        @click.stop
+  <Modal
+    :open="open"
+    max-width="max-w-md"
+    @close="handleClose"
+  >
+    <h3 class="text-sm font-semibold text-foreground font-mono mb-3">
+      管理标签
+    </h3>
+
+    <div class="flex gap-2 mb-3">
+      <input
+        v-model="input"
+        type="text"
+        placeholder="新建或搜索标签..."
+        class="flex-1 h-9 px-3 rounded-md border border-border bg-transparent text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        @keydown.enter.prevent="addNew"
       >
-        <h3 class="text-sm font-semibold text-foreground font-mono mb-3">
-          管理标签
-        </h3>
+      <button
+        class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 font-mono"
+        :disabled="!input.trim()"
+        @click="addNew"
+      >
+        添加
+      </button>
+    </div>
 
-        <div class="flex gap-2 mb-3">
-          <input
-            v-model="input"
-            type="text"
-            placeholder="新建或搜索标签..."
-            class="flex-1 h-9 px-3 rounded-md border border-border bg-transparent text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            @keydown.enter.prevent="addNew"
-          >
-          <button
-            class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 font-mono"
-            :disabled="!input.trim()"
-            @click="addNew"
-          >
-            添加
-          </button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto min-h-24 border border-border rounded-md p-2">
-          <template v-if="tagTree.length > 0 || customTagNames.length > 0">
-            <Tree
-              v-if="tagTree.length > 0"
-              :nodes="tagTree"
-              :item-height="32"
-              :indent="16"
-              :default-expanded="defaultExpandedTagIds"
-              container-class="min-h-20"
-            >
-              <template #default="{ node, hasChildren }">
-                <div
-                  class="flex items-center gap-2 flex-1 min-w-0 py-0.5"
-                  :class="(node.data as TagTreeData).tagId ? 'cursor-pointer' : ''"
-                  @click.stop="handleLeafClick(node)"
-                >
-                  <div
-                    v-if="(node.data as TagTreeData).tagId"
-                    class="h-4 w-4 rounded border flex items-center justify-center flex-shrink-0"
-                    :class="isSelected(node.id) ? 'bg-primary border-primary' : 'border-border'"
-                  >
-                    <div v-if="isSelected(node.id)" class="i-carbon-checkmark h-2.5 w-2.5 text-primary-foreground" />
-                  </div>
-                  <div
-                    v-else
-                    class="h-4 w-4 flex-shrink-0 opacity-50"
-                    :class="hasChildren ? 'i-carbon-folder' : 'i-carbon-tag'"
-                  />
-                  <span class="text-sm text-foreground truncate font-mono">{{ node.label }}</span>
-                  <span class="ml-auto text-[10px] text-muted-foreground flex-shrink-0 font-mono">
-                    {{ (node.data as TagTreeData).noteCount }}
-                  </span>
-                </div>
-              </template>
-            </Tree>
+    <div class="flex-1 overflow-y-auto min-h-24 border border-border rounded-md p-2">
+      <template v-if="tagTree.length > 0 || customTagNames.length > 0">
+        <Tree
+          v-if="tagTree.length > 0"
+          :nodes="tagTree"
+          :item-height="32"
+          :indent="16"
+          :default-expanded="defaultExpandedTagIds"
+          container-class="min-h-20"
+        >
+          <template #default="{ node, hasChildren }">
             <div
-              v-for="name in customTagNames"
-              :key="`custom-${name}`"
-              class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent/50 cursor-pointer mt-1"
-              @click="toggle({ id: '', name, createdAt: new Date() })"
+              class="flex items-center gap-2 flex-1 min-w-0 py-0.5"
+              :class="(node.data as TagTreeData).tagId ? 'cursor-pointer' : ''"
+              @click.stop="handleLeafClick(node)"
             >
               <div
+                v-if="(node.data as TagTreeData).tagId"
                 class="h-4 w-4 rounded border flex items-center justify-center flex-shrink-0"
-                :class="isSelected(name) ? 'bg-primary border-primary' : 'border-border'"
+                :class="isSelected(node.id) ? 'bg-primary border-primary' : 'border-border'"
               >
-                <div v-if="isSelected(name)" class="i-carbon-checkmark h-2.5 w-2.5 text-primary-foreground" />
+                <div v-if="isSelected(node.id)" class="i-carbon-checkmark h-2.5 w-2.5 text-primary-foreground" />
               </div>
-              <span class="text-sm text-foreground truncate font-mono">{{ name }}</span>
-              <span class="ml-auto text-[10px] text-muted-foreground/60 font-mono">新建</span>
+              <div
+                v-else
+                class="h-4 w-4 flex-shrink-0 opacity-50"
+                :class="hasChildren ? 'i-carbon-folder' : 'i-carbon-tag'"
+              />
+              <span class="text-sm text-foreground truncate font-mono">{{ node.label }}</span>
+              <span class="ml-auto text-[10px] text-muted-foreground flex-shrink-0 font-mono">
+                {{ (node.data as TagTreeData).noteCount }}
+              </span>
             </div>
           </template>
-          <div v-else class="h-full min-h-20 flex flex-col items-center justify-center text-center text-sm text-muted-foreground/70 py-6 font-mono">
-            <div class="i-carbon-tag-group h-8 w-8 mb-2 opacity-40" />
-            <p>暂无标签</p>
-            <p class="text-xs mt-0.5">
-              在上方输入框创建新标签
-            </p>
+        </Tree>
+        <div
+          v-for="name in customTagNames"
+          :key="`custom-${name}`"
+          class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent/50 cursor-pointer mt-1"
+          @click="toggle({ id: '', name, createdAt: new Date() })"
+        >
+          <div
+            class="h-4 w-4 rounded border flex items-center justify-center flex-shrink-0"
+            :class="isSelected(name) ? 'bg-primary border-primary' : 'border-border'"
+          >
+            <div v-if="isSelected(name)" class="i-carbon-checkmark h-2.5 w-2.5 text-primary-foreground" />
           </div>
+          <span class="text-sm text-foreground truncate font-mono">{{ name }}</span>
+          <span class="ml-auto text-[10px] text-muted-foreground/60 font-mono">新建</span>
         </div>
-
-        <div class="mt-4 flex justify-end gap-2">
-          <button
-            class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-accent transition-colors font-mono"
-            @click="handleCancel"
-          >
-            取消
-          </button>
-          <button
-            class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 font-mono"
-            :disabled="!hasChanges"
-            @click="handleSave"
-          >
-            保存
-          </button>
-        </div>
+      </template>
+      <div v-else class="h-full min-h-20 flex flex-col items-center justify-center text-center text-sm text-muted-foreground/70 py-6 font-mono">
+        <div class="i-carbon-tag-group h-8 w-8 mb-2 opacity-40" />
+        <p>暂无标签</p>
+        <p class="text-xs mt-0.5">
+          在上方输入框创建新标签
+        </p>
       </div>
     </div>
-  </Teleport>
+
+    <div class="mt-4 flex justify-end gap-2">
+      <button
+        class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-accent transition-colors font-mono"
+        @click="handleClose"
+      >
+        取消
+      </button>
+      <button
+        class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 font-mono"
+        :disabled="!hasChanges"
+        @click="handleSave"
+      >
+        保存
+      </button>
+    </div>
+  </Modal>
 </template>

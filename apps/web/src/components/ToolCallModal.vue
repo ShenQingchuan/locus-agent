@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onKeyStroke } from '@vueuse/core'
+import { Modal } from '@locus-agent/ui'
 import { computed, watch } from 'vue'
 
 const props = defineProps<{
@@ -16,13 +16,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
-
-onKeyStroke('Escape', (e) => {
-  if (props.visible) {
-    e.preventDefault()
-    emit('close')
-  }
-})
 
 watch(() => props.visible, (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
@@ -85,79 +78,69 @@ const statusLabel = computed(() => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
+  <Modal
+    :open="visible"
+    max-width="max-w-2xl"
+    panel-class="rounded-xl border-white/10 shadow-2xl"
+    @close="emit('close')"
+  >
+    <!-- Header -->
+    <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 flex-shrink-0">
       <div
-        v-if="visible"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="h-4 w-4 flex-shrink-0"
+        :class="[statusIcon, statusIconClass]"
+      />
+      <code class="text-sm font-mono font-medium text-foreground">{{ toolName }}</code>
+      <span class="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal">
+        {{ statusLabel }}
+      </span>
+      <button
+        class="ml-2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        @click="emit('close')"
       >
-        <!-- Backdrop -->
-        <div
-          class="absolute inset-0 bg-black/40 backdrop-blur-sm"
-          @click="emit('close')"
-        />
+        <div class="i-carbon-close h-4 w-4" />
+      </button>
+    </div>
 
-        <!-- Panel -->
-        <div class="relative bg-background border border-white/10 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-          <!-- Header -->
-          <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 flex-shrink-0">
-            <div
-              class="h-4 w-4 flex-shrink-0"
-              :class="[statusIcon, statusIconClass]"
-            />
-            <code class="text-sm font-mono font-medium text-foreground">{{ toolName }}</code>
-            <span class="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal">
-              {{ statusLabel }}
-            </span>
-            <button
-              class="ml-2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              @click="emit('close')"
-            >
-              <div class="i-carbon-close h-4 w-4" />
-            </button>
-          </div>
+    <!-- Content -->
+    <div class="overflow-y-auto flex-1 p-4 space-y-4">
+      <section>
+        <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          参数
+        </h3>
+        <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedArgs }}</pre>
+      </section>
 
-          <!-- Content -->
-          <div class="overflow-y-auto flex-1 p-4 space-y-4">
-            <section>
-              <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                参数
-              </h3>
-              <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedArgs }}</pre>
-            </section>
-
-            <!-- Results -->
-            <section v-if="result !== undefined && !hideResult">
-              <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                结果
-              </h3>
-              <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedResult }}</pre>
-            </section>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+      <!-- Results -->
+      <section v-if="result !== undefined && !hideResult">
+        <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          结果
+        </h3>
+        <pre class="text-xs font-mono bg-muted rounded-md p-3 whitespace-pre-wrap break-all overflow-y-auto max-h-60 text-foreground">{{ formattedResult }}</pre>
+      </section>
+    </div>
+  </Modal>
 </template>
 
 <style scoped>
-.modal-enter-active,
-.modal-leave-active {
+/* Keep modal transitions from original */
+:deep(.modal-enter-active),
+:deep(.modal-leave-active) {
   transition: opacity 150ms ease;
 }
 
-.modal-enter-from,
-.modal-leave-to {
+:deep(.modal-enter-from),
+:deep(.modal-leave-to) {
   opacity: 0;
 }
 
-.modal-enter-active .relative,
-.modal-leave-active .relative {
+:deep(.modal-enter-active) .relative,
+:deep(.modal-leave-active) .relative {
   transition: opacity 150ms ease, transform 150ms ease;
 }
 
-.modal-enter-from .relative,
-.modal-leave-to .relative {
+:deep(.modal-enter-from) .relative,
+:deep(.modal-leave-to) .relative {
   transform: scale(0.96);
 }
 </style>
