@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useToast } from '@locus-agent/ui'
+import { useThrottleFn } from '@vueuse/core'
 import { computed, onMounted, ref } from 'vue'
 
 const toast = useToast()
@@ -97,7 +98,7 @@ async function loadEmbeddingStatus() {
   }
 }
 
-async function onDownloadModel() {
+const onDownloadModel = useThrottleFn(async () => {
   embeddingBusy.value = true
   embeddingProgress.value = {}
   embeddingState.value.status = 'downloading'
@@ -129,7 +130,7 @@ async function onDownloadModel() {
     },
   )
   embeddingStreamClose = stream.close
-}
+}, 2000)
 
 async function onCancelDownload() {
   if (embeddingStreamClose) {
@@ -144,7 +145,7 @@ async function onCancelDownload() {
   toast.success('已取消下载')
 }
 
-async function onReindex() {
+const onReindex = useThrottleFn(async () => {
   embeddingBusy.value = true
   embeddingProgress.value = {}
   embeddingState.value.status = 'indexing'
@@ -171,7 +172,7 @@ async function onReindex() {
     },
   )
   embeddingStreamClose = stream.close
-}
+}, 2000)
 
 async function onDismissError() {
   try {
@@ -184,7 +185,7 @@ async function onDismissError() {
   await loadEmbeddingStatus()
 }
 
-async function onDeleteModel() {
+const onDeleteModel = useThrottleFn(async () => {
   embeddingBusy.value = true
   try {
     const { deleteEmbeddingModel } = await import('@/api/embedding')
@@ -199,7 +200,7 @@ async function onDeleteModel() {
     // 从服务器同步最新状态，确保 UI 与后端一致
     await loadEmbeddingStatus()
   }
-}
+}, 2000)
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -338,18 +339,26 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 索引进度 -->
-        <div v-if="embeddingState.status === 'indexing' && embeddingProgress.totalCount" class="space-y-1.5">
-          <div class="h-2 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              class="h-full rounded-full bg-blue-500 transition-all duration-300"
-              :style="{ width: `${embeddingProgress.percent || 0}%` }"
+        <!-- 索引进度：圆环 + 文字 -->
+        <div v-if="embeddingState.status === 'indexing'" class="flex items-center gap-2.5 py-1">
+          <svg class="h-5 w-5 -rotate-90 flex-shrink-0" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2.5" class="text-muted/50" />
+            <circle
+              cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2.5"
+              class="text-blue-500 transition-all duration-300"
+              stroke-linecap="round"
+              :stroke-dasharray="`${2 * Math.PI * 8}`"
+              :stroke-dashoffset="`${2 * Math.PI * 8 * (1 - (embeddingProgress.percent || 0) / 100)}`"
             />
-          </div>
-          <div class="flex justify-between text-[10px] text-muted-foreground">
-            <span>正在索引笔记...</span>
-            <span>{{ embeddingProgress.indexedCount || 0 }} / {{ embeddingProgress.totalCount }}</span>
-          </div>
+          </svg>
+          <span class="text-xs text-muted-foreground">
+            <template v-if="embeddingProgress.totalCount">
+              正在索引 {{ embeddingProgress.indexedCount || 0 }} / {{ embeddingProgress.totalCount }} 条笔记
+            </template>
+            <template v-else>
+              正在准备索引...
+            </template>
+          </span>
         </div>
 
         <!-- 已就绪时的索引信息 -->

@@ -3,8 +3,8 @@ import type { TagWithCount } from '@locus-agent/shared'
 import type { TreeNode } from '@locus-agent/ui'
 import type { TagTreeData } from '@/utils/tagTree'
 import { Tree } from '@locus-agent/ui'
-import { buildTagTree } from '@/utils/tagTree'
 import { computed } from 'vue'
+import { buildTagTree } from '@/utils/tagTree'
 
 const props = defineProps<{
   tags: TagWithCount[]
@@ -47,14 +47,14 @@ function handleTagTreeSelect(node: TreeNode) {
         @click="handleSelectAll"
       >
         <div class="i-carbon-notebook h-4 w-4 opacity-60" />
-        <span>全部记忆</span>
-        <span class="ml-auto text-xs text-muted-foreground">{{ notesCount }}</span>
+        <span class="font-mono">全部记忆</span>
+        <span class="ml-auto text-xs text-muted-foreground font-mono">{{ notesCount }}</span>
       </button>
     </div>
 
     <!-- Tag tree -->
     <div class="flex-1 overflow-hidden px-2 pt-3 pb-2 flex flex-col">
-      <div class="px-3 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      <div class="px-3 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
         标签
       </div>
       <template v-if="tagTree.length > 0">
@@ -78,8 +78,8 @@ function handleTagTreeSelect(node: TreeNode) {
                   class="h-3.5 w-3.5 opacity-50 flex-shrink-0"
                   :class="hasChildren ? 'i-carbon-folder' : 'i-carbon-tag'"
                 />
-                <span class="truncate">{{ node.label }}</span>
-                <span class="ml-auto text-[11px] text-muted-foreground/60 flex-shrink-0">
+                <span class="truncate font-mono">{{ node.label }}</span>
+                <span class="ml-auto text-[11px] text-muted-foreground/60 flex-shrink-0 font-mono">
                   {{ (node.data as TagTreeData).noteCount }}
                 </span>
               </div>

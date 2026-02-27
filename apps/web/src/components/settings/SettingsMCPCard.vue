@@ -346,9 +346,6 @@ onMounted(() => {
         <p v-if="mcpJsonError" class="text-xs text-red-500 mt-1">
           {{ mcpJsonError }}
         </p>
-        <p class="text-xs text-muted-foreground/60 mt-1">
-          可直接粘贴 Cursor / Claude Code 的 mcp.json 内容。
-        </p>
         <div class="mt-3 flex items-center justify-end">
           <button
             class="btn-primary btn-sm"

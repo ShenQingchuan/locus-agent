@@ -9,9 +9,9 @@ import { computed, nextTick, ref, watch } from 'vue'
 import * as api from '@/api/knowledge'
 import AppNavRail from '@/components/AppNavRail.vue'
 import AddTagsModal from '@/components/knowledge/AddTagsModal.vue'
-import MemoryNoteCard from '@/components/knowledge/MemoryNoteCard.vue'
 import MemoriesComposer from '@/components/knowledge/MemoriesComposer.vue'
 import MemoriesTagSidebar from '@/components/knowledge/MemoriesTagSidebar.vue'
+import MemoryNoteCard from '@/components/knowledge/MemoryNoteCard.vue'
 import NoteEditor from '@/components/knowledge/NoteEditor.vue'
 import {
   useNotesListQuery,
@@ -314,12 +314,21 @@ watch(pendingTagSelection, (sel) => {
                 <span class="text-xs text-muted-foreground/60">
                   {{ store.isSaving ? '保存中...' : lastSavedText || '编辑中' }}
                 </span>
-                <button
-                  class="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"
-                  @click="cancelEditing"
-                >
-                  完成
-                </button>
+                <div class="flex items-center gap-1">
+                  <button
+                    class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    title="管理标签"
+                    @click="openTagsModal(editingNoteId!)"
+                  >
+                    <div class="i-carbon-tag h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    class="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"
+                    @click="cancelEditing"
+                  >
+                    完成
+                  </button>
+                </div>
               </div>
             </div>
 

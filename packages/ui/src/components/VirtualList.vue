@@ -11,10 +11,13 @@ const props = withDefaults(defineProps<{
   overscan?: number
   /** Additional class for the scroll container */
   containerClass?: string
+  /** Custom key function for stable DOM identity across re-orders */
+  getItemKey?: (index: number) => string | number
 }>(), {
   estimateSize: 32,
   overscan: 5,
   containerClass: '',
+  getItemKey: undefined,
 })
 
 defineSlots<{
@@ -29,6 +32,7 @@ const virtualizer = useVirtualizer(computed(() => ({
   getScrollElement: () => scrollContainerRef.value,
   estimateSize: () => props.estimateSize,
   overscan: props.overscan,
+  ...(props.getItemKey ? { getItemKey: props.getItemKey } : {}),
 })))
 
 const virtualItems = computed(() => virtualizer.value.getVirtualItems())

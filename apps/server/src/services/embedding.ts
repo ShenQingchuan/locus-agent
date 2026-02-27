@@ -97,6 +97,29 @@ export function isModelLoaded(): boolean {
 }
 
 /**
+ * 确保模型已加载到内存。
+ * 如果模型已缓存到磁盘但未加载（如服务器重启后），自动加载。
+ * 如果模型未缓存，返回 false（需要用户手动下载）。
+ */
+export async function ensureModelLoaded(): Promise<boolean> {
+  if (_extractor)
+    return true
+
+  if (!isModelCached())
+    return false
+
+  // 模型已缓存，自动加载到内存
+  try {
+    await loadModel()
+    return _extractor !== null
+  }
+  catch (err) {
+    console.warn('[embedding] Failed to auto-load cached model:', err)
+    return false
+  }
+}
+
+/**
  * 释放模型，回收内存
  */
 export async function unloadModel(): Promise<void> {
@@ -122,10 +145,13 @@ export async function deleteModelCache(): Promise<void> {
  * 此函数用于存储（passage）和查询（query）时分别传入对应文本
  */
 export async function embed(text: string): Promise<Float32Array> {
-  if (!_extractor)
-    throw new Error('Embedding model not loaded. Call loadModel() first.')
+  if (!_extractor) {
+    const loaded = await ensureModelLoaded()
+    if (!loaded)
+      throw new Error('Embedding model not loaded. Call loadModel() first.')
+  }
 
-  const output = await _extractor(text, { pooling: 'mean', normalize: true })
+  const output = await _extractor!(text, { pooling: 'mean', normalize: true })
   return new Float32Array((output.data as Float32Array).buffer, 0, EMBEDDING_DIM)
 }
 

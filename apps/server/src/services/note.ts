@@ -7,20 +7,20 @@ import { getOrCreateTag } from './tag.js'
 
 /**
  * 异步生成笔记的 embedding 并存入向量数据库（fire-and-forget）
+ * 如果模型已缓存但未加载到内存，会自动加载后再 embed。
  */
 function autoEmbedNote(noteId: string, content: string): void {
   if (!isVecAvailable() || !content.trim())
     return
 
   // 延迟导入避免循环依赖
-  import('./embedding.js').then(({ embedPassage, isModelLoaded }) => {
-    if (!isModelLoaded())
+  import('./embedding.js').then(async ({ embedPassage, ensureModelLoaded }) => {
+    const loaded = await ensureModelLoaded()
+    if (!loaded)
       return
-    return embedPassage(content).then((vector) => {
-      import('./vectorStore.js').then(({ upsertNoteEmbedding }) => {
-        upsertNoteEmbedding(noteId, vector)
-      })
-    })
+    const vector = await embedPassage(content)
+    const { upsertNoteEmbedding } = await import('./vectorStore.js')
+    upsertNoteEmbedding(noteId, vector)
   }).catch((err) => {
     console.warn('[auto-embed] Failed to embed note:', noteId, err)
   })

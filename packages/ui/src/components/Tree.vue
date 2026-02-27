@@ -104,6 +104,10 @@ function getNode(index: number): FlatTreeNode {
   return flatNodes.value[index]!
 }
 
+function getItemKey(index: number): string {
+  return flatNodes.value[index]?.node.id ?? String(index)
+}
+
 // Expose for programmatic control
 defineExpose({
   /** Expand a node by ID */
@@ -145,6 +149,7 @@ defineExpose({
     :estimate-size="itemHeight"
     :overscan="overscan"
     :container-class="containerClass"
+    :get-item-key="getItemKey"
   >
     <template #default="{ index }">
       <div
@@ -159,7 +164,7 @@ defineExpose({
           @click.stop="toggleExpand(getNode(index).node)"
         >
           <div
-            class="i-carbon-chevron-right h-3.5 w-3.5 text-muted-foreground transition-transform duration-150"
+            class="i-carbon-chevron-right h-3.5 w-3.5 text-muted-foreground"
             :class="getNode(index).expanded && 'rotate-90'"
           />
         </div>

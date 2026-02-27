@@ -43,17 +43,17 @@ function handleDelete(e: Event, noteId: string) {
     </div>
     <div class="px-3 pb-2.5 flex items-center justify-between gap-1">
       <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
-        <span class="text-[11px] text-muted-foreground/50 flex-shrink-0">
+        <span class="text-[11px] text-muted-foreground/50 flex-shrink-0 font-mono">
           {{ formatRelativeDateShort(note.updatedAt) }}
         </span>
         <span
           v-for="tag in note.tags.slice(0, 2)"
           :key="tag.id"
-          class="text-[11px] px-1 py-px rounded bg-secondary/50 text-secondary-foreground/70 truncate"
+          class="text-[11px] px-1 py-px rounded bg-secondary/50 text-secondary-foreground/70 truncate font-mono"
         >
           #{{ tag.name }}
         </span>
-        <span v-if="note.tags.length > 2" class="text-[11px] text-muted-foreground/40">
+        <span v-if="note.tags.length > 2" class="text-[10px] text-muted-foreground font-mono">
           +{{ note.tags.length - 2 }}
         </span>
       </div>

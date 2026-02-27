@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { db } from '../db/index.js'
 import { notes } from '../db/schema.js'
-import { deleteModelCache, embedBatch, loadModel, unloadModel } from '../services/embedding.js'
+import { deleteModelCache, embedBatch, ensureModelLoaded, loadModel, unloadModel } from '../services/embedding.js'
 import {
   clearTransientStatus,
   getEmbeddingStatus,
@@ -14,6 +14,9 @@ export const embeddingRoutes = new Hono()
 
 // 下载取消控制器
 let downloadAbortController: AbortController | null = null
+
+// 防止重复索引
+let reindexing = false
 
 /**
  * GET /api/embedding/status
@@ -168,12 +171,30 @@ embeddingRoutes.post('/reindex', (c) => {
     return c.json({ error: 'sqlite-vec 扩展不可用' }, 400)
   }
 
-  if (!status.embeddingModelLoaded) {
-    return c.json({ error: '模型未加载，请先下载模型' }, 400)
+  if (!status.embeddingModelLoaded && !status.embeddingModelCached) {
+    return c.json({ error: '模型未下载，请先下载模型' }, 400)
+  }
+
+  if (reindexing) {
+    return c.json({ error: '正在索引中，请稍候' }, 409)
   }
 
   return streamSSE(c, async (stream) => {
+    reindexing = true
+
     try {
+      // 如果模型已缓存但未加载到内存（如服务器重启后），自动加载
+      if (!status.embeddingModelLoaded) {
+        const loaded = await ensureModelLoaded()
+        if (!loaded) {
+          await stream.writeSSE({
+            event: 'error',
+            data: JSON.stringify({ status: 'error', message: '模型加载失败' }),
+          })
+          return
+        }
+      }
+
       setTransientStatus('indexing')
 
       // 获取所有笔记
@@ -238,6 +259,9 @@ embeddingRoutes.post('/reindex', (c) => {
         event: 'error',
         data: JSON.stringify({ status: 'error', message }),
       })
+    }
+    finally {
+      reindexing = false
     }
   })
 })
