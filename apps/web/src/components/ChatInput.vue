@@ -6,6 +6,7 @@ import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
+import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
 import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 
 const chatStore = useChatStore()
 const toast = useToast()
+const markDirty = useMarkConversationDirty()
 
 const { textarea, input } = useTextareaAutosize()
 const whitelistOpen = ref(false)
@@ -212,13 +214,16 @@ watch(() => chatStore.focusInputTrigger, async () => {
   textarea.value?.focus()
 })
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!input.value.trim())
     return
 
   if (isEditing.value) {
     // Edit mode: save the edited message and re-send
-    chatStore.saveEditMessage(chatStore.editingMessageId!, input.value)
+    const conversationId = await chatStore.saveEditMessage(chatStore.editingMessageId!, input.value)
+    if (conversationId) {
+      markDirty(conversationId)
+    }
     input.value = ''
     return
   }

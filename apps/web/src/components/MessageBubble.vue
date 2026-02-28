@@ -5,6 +5,7 @@ import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
 import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
+import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
 import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
@@ -15,6 +16,7 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const markDirty = useMarkConversationDirty()
 
 const isUser = computed(() => props.message.role === 'user')
 const isEditing = computed(() => chatStore.editingMessageId === props.message.id)
@@ -47,7 +49,10 @@ function getQuestionData(toolCallId: string) {
 }
 
 async function handleRetry() {
-  await chatStore.retryFromMessage(props.message.id)
+  const conversationId = await chatStore.retryFromMessage(props.message.id)
+  if (conversationId) {
+    markDirty(conversationId)
+  }
 }
 
 function handleEdit() {

@@ -7,6 +7,7 @@ import ChatInput from '@/components/ChatInput.vue'
 import MessageList from '@/components/MessageList.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import { useConversationQuery } from '@/composables/queries'
+import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
@@ -20,6 +21,11 @@ const isSyncingToUrl = ref(false)
 
 // 跟踪已修改的会话（发送过消息），切换时失效缓存
 const dirtyConversations = new Set<string>()
+
+// Provide 标记 dirty 的方法给子组件使用（如重试、编辑消息时）
+provideMarkConversationDirty((conversationId: string) => {
+  dirtyConversations.add(conversationId)
+})
 
 // Pinia Colada 查询：缓存会话消息数据
 const { data: conversationData } = useConversationQuery(

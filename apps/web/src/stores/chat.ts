@@ -1222,20 +1222,21 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 保存编辑后的消息并重新发送
+   * @returns 会话 ID，用于调用方标记 dirtyConversations
    */
-  async function saveEditMessage(messageId: string, newContent: string) {
+  async function saveEditMessage(messageId: string, newContent: string): Promise<string | null> {
     const conversationId = currentConversationId.value
     const runtimeState = getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
       console.warn('[saveEditMessage] 未找到消息:', messageId)
-      return
+      return null
     }
 
     if (message.role !== 'user') {
       console.warn('[saveEditMessage] 只能编辑用户消息')
-      return
+      return null
     }
 
     // 清除编辑状态
@@ -1244,7 +1245,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 如果内容没变，不需要重新发送
     if (newContent.trim() === message.content.trim()) {
-      return
+      return null
     }
 
     // 保存之前的历史
@@ -1269,25 +1270,28 @@ export const useChatStore = defineStore('chat', () => {
 
     // 发送编辑后的新内容（带历史）
     await sendMessage(newContent.trim(), messagesToCoreMessages(historyBeforeEdit), conversationId ?? undefined)
+
+    return conversationId
   }
 
   /**
    * 从指定消息开始重试
    * 删除该消息及之后的所有消息，然后重新发送
+   * @returns 会话 ID，用于调用方标记 dirtyConversations
    */
-  async function retryFromMessage(messageId: string) {
+  async function retryFromMessage(messageId: string): Promise<string | null> {
     const conversationId = currentConversationId.value
     const runtimeState = getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
       console.warn('[retryFromMessage] 未找到消息:', messageId)
-      return
+      return null
     }
 
     if (message.role !== 'user') {
       console.warn('[retryFromMessage] 只能重试用户消息')
-      return
+      return null
     }
 
     // 保存消息内容和之前的历史
@@ -1314,6 +1318,8 @@ export const useChatStore = defineStore('chat', () => {
 
     // 重新发送消息，带上历史
     await sendMessage(content, messagesToCoreMessages(historyBeforeRetry), conversationId ?? undefined)
+
+    return conversationId
   }
 
   return {
