@@ -12,6 +12,7 @@ import {
   deleteWhitelistRule,
   fetchSettingsConfig,
   fetchWhitelistRules,
+  generateConversationTitle,
   streamChat,
   truncateMessages,
   updateConversation,
@@ -901,6 +902,25 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
+   * Generate a title for a conversation using LLM, then update local state
+   */
+  async function generateTitle(conversationId: string) {
+    try {
+      const title = await generateConversationTitle(conversationId)
+      if (title) {
+        // Update the conversation in local state
+        const idx = conversations.value.findIndex(c => c.id === conversationId)
+        if (idx !== -1) {
+          conversations.value[idx] = { ...conversations.value[idx]!, title }
+        }
+      }
+    }
+    catch (err) {
+      console.warn('[chat store] Failed to generate title:', err)
+    }
+  }
+
+  /**
    * 发送消息（或入队）
    * - 如果 LLM 空闲，直接发送
    * - 如果 LLM 正忙（isLoading），将消息放入队列，等待当前请求结束后自动发送
@@ -916,14 +936,26 @@ export const useChatStore = defineStore('chat', () => {
       return null
 
     let conversationId = targetConversationId ?? currentConversationId.value
+    let isNewConversation = false
 
     // Ensure we have a conversation ID
     if (!conversationId) {
       conversationId = crypto.randomUUID()
+      isNewConversation = true
       // Keep current selection in sync for normal user sends.
       if (!targetConversationId) {
         currentConversationId.value = conversationId
       }
+      // Optimistically add to conversations list so sidebar shows it immediately
+      const now = new Date()
+      const optimisticConversation: Conversation = {
+        id: conversationId,
+        title: content.length > 50 ? `${content.substring(0, 50)}...` : content,
+        confirmMode: !yoloMode.value,
+        createdAt: now,
+        updatedAt: now,
+      }
+      conversations.value = [optimisticConversation, ...conversations.value]
     }
 
     const runtimeState = getConversationRuntimeState(conversationId)
@@ -931,9 +963,7 @@ export const useChatStore = defineStore('chat', () => {
     // 如果当前会话正在加载（LLM 忙），把消息加入该会话队列（不添加到消息列表）
     if (runtimeState.isLoading && !historyMessages) {
       const queueItem = { id: crypto.randomUUID(), content }
-      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-push', data: { contentType: typeof content, content, queueItem } }) }).catch(() => {})
       runtimeState.messageQueue.push(queueItem)
-      fetch('http://localhost:51961/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: 'queue-after-push', data: { queueLength: runtimeState.messageQueue.length, firstItem: runtimeState.messageQueue[0], rawQueue: JSON.stringify(runtimeState.messageQueue) } }) }).catch(() => {})
       return conversationId
     }
 
@@ -1007,6 +1037,11 @@ export const useChatStore = defineStore('chat', () => {
           const doneState = getConversationRuntimeState(conversationId)
           doneState.currentStreamingMessageId = null
           doneState.isLoading = false
+
+          // Auto-generate title after first Q&A exchange on a new conversation
+          if (isNewConversation && conversationId) {
+            generateTitle(conversationId)
+          }
         },
         onError: (code, message) => {
           setError({ code, message }, conversationId)
@@ -1408,5 +1443,6 @@ export const useChatStore = defineStore('chat', () => {
     startEditMessage,
     cancelEditMessage,
     saveEditMessage,
+    generateTitle,
   }
 })

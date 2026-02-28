@@ -80,6 +80,7 @@ export async function listConversations(): Promise<Conversation[]> {
 export async function updateConversation(
   id: string,
   data: { title?: string, confirmMode?: boolean },
+  options?: { touch?: boolean },
 ): Promise<Conversation | null> {
   const existing = await getConversation(id)
 
@@ -87,7 +88,10 @@ export async function updateConversation(
     return null
   }
 
-  const updates: Partial<NewConversation> & { updatedAt: Date } = { updatedAt: new Date() }
+  const touch = options?.touch ?? true
+  const updates: Partial<NewConversation> & { updatedAt?: Date } = {}
+  if (touch)
+    updates.updatedAt = new Date()
   if (data.title !== undefined)
     updates.title = data.title
   if (data.confirmMode !== undefined)

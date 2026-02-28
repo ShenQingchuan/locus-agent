@@ -150,6 +150,22 @@ function handleStop() {
 function handleNewChat() {
   chatStore.newConversation()
 }
+
+const isGeneratingTitle = ref(false)
+
+async function handleGenerateTitle() {
+  const conversationId = chatStore.currentConversationId
+  if (!conversationId || isGeneratingTitle.value)
+    return
+  isGeneratingTitle.value = true
+  try {
+    await chatStore.generateTitle(conversationId)
+    queryCache.invalidateQueries({ key: ['conversations'] })
+  }
+  finally {
+    isGeneratingTitle.value = false
+  }
+}
 </script>
 
 <template>
@@ -188,6 +204,18 @@ function handleNewChat() {
         </div>
 
         <div class="flex items-center gap-1">
+          <!-- Generate title button -->
+          <button
+            v-if="chatStore.currentConversationId"
+            class="btn-ghost btn-icon"
+            :class="{ 'opacity-50 pointer-events-none': isGeneratingTitle }"
+            title="智能生成标题"
+            @click="handleGenerateTitle"
+          >
+            <div v-if="isGeneratingTitle" class="i-svg-spinners:ring-resize h-4 w-4" />
+            <div v-else class="i-ix:rename text-lg" />
+          </button>
+
           <!-- New chat button (mobile) -->
           <button
             class="btn-ghost btn-icon sm:hidden"

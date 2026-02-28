@@ -1,4 +1,6 @@
+import { generateText } from 'ai'
 import { Hono } from 'hono'
+import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import {
   conversationExists,
   createConversation,
@@ -74,6 +76,63 @@ conversationsRoutes.delete('/:id', async (c) => {
   }
 
   return c.json({ success: true })
+})
+
+const GENERATE_TITLE_PROMPT = `
+Generate a concise title (max 24 characters) for this conversation.
+Use the same language as the conversation.
+Output ONLY the title text, no quotes or formatting.
+`
+// POST /api/conversations/:id/generate-title - Generate a title using LLM
+conversationsRoutes.post('/:id/generate-title', async (c) => {
+  const conversationId = c.req.param('id')
+
+  const result = await getConversationWithMessages(conversationId)
+  if (!result) {
+    return c.json({ error: 'Conversation not found' }, 404)
+  }
+
+  // Collect the last 2 rounds of Q&A (up to 4 messages: user, assistant, user, assistant)
+  const msgs = result.messages
+  const qaPairs: Array<{ role: string, content: string }> = []
+  for (let i = msgs.length - 1; i >= 0 && qaPairs.length < 4; i--) {
+    const m = msgs[i]!
+    if (m.role === 'user' || m.role === 'assistant') {
+      qaPairs.unshift({ role: m.role, content: m.content })
+    }
+  }
+
+  if (qaPairs.length === 0) {
+    return c.json({ error: 'No messages to generate title from' }, 400)
+  }
+
+  const conversationSnippet = qaPairs
+    .map(m => `${m.role}: ${m.content.slice(0, 50)}`)
+    .join('\n')
+
+  try {
+    const modelInfo = getCurrentModelInfo()
+    const model = createLLMModel(modelInfo.model, false)
+
+    const { text } = await generateText({
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: `${GENERATE_TITLE_PROMPT}\n\n${conversationSnippet}`,
+        },
+      ],
+    })
+
+    const title = text.trim().replace(/^["']|["']$/g, '').slice(0, 24)
+
+    const updated = await updateConversation(conversationId, { title }, { touch: false })
+    return c.json({ success: true, title: updated?.title ?? title, model: `${modelInfo.provider}/${modelInfo.model}` })
+  }
+  catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return c.json({ error: `Failed to generate title: ${errorMessage}` }, 500)
+  }
 })
 
 // POST /api/conversations/:id/messages - Add a message to a conversation

@@ -573,6 +573,32 @@ export async function updateConversation(
 }
 
 /**
+ * Generate a title for a conversation using LLM
+ */
+export async function generateConversationTitle(conversationId: string): Promise<string | null> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/generate-title`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error('Failed to generate title:', response.statusText)
+      return null
+    }
+
+    const data = await response.json()
+    return data.title ?? null
+  }
+  catch (error) {
+    console.error('Failed to generate title:', error)
+    return null
+  }
+}
+
+/**
  * Delete a conversation
  */
 export async function deleteConversation(conversationId: string): Promise<boolean> {
