@@ -95,6 +95,12 @@ async function handleCopy() {
   }
   catch {}
 }
+
+// 代码/预览切换
+const showSource = ref(false)
+function toggleSource() {
+  showSource.value = !showSource.value
+}
 </script>
 
 <template>
@@ -128,6 +134,14 @@ async function handleCopy() {
         <div class="w-px h-3.5 bg-border mx-1" />
         <button
           class="p-1 rounded hover:bg-muted"
+          :class="{ 'bg-muted': showSource }"
+          :title="showSource ? 'Show preview' : 'Show source'"
+          @click="toggleSource"
+        >
+          <div :class="showSource ? 'i-carbon-chart-bar' : 'i-carbon-code'" class="h-3.5 w-3.5" />
+        </button>
+        <button
+          class="p-1 rounded hover:bg-muted"
           title="Copy source"
           @click="handleCopy"
         >
@@ -137,13 +151,20 @@ async function handleCopy() {
       </div>
     </div>
 
-    <div v-if="error && !svgHtml" class="p-4">
+    <!-- 源代码展示 -->
+    <div v-if="showSource" class="p-4">
+      <pre class="text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else-if="error && !svgHtml" class="p-4">
       <p class="text-sm text-red-500 mb-2">
         {{ error }}
       </p>
       <pre class="text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
     </div>
 
+    <!-- Mermaid 渲染图 -->
     <div v-else-if="svgHtml" class="mermaid-svg-container overflow-auto p-4">
       <div
         class="flex justify-center origin-top-left"
@@ -153,6 +174,7 @@ async function handleCopy() {
       </div>
     </div>
 
+    <!-- 加载中 -->
     <div v-else class="flex items-center justify-center p-6">
       <div class="i-svg-spinners:bars-fade h-5 w-5 text-muted-foreground" />
     </div>

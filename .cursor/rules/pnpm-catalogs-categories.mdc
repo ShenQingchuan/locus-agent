@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+安装包一定要先 pnpm view 查询最新正式版本
+然后新增在 pnpm-workspace.yaml 里找适合的 category
+不可以使用无分类的 "catalog:"

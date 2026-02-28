@@ -46,6 +46,7 @@
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
     "@huggingface/transformers": "catalog:embedding",
+    "zhipu-ai-provider": "catalog:ai-sdk",
     "@locus-agent/shared": "workspace:*",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "ai": "catalog:ai-sdk",

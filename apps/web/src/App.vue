@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { SearchCommandItemData } from '@/composables/useGlobalSearch'
 import { CommandPalette, ToastContainer } from '@locus-agent/ui'
-import { RouterView } from 'vue-router'
+import { useMagicKeys, whenever } from '@vueuse/core'
+import { computed } from 'vue'
+import { RouterView, useRouter } from 'vue-router'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
+
+const router = useRouter()
 
 const {
   showCommandPalette,
@@ -12,6 +16,14 @@ const {
   handleCommandSearch,
   handleCommandSelect,
 } = useGlobalSearch()
+
+// Cmd/Ctrl + , 呼出设置页面
+const keys = useMagicKeys()
+const openSettings = computed(() => !!(keys['Cmd+,']?.value || keys['Ctrl+,']?.value))
+
+whenever(openSettings, () => {
+  router.push({ name: 'settings' })
+})
 </script>
 
 <template>

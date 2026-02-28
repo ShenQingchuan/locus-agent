@@ -30,6 +30,9 @@ catalogs:
     ai:
       specifier: ^6.0.73
       version: 6.0.73
+    zhipu-ai-provider:
+      specifier: ^0.2.2
+      version: 0.2.2
     zod:
       specifier: ^4.3.6
       version: 4.3.6
@@ -140,6 +143,9 @@ catalogs:
     js-tiktoken:
       specifier: ^1.0.21
       version: 1.0.21
+    katex:
+      specifier: ^0.16.33
+      version: 0.16.33
     markstream-vue:
       specifier: ^0.0.6
       version: 0.0.6
@@ -242,6 +248,9 @@ importers:
       sqlite-vec:
         specifier: catalog:embedding
         version: 0.1.6
+      zhipu-ai-provider:
+        specifier: catalog:ai-sdk
+        version: 0.2.2(zod@4.3.6)
       zod:
         specifier: catalog:ai-sdk
         version: 4.3.6
@@ -279,6 +288,9 @@ importers:
       js-tiktoken:
         specifier: catalog:vue-family
         version: 1.0.21
+      katex:
+        specifier: catalog:vue-family
+        version: 0.16.33
       markstream-vue:
         specifier: catalog:vue-family
         version: 0.0.6(katex@0.16.33)(mermaid@11.12.3)(shiki@3.22.0)(vue@3.5.27(typescript@5.9.3))
@@ -412,6 +424,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@3.0.21':
+    resolution: {integrity: sha512-veuMwTLxsgh31Jjn0SnBABnM1f7ebHhRWcV2ZuY3hP3iJDCZ8VXBaYqcHXoOQDqUXTCas08sKQcHyWK+zl882Q==, tarball: https://registry.npmjs.org/@ai-sdk/provider-utils/-/provider-utils-3.0.21.tgz}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider-utils@4.0.13':
     resolution: {integrity: sha512-HHG72BN4d+OWTcq2NwTxOm/2qvk1duYsnhCDtsbYwn/h/4zeqURu1S0+Cn0nY2Ysq9a9HGKvrYuMn9bgFhR2Og==, tarball: https://registry.npmjs.org/@ai-sdk/provider-utils/-/provider-utils-4.0.13.tgz}
     engines: {node: '>=18'}
@@ -429,6 +447,10 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider@2.0.1':
+    resolution: {integrity: sha512-KCUwswvsC5VsW2PWFqF8eJgSCu5Ysj7m1TxiHTVA6g7k360bk0RNQENT8KTMAYEs+8fWPD3Uu4dEmzGHc+jGng==, tarball: https://registry.npmjs.org/@ai-sdk/provider/-/provider-2.0.1.tgz}
+    engines: {node: '>=18'}
 
   '@ai-sdk/provider@3.0.7':
     resolution: {integrity: sha512-VkPLrutM6VdA924/mG8OS+5frbVTcu6e046D2bgDo00tehBANR1QBJ/mPcZ9tXMFOsVcm6SQArOregxePzTFPw==, tarball: https://registry.npmjs.org/@ai-sdk/provider/-/provider-3.0.7.tgz}
@@ -4510,6 +4532,10 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zhipu-ai-provider@0.2.2:
+    resolution: {integrity: sha512-UjX1ho4DI9ICUv/mrpAnzmrRe5/LXrGkS5hF6h4WDY2aup5GketWWopFzWYCqsbArXAM5wbzzdH9QzZusgGiBg==, tarball: https://registry.npmjs.org/zhipu-ai-provider/-/zhipu-ai-provider-0.2.2.tgz}
+    engines: {node: '>=18'}
+
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
@@ -4563,6 +4589,13 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.13(zod@4.3.6)
       zod: 4.3.6
 
+  '@ai-sdk/provider-utils@3.0.21(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.1
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      zod: 4.3.6
+
   '@ai-sdk/provider-utils@4.0.13(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.7
@@ -4583,6 +4616,10 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 4.3.6
+
+  '@ai-sdk/provider@2.0.1':
+    dependencies:
+      json-schema: 0.4.0
 
   '@ai-sdk/provider@3.0.7':
     dependencies:
@@ -9071,6 +9108,13 @@ snapshots:
   yaml@2.8.2: {}
 
   yocto-queue@0.1.0: {}
+
+  zhipu-ai-provider@0.2.2(zod@4.3.6):
+    dependencies:
+      '@ai-sdk/provider': 2.0.1
+      '@ai-sdk/provider-utils': 3.0.21(zod@4.3.6)
+    transitivePeerDependencies:
+      - zod
 
   zod@4.3.6: {}
 

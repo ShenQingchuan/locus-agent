@@ -3,6 +3,7 @@ import presetTypography from '@unocss/preset-typography'
 import { defineConfig, presetIcons, presetWebFonts, presetWind4, transformerDirectives } from 'unocss'
 
 const moonshotSvg = readFileSync(new URL('./public/moonshot.svg', import.meta.url), 'utf-8')
+const zaiSvg = readFileSync(new URL('./public/z-ai.svg', import.meta.url), 'utf-8')
 
 export default defineConfig({
   content: {
@@ -21,6 +22,7 @@ export default defineConfig({
       collections: {
         custom: {
           moonshot: moonshotSvg,
+          zai: zaiSvg,
         },
       },
     }),

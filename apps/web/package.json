@@ -18,6 +18,7 @@
     "@vueuse/core": "catalog:vue-family",
     "mermaid": "catalog:vue-family",
     "js-tiktoken": "catalog:vue-family",
+    "katex": "catalog:vue-family",
     "markstream-vue": "catalog:vue-family",
     "modern-monaco": "catalog:prosekit-family",
     "pinia": "catalog:vue-family",

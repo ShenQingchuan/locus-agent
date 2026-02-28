@@ -1,4 +1,4 @@
-export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek' | 'custom'
+export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek' | 'zhipu' | 'custom'
 
 export type CustomProviderMode = 'openai-compatible' | 'anthropic-compatible'
 
@@ -16,7 +16,8 @@ export const LLM_PROVIDERS: LLMProviderMeta[] = [
   { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
   { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
   { value: 'deepseek', label: 'DeepSeek', icon: 'i-ri:deepseek-fill', defaultModel: 'deepseek-chat', defaultApiBase: 'https://api.deepseek.com' },
-  { value: 'custom', label: '自定义来源', icon: 'i-icon-park-outline:magic-hat', defaultModel: 'claude-opus-4-6', defaultApiBase: '' },
+  { value: 'zhipu', label: '智谱清言', icon: 'i-custom:zai', defaultModel: 'glm-5', defaultApiBase: 'https://open.bigmodel.cn/api/paas/v4' },
+  { value: 'custom', label: '自定义来源', icon: 'i-tabler:message-chatbot-filled', defaultModel: 'claude-opus-4-6', defaultApiBase: '' },
 ]
 
 export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntries(

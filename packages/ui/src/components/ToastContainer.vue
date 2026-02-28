@@ -57,13 +57,13 @@ function getToastClass(type: string): string {
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg bg-background border border-border shadow-lg max-w-sm"
+          class="pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg bg-background border border-border shadow-lg w-max max-w-80vw"
         >
           <div
             class="h-4 w-4 flex-shrink-0"
             :class="[getToastIcon(toast.type), getToastClass(toast.type)]"
           />
-          <span class="text-sm text-foreground">{{ toast.message }}</span>
+          <span class="text-sm text-foreground break-words max-w-70vw">{{ toast.message }}</span>
           <button
             class="ml-2 text-muted-foreground hover:text-foreground transition-colors"
             @click="remove(toast.id)"

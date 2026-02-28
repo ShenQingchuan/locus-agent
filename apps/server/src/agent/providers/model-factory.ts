@@ -7,11 +7,13 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { normalizeModelForProvider } from '@locus-agent/shared'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { createZhipu } from 'zhipu-ai-provider'
 import { getDefaultModelId, getProviderConfig } from './config-store.js'
 
 const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
   moonshotai: 'https://api.moonshot.cn/v1',
   openrouter: 'https://openrouter.ai/api/v1',
+  zhipu: 'https://open.bigmodel.cn/api/paas/v4',
 }
 
 export function createLLMModel(
@@ -58,6 +60,13 @@ export function createLLMModel(
         ...(baseURL ? { baseURL } : {}),
       })
       return openrouter(effectiveModelId)
+    }
+    case 'zhipu': {
+      const zhipu = createZhipu({
+        apiKey: cfg.apiKey,
+        baseURL: baseURL || 'https://open.bigmodel.cn/api/paas/v4',
+      })
+      return zhipu.chat(effectiveModelId)
     }
     case 'custom': {
       const mode = cfg.customMode || 'openai-compatible'

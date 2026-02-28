@@ -8,6 +8,7 @@ import MermaidBlock from './components/MermaidBlock.vue'
 import router from './router'
 
 import '@unocss/reset/tailwind.css'
+import 'katex/dist/katex.min.css'
 import 'markstream-vue/index.css'
 import './styles/main.css'
 import 'virtual:uno.css'
