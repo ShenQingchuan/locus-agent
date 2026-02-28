@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
@@ -95,12 +94,16 @@ export function initDB(options?: InitDBOptions): void {
 /**
  * 期望的向量维度（与 embedding.ts 中 EMBEDDING_DIM 保持一致）
  */
-const EXPECTED_VEC_DIM = 384
+const EXPECTED_VEC_DIM = 1024
+
+const EXPECTED_VEC_SQL = `CREATE VIRTUAL TABLE IF NOT EXISTS vec_notes USING vec0(
+  note_id TEXT PRIMARY KEY,
+  embedding float[${EXPECTED_VEC_DIM}] distance_metric=cosine
+)`
 
 /**
- * 初始化 sqlite-vec 向量搜索扩展
- * 如果加载失败（平台不支持等），设置 _vecAvailable = false 并记录警告
- * 如果已有 vec_notes 表的维度与当前模型不匹配，自动重建
+ * Init sqlite-vec extension and ensure vec_notes table matches expected schema
+ * (dimension + distance metric). Drops & recreates on mismatch.
  */
 function initVec(sqlite: Database): void {
   try {
@@ -108,38 +111,24 @@ function initVec(sqlite: Database): void {
     const sqliteVec = require('sqlite-vec')
     sqliteVec.load(sqlite)
 
-    // 检测已有 vec_notes 表的维度是否与当前模型匹配
-    // 如果不匹配（例如之前用了 768 维模型），需要 drop 重建
-    const existingTable = sqlite.query(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='vec_notes'`,
-    ).get() as { name: string } | null
+    const existing = sqlite.query(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_notes'`,
+    ).get() as { sql: string } | null
 
-    if (existingTable) {
-      try {
-        // 尝试插入一个测试向量来检测维度是否匹配
-        const testVector = new Float32Array(EXPECTED_VEC_DIM)
-        sqlite.run(`INSERT INTO vec_notes(note_id, embedding) VALUES ('__dim_check__', ?)`, [
-          Buffer.from(testVector.buffer),
-        ])
-        sqlite.run(`DELETE FROM vec_notes WHERE note_id = '__dim_check__'`)
-      }
-      catch {
-        // 维度不匹配，drop 并重建
+    if (existing) {
+      const needsRebuild
+        = !existing.sql.includes(`float[${EXPECTED_VEC_DIM}]`)
+          || !existing.sql.includes('distance_metric=cosine')
+
+      if (needsRebuild) {
         console.warn(
-          `[sqlite-vec] vec_notes dimension mismatch detected, rebuilding with ${EXPECTED_VEC_DIM} dimensions...`,
+          `[sqlite-vec] vec_notes schema mismatch, rebuilding (need ${EXPECTED_VEC_DIM}d cosine)...`,
         )
         sqlite.run(`DROP TABLE vec_notes`)
       }
     }
 
-    // 创建向量虚拟表（384 维 float32 向量，匹配 multilingual-e5-small）
-    sqlite.run(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS vec_notes USING vec0(
-        note_id TEXT PRIMARY KEY,
-        embedding float[${EXPECTED_VEC_DIM}]
-      );
-    `)
-
+    sqlite.run(EXPECTED_VEC_SQL)
     _vecAvailable = true
   }
   catch (err) {

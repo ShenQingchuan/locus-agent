@@ -1,4 +1,3 @@
-import consola from 'consola'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -14,7 +13,6 @@ import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
 import { settingsRoutes } from './routes/settings.js'
 import { tagsRoutes } from './routes/tags.js'
-import { ensureModelLoaded } from './services/embedding.js'
 import {
   ensureDataDir,
   getLLMSettings,
@@ -44,14 +42,6 @@ export function createApp(): Hono {
 
   // Health check
   app.get('/health', c => c.json({ status: 'ok' }))
-
-  // 启动时异步预加载 embedding 模型（ensureModelLoaded 内部已检查磁盘缓存）
-  ensureModelLoaded().then((loaded) => {
-    if (loaded)
-      consola.log('[embedding] Model auto-loaded from cache on startup')
-  }).catch((err) => {
-    console.warn('[embedding] Failed to auto-load model on startup:', err)
-  })
 
   // Routes
   app.route('/api/chat', chatRoutes)

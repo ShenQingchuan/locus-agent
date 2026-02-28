@@ -36,6 +36,7 @@ whenever(openSettings, () => {
     :items="commandSearchResults"
     :groups="commandGroups"
     placeholder="搜索记忆、标签、对话..."
+    manual-filter
     @search="handleCommandSearch"
     @select="handleCommandSelect"
   >

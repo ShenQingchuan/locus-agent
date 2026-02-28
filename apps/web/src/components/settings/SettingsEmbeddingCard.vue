@@ -10,65 +10,36 @@ const toast = useToast()
 // ---------------------------------------------------------------------------
 
 interface EmbeddingState {
-  status: 'loading' | 'not_downloaded' | 'downloading' | 'indexing' | 'ready' | 'error'
+  status: 'loading' | 'not_configured' | 'indexing' | 'ready' | 'error'
   error?: string
   indexedCount: number
   vecAvailable: boolean
-  embeddingModelCached: boolean
-  embeddingModelLoaded: boolean
+  embeddingConfigured: boolean
 }
 
 const embeddingState = ref<EmbeddingState>({
   status: 'loading',
   indexedCount: 0,
   vecAvailable: true,
-  embeddingModelCached: false,
-  embeddingModelLoaded: false,
+  embeddingConfigured: false,
 })
 
-interface FileProgressItem {
-  name: string
-  loaded: number
-  total: number
-  percent: number
-}
-
 const embeddingProgress = ref<{
-  file?: string
-  loaded?: number
-  total?: number
-  percent?: number
-  files?: FileProgressItem[]
   indexedCount?: number
   totalCount?: number
+  percent?: number
 }>({})
 
 const embeddingBusy = ref(false)
-let embeddingStreamClose: (() => void) | null = null
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024)
-    return `${bytes} B`
-  if (bytes < 1024 * 1024)
-    return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-/** 从路径中提取文件名（取最后一段） */
-function shortFileName(path: string): string {
-  const parts = path.split('/')
-  return parts[parts.length - 1] || path
-}
-
 const embeddingStatusLabel = computed(() => {
   switch (embeddingState.value.status) {
     case 'loading': return '加载中...'
-    case 'not_downloaded': return '未下载'
-    case 'downloading': return '下载中...'
+    case 'not_configured': return '未配置'
     case 'indexing': return '索引中...'
     case 'ready': return '已就绪'
     case 'error': return '错误'
@@ -89,60 +60,12 @@ async function loadEmbeddingStatus() {
       error: status.error,
       indexedCount: status.indexedCount,
       vecAvailable: status.vecAvailable,
-      embeddingModelCached: status.embeddingModelCached,
-      embeddingModelLoaded: status.embeddingModelLoaded,
+      embeddingConfigured: status.embeddingConfigured,
     }
   }
   catch {
-    embeddingState.value.status = 'not_downloaded'
+    embeddingState.value.status = 'not_configured'
   }
-}
-
-const onDownloadModel = useThrottleFn(async () => {
-  embeddingBusy.value = true
-  embeddingProgress.value = {}
-  embeddingState.value.status = 'downloading'
-
-  const { startModelDownload } = await import('@/api/embedding')
-  const stream = startModelDownload(
-    (data) => {
-      embeddingProgress.value = {
-        file: data.file,
-        loaded: data.loaded,
-        total: data.total,
-        percent: data.percent,
-        files: data.files,
-      }
-    },
-    () => {
-      embeddingState.value.status = 'ready'
-      embeddingBusy.value = false
-      embeddingStreamClose = null
-      toast.success('模型下载完成')
-      loadEmbeddingStatus()
-    },
-    (msg) => {
-      embeddingState.value.status = 'error'
-      embeddingState.value.error = msg
-      embeddingBusy.value = false
-      embeddingStreamClose = null
-      toast.error(`下载失败: ${msg}`)
-    },
-  )
-  embeddingStreamClose = stream.close
-}, 2000)
-
-async function onCancelDownload() {
-  if (embeddingStreamClose) {
-    embeddingStreamClose()
-    embeddingStreamClose = null
-  }
-  const { cancelModelDownload } = await import('@/api/embedding')
-  await cancelModelDownload().catch(() => {})
-  embeddingState.value.status = 'not_downloaded'
-  embeddingBusy.value = false
-  embeddingProgress.value = {}
-  toast.success('已取消下载')
 }
 
 const onReindex = useThrottleFn(async () => {
@@ -151,7 +74,7 @@ const onReindex = useThrottleFn(async () => {
   embeddingState.value.status = 'indexing'
 
   const { startReindex } = await import('@/api/embedding')
-  const stream = startReindex(
+  startReindex(
     (data) => {
       embeddingProgress.value = {
         indexedCount: data.indexedCount,
@@ -171,7 +94,6 @@ const onReindex = useThrottleFn(async () => {
       toast.error(`索引失败: ${msg}`)
     },
   )
-  embeddingStreamClose = stream.close
 }, 2000)
 
 async function onDismissError() {
@@ -180,27 +102,10 @@ async function onDismissError() {
     await clearEmbeddingError()
   }
   catch {
-    // 即使 API 失败，也在前端清除错误态让用户继续操作
+    // Clear frontend state even if API fails
   }
   await loadEmbeddingStatus()
 }
-
-const onDeleteModel = useThrottleFn(async () => {
-  embeddingBusy.value = true
-  try {
-    const { deleteEmbeddingModel } = await import('@/api/embedding')
-    await deleteEmbeddingModel()
-    toast.success('模型已删除')
-  }
-  catch (err) {
-    toast.error(`删除失败: ${err instanceof Error ? err.message : '未知错误'}`)
-  }
-  finally {
-    embeddingBusy.value = false
-    // 从服务器同步最新状态，确保 UI 与后端一致
-    await loadEmbeddingStatus()
-  }
-}, 2000)
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -218,7 +123,7 @@ onMounted(() => {
         Embedding
       </h2>
       <p class="text-xs text-muted-foreground mt-0.5">
-        向量化能实现更好的语义搜索，需要下载专用模型
+        使用智谱 embedding-3 实现语义搜索
       </p>
     </div>
 
@@ -227,7 +132,7 @@ onMounted(() => {
       <div class="grid gap-1.5">
         <label class="text-xs text-muted-foreground">模型</label>
         <div class="text-xs font-mono text-foreground/80">
-          multilingual-e5-small (INT8, ~90MB)
+          Zhipu embedding-3 (1024d)
         </div>
       </div>
 
@@ -251,8 +156,7 @@ onMounted(() => {
             <span
               class="inline-block h-2 w-2 rounded-full"
               :class="{
-                'bg-gray-400': embeddingState.status === 'not_downloaded',
-                'bg-yellow-500 animate-pulse': embeddingState.status === 'downloading',
+                'bg-gray-400': embeddingState.status === 'not_configured',
                 'bg-blue-500 animate-pulse': embeddingState.status === 'indexing',
                 'bg-green-500': embeddingState.status === 'ready',
                 'bg-red-500': embeddingState.status === 'error',
@@ -260,6 +164,12 @@ onMounted(() => {
             />
             <span class="text-xs text-foreground">{{ embeddingStatusLabel }}</span>
           </div>
+        </div>
+
+        <!-- API Key 未配置提示 -->
+        <div v-if="embeddingState.status === 'not_configured'" class="alert text-xs">
+          <div class="i-carbon-information h-4 w-4 mr-1.5 flex-shrink-0 text-muted-foreground" />
+          <span>请在左侧 LLM 设置中配置智谱（Zhipu）API Key 以启用语义搜索</span>
         </div>
 
         <!-- 错误信息 -->
@@ -274,72 +184,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <!-- 下载进度：文件表格 + 总进度 -->
-        <div v-if="embeddingState.status === 'downloading'" class="space-y-2">
-          <!-- 文件列表表格 -->
-          <div v-if="embeddingProgress.files?.length" class="rounded-lg border border-border overflow-hidden">
-            <table class="w-full text-xs">
-              <thead>
-                <tr class="bg-muted/40 text-muted-foreground">
-                  <th class="text-left font-medium px-2.5 py-1.5">
-                    文件
-                  </th>
-                  <th class="text-right font-medium px-2.5 py-1.5 w-20">
-                    大小
-                  </th>
-                  <th class="text-right font-medium px-2.5 py-1.5 w-16">
-                    进度
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="fp in embeddingProgress.files"
-                  :key="fp.name"
-                  class="border-t border-border/50"
-                >
-                  <td class="px-2.5 py-1.5">
-                    <div class="flex items-center gap-1.5 min-w-0">
-                      <div
-                        class="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                        :class="fp.percent >= 100 ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'"
-                      />
-                      <span class="font-mono truncate text-foreground/80" :title="fp.name">{{ shortFileName(fp.name) }}</span>
-                    </div>
-                  </td>
-                  <td class="px-2.5 py-1.5 text-right text-muted-foreground tabular-nums">
-                    {{ formatBytes(fp.total) }}
-                  </td>
-                  <td class="px-2.5 py-1.5 text-right tabular-nums" :class="fp.percent >= 100 ? 'text-green-500' : 'text-foreground'">
-                    {{ fp.percent }}%
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 总进度条（等文件列表出现后才展示，避免闪烁） -->
-          <div v-if="embeddingProgress.files?.length && embeddingProgress.percent != null" class="space-y-1">
-            <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                class="h-full rounded-full bg-primary transition-all duration-300"
-                :style="{ width: `${embeddingProgress.percent}%` }"
-              />
-            </div>
-            <div class="flex justify-between text-[10px] text-muted-foreground">
-              <span>总进度{{ embeddingProgress.total ? ` · ${formatBytes(embeddingProgress.loaded || 0)} / ${formatBytes(embeddingProgress.total)}` : '' }}</span>
-              <span>{{ embeddingProgress.percent }}%</span>
-            </div>
-          </div>
-
-          <!-- 尚无文件进度数据时的占位 -->
-          <div v-if="!embeddingProgress.files?.length" class="flex items-center gap-2 text-xs text-muted-foreground py-2">
-            <div class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
-            <span>正在连接...</span>
-          </div>
-        </div>
-
-        <!-- 索引进度：圆环 + 文字 -->
+        <!-- 索引进度 -->
         <div v-if="embeddingState.status === 'indexing'" class="flex items-center gap-2.5 py-1">
           <svg class="h-5 w-5 -rotate-90 flex-shrink-0" viewBox="0 0 20 20">
             <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2.5" class="text-muted/50" />
@@ -368,46 +213,6 @@ onMounted(() => {
 
         <!-- 操作按钮 -->
         <div class="flex gap-2 pt-1">
-          <!-- 未下载：下载按钮 -->
-          <button
-            v-if="embeddingState.status === 'not_downloaded'"
-            class="btn-primary btn-sm"
-            :disabled="embeddingBusy"
-            @click="onDownloadModel"
-          >
-            <div v-if="embeddingBusy" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1" />
-            下载模型
-          </button>
-
-          <!-- 错误状态：根据模型是否已下载显示不同按钮 -->
-          <button
-            v-if="embeddingState.status === 'error' && !embeddingState.embeddingModelCached"
-            class="btn-primary btn-sm"
-            :disabled="embeddingBusy"
-            @click="onDownloadModel"
-          >
-            <div v-if="embeddingBusy" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1" />
-            重新下载
-          </button>
-          <button
-            v-if="embeddingState.status === 'error' && embeddingState.embeddingModelCached"
-            class="btn-primary btn-sm"
-            :disabled="embeddingBusy"
-            @click="onReindex"
-          >
-            <div v-if="embeddingBusy" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1" />
-            重新索引
-          </button>
-
-          <!-- 下载中：取消按钮 -->
-          <button
-            v-if="embeddingState.status === 'downloading'"
-            class="btn-outline btn-sm"
-            @click="onCancelDownload"
-          >
-            取消
-          </button>
-
           <!-- 已就绪：重新索引 -->
           <button
             v-if="embeddingState.status === 'ready'"
@@ -419,14 +224,15 @@ onMounted(() => {
             重新索引
           </button>
 
-          <!-- 已就绪或错误（模型已下载）：删除模型 -->
+          <!-- 错误状态：重新索引按钮 -->
           <button
-            v-if="embeddingState.status === 'ready' || (embeddingState.status === 'error' && embeddingState.embeddingModelCached)"
-            class="btn-ghost btn-sm text-destructive hover:text-destructive"
+            v-if="embeddingState.status === 'error' && embeddingState.embeddingConfigured"
+            class="btn-primary btn-sm"
             :disabled="embeddingBusy"
-            @click="onDeleteModel"
+            @click="onReindex"
           >
-            删除模型
+            <div v-if="embeddingBusy" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1" />
+            重新索引
           </button>
         </div>
       </template>

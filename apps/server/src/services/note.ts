@@ -6,17 +6,15 @@ import { getOrCreateTag } from './tag.js'
 // ==================== Embedding 自动索引 ====================
 
 /**
- * 异步生成笔记的 embedding 并存入向量数据库（fire-and-forget）
- * 如果模型已缓存但未加载到内存，会自动加载后再 embed。
+ * Async embed a note and store in vector DB (fire-and-forget).
+ * Requires Zhipu API key to be configured and sqlite-vec to be available.
  */
 function autoEmbedNote(noteId: string, content: string): void {
   if (!isVecAvailable() || !content.trim())
     return
 
-  // 延迟导入避免循环依赖
-  import('./embedding.js').then(async ({ embedPassage, ensureModelLoaded }) => {
-    const loaded = await ensureModelLoaded()
-    if (!loaded)
+  import('./embedding.js').then(async ({ embedPassage, isEmbeddingConfigured }) => {
+    if (!isEmbeddingConfigured())
       return
     const vector = await embedPassage(content)
     const { upsertNoteEmbedding } = await import('./vectorStore.js')
@@ -263,38 +261,73 @@ async function setNoteTags(noteId: string, tagNames: string[]): Promise<void> {
 // ==================== 搜索 ====================
 
 /**
- * 向量语义搜索，LIKE 子串匹配作为 fallback
- *
- * 当 embedding 模型已加载且 sqlite-vec 可用时，使用向量 KNN 搜索；
- * 否则降级到 LIKE '%query%' 子串匹配。
+ * Hybrid search: run vector semantic search AND keyword LIKE in parallel,
+ * merge results with vector hits first (filtered by distance threshold),
+ * keyword-only hits appended after. Either source can fail independently.
  */
 export async function searchNotesHybrid(query: string): Promise<NoteWithTags[]> {
-  const { isModelLoaded, embedQuery } = await import('./embedding.js')
+  const { isEmbeddingConfigured, embedQuery } = await import('./embedding.js')
   const { isVecAvailable, searchByVector } = await import('./vectorStore.js')
 
-  let matchedIds: string[] = []
+  // Cosine distance: 0 = identical, 1 = orthogonal, 2 = opposite.
+  // Two-layer filter:
+  //   1) hard ceiling — reject anything above this regardless
+  //   2) relative factor — reject if distance > best_distance * factor
+  // A result must pass BOTH to be included.
+  const VEC_HARD_CEILING = 0.55
+  const VEC_RELATIVE_FACTOR = 1.25
 
-  if (isModelLoaded() && isVecAvailable()) {
-    // 向量语义搜索
-    const queryVector = await embedQuery(query)
-    const vecResults = searchByVector(queryVector, 30)
-    matchedIds = vecResults.map(r => r.noteId)
+  // --- 1. Vector semantic search (best-effort) ---
+  let vecMatchedIds: string[] = []
+
+  if (isEmbeddingConfigured() && isVecAvailable()) {
+    try {
+      const queryVector = await embedQuery(query)
+      const vecResults = searchByVector(queryVector, 30)
+
+      if (vecResults.length > 0) {
+        const bestDist = vecResults[0].distance
+        const adaptiveThreshold = Math.min(bestDist * VEC_RELATIVE_FACTOR, VEC_HARD_CEILING)
+
+        vecMatchedIds = vecResults
+          .filter(r => r.distance <= adaptiveThreshold)
+          .map(r => r.noteId)
+      }
+    }
+    catch (err) {
+      console.warn('[search] Vector search failed, continuing with keyword search:', err)
+    }
   }
-  else {
-    // 降级：LIKE 子串匹配
-    const pattern = `%${query}%`
-    const fallbackResults = await db
-      .select({ id: notes.id })
-      .from(notes)
-      .where(like(notes.content, pattern))
-      .limit(30)
-    matchedIds = fallbackResults.map(r => r.id)
+
+  // --- 2. Keyword LIKE search (always runs as supplement) ---
+  const pattern = `%${query}%`
+  const likeResults = await db
+    .select({ id: notes.id })
+    .from(notes)
+    .where(like(notes.content, pattern))
+    .limit(30)
+  const likeMatchedIds = likeResults.map(r => r.id)
+
+  // --- 3. Merge: vector results first, keyword-only results appended ---
+  const seen = new Set<string>()
+  const matchedIds: string[] = []
+
+  for (const id of vecMatchedIds) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      matchedIds.push(id)
+    }
+  }
+  for (const id of likeMatchedIds) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      matchedIds.push(id)
+    }
   }
 
   if (matchedIds.length === 0)
     return []
 
-  // 查询完整数据并保持向量搜索排序
   const result = await db
     .select()
     .from(notes)

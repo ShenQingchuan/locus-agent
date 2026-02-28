@@ -31,7 +31,6 @@ catalogs:
     eslint: ^9.39.2
     typescript: ^5.9.3
   embedding:
-    '@huggingface/transformers': ^3.8.1
     sqlite-vec: ^0.1.6
   highlight:
     shiki: ^3.22.0
@@ -73,7 +72,6 @@ catalogs:
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild
-  - onnxruntime-node
   - protobufjs
   - sharp
   - sqlite-vec-darwin-arm64

@@ -35,10 +35,13 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   /** Whether to close on item select (default true) */
   closeOnSelect?: boolean
+  /** When true, skip client-side filtering — caller manages items externally (e.g. server-side search) */
+  manualFilter?: boolean
 }>(), {
   groups: () => [],
   placeholder: '搜索...',
   closeOnSelect: true,
+  manualFilter: false,
 })
 
 const emit = defineEmits<{
@@ -64,8 +67,11 @@ const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 
-// Filter items by query
+// Filter items by query (skipped when manualFilter is true)
 const filteredItems = computed(() => {
+  if (props.manualFilter)
+    return props.items
+
   const q = query.value.toLowerCase().trim()
   if (!q)
     return props.items
