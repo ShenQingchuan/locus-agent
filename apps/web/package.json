@@ -21,6 +21,7 @@
     "markstream-vue": "catalog:vue-family",
     "mermaid": "catalog:vue-family",
     "modern-monaco": "catalog:prosekit-family",
+    "panzoom": "catalog:ui-utils",
     "pinia": "catalog:vue-family",
     "prosekit": "catalog:prosekit-family",
     "prosemirror-highlight": "catalog:prosekit-family",

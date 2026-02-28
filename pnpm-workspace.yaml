@@ -43,6 +43,8 @@ catalogs:
     prosemirror-highlight: ^0.15.0
     prosemirror-markdown: ^1.13.4
     prosemirror-model: ^1.25.4
+  ui-utils:
+    panzoom: ^9.4.3
   unocss-family:
     '@iconify/json': ^2.2.437
     '@unocss/preset-typography': ^66.6.0

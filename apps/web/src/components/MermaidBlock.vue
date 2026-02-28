@@ -1,5 +1,13 @@
-<script lang="ts">
+<script setup lang="ts">
+import type { PanZoom } from 'panzoom'
+import { useDark, useDebounceFn } from '@vueuse/core'
 import mermaid from 'mermaid'
+import createPanZoom from 'panzoom'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+
+const props = defineProps<{
+  node: any
+}>()
 
 let queue = Promise.resolve()
 
@@ -27,19 +35,122 @@ function enqueuRender(
     })
   })
 }
-</script>
-
-<script setup lang="ts">
-import { useDark, useDebounceFn } from '@vueuse/core' // eslint-disable-line import/first
-import { ref, watch } from 'vue' // eslint-disable-line import/first
-
-const props = defineProps<{
-  node: any
-}>()
 
 const svgHtml = ref('')
 const error = ref<string | null>(null)
 const isDark = useDark()
+
+const containerRef = ref<HTMLElement | null>(null)
+const svgWrapperRef = ref<HTMLElement | null>(null)
+
+let panzoomInstance: PanZoom | null = null
+let baseScale = 1
+
+const ZOOM_STEP = 0.2
+const MIN_ZOOM_RATIO = 0.2
+const MAX_ZOOM_RATIO = 3
+const zoomRatio = ref(1)
+
+function disposePanzoom() {
+  if (panzoomInstance) {
+    panzoomInstance.dispose()
+    panzoomInstance = null
+  }
+}
+
+function fitAndInitPanzoom() {
+  const container = containerRef.value
+  const wrapper = svgWrapperRef.value
+  if (!container || !wrapper)
+    return
+
+  const svgEl = wrapper.querySelector('svg')
+  if (!svgEl)
+    return
+
+  disposePanzoom()
+
+  // Remove mermaid's inline dimensions so we can measure the intrinsic size
+  svgEl.removeAttribute('width')
+  svgEl.style.maxWidth = 'none'
+  svgEl.style.height = 'auto'
+  container.style.height = 'auto'
+
+  const svgRect = svgEl.getBoundingClientRect()
+  const containerW = container.getBoundingClientRect().width
+
+  const svgW = svgRect.width
+  const svgH = svgRect.height
+
+  if (svgW === 0 || svgH === 0)
+    return
+
+  const FIT_RATIO = 0.7
+  const PADDING = 32
+  const MIN_HEIGHT = 200
+  const MAX_HEIGHT = 500
+
+  // Width-fit scale at 70%
+  const widthFitScale = (containerW / svgW) * FIT_RATIO
+  const neededH = svgH * widthFitScale + PADDING * 2
+
+  const containerH = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, neededH))
+  container.style.height = `${containerH}px`
+
+  // Fit within both dimensions: width at 70%, height within padding
+  baseScale = Math.min(
+    (containerW / svgW) * FIT_RATIO,
+    (containerH - PADDING * 2) / svgH,
+  )
+
+  const offsetX = (containerW - svgW * baseScale) / 2
+  const offsetY = (containerH - svgH * baseScale) / 2
+
+  wrapper.style.transformOrigin = '0 0'
+
+  panzoomInstance = createPanZoom(wrapper, {
+    maxZoom: MAX_ZOOM_RATIO * baseScale,
+    minZoom: MIN_ZOOM_RATIO * baseScale,
+    smoothScroll: false,
+    zoomDoubleClickSpeed: 1,
+  })
+
+  panzoomInstance.zoomAbs(0, 0, baseScale)
+  panzoomInstance.moveTo(offsetX, offsetY)
+
+  zoomRatio.value = 1
+
+  panzoomInstance.on('zoom', () => {
+    if (!panzoomInstance)
+      return
+    const { scale } = panzoomInstance.getTransform()
+    zoomRatio.value = Math.round((scale / baseScale) * 100) / 100
+  })
+}
+
+function zoomIn() {
+  if (!panzoomInstance || !containerRef.value)
+    return
+  const rect = containerRef.value.getBoundingClientRect()
+  const cx = rect.width / 2
+  const cy = rect.height / 2
+  const target = Math.min(MAX_ZOOM_RATIO, +(zoomRatio.value + ZOOM_STEP).toFixed(1))
+  panzoomInstance.smoothZoomAbs(cx, cy, target * baseScale)
+}
+
+function zoomOut() {
+  if (!panzoomInstance || !containerRef.value)
+    return
+  const rect = containerRef.value.getBoundingClientRect()
+  const cx = rect.width / 2
+  const cy = rect.height / 2
+  const target = Math.max(MIN_ZOOM_RATIO, +(zoomRatio.value - ZOOM_STEP).toFixed(1))
+  panzoomInstance.smoothZoomAbs(cx, cy, target * baseScale)
+}
+
+function zoomReset() {
+  fitAndInitPanzoom()
+}
 
 let generation = 0
 
@@ -52,6 +163,9 @@ async function renderMermaid(code: string, dark: boolean) {
     return
   svgHtml.value = svg
   error.value = null
+
+  await nextTick()
+  fitAndInitPanzoom()
 }
 
 const debouncedRender = useDebounceFn(() => {
@@ -69,23 +183,6 @@ watch(isDark, () => {
   }
 })
 
-const ZOOM_STEP = 0.2
-const MIN_ZOOM = 0.2
-const MAX_ZOOM = 3
-const zoom = ref(1)
-
-function zoomIn() {
-  zoom.value = Math.min(MAX_ZOOM, +(zoom.value + ZOOM_STEP).toFixed(1))
-}
-
-function zoomOut() {
-  zoom.value = Math.max(MIN_ZOOM, +(zoom.value - ZOOM_STEP).toFixed(1))
-}
-
-function zoomReset() {
-  zoom.value = 1
-}
-
 const copied = ref(false)
 async function handleCopy() {
   try {
@@ -96,11 +193,14 @@ async function handleCopy() {
   catch {}
 }
 
-// 代码/预览切换
 const showSource = ref(false)
 function toggleSource() {
   showSource.value = !showSource.value
 }
+
+onBeforeUnmount(() => {
+  disposePanzoom()
+})
 </script>
 
 <template>
@@ -111,7 +211,7 @@ function toggleSource() {
         <button
           class="p-1 rounded hover:bg-muted"
           title="Zoom out"
-          :disabled="zoom <= MIN_ZOOM"
+          :disabled="zoomRatio <= MIN_ZOOM_RATIO"
           @click="zoomOut"
         >
           <div class="i-carbon-zoom-out h-3.5 w-3.5" />
@@ -121,12 +221,12 @@ function toggleSource() {
           title="Reset zoom"
           @click="zoomReset"
         >
-          {{ Math.round(zoom * 100) }}%
+          {{ Math.round(zoomRatio * 100) }}%
         </button>
         <button
           class="p-1 rounded hover:bg-muted"
           title="Zoom in"
-          :disabled="zoom >= MAX_ZOOM"
+          :disabled="zoomRatio >= MAX_ZOOM_RATIO"
           @click="zoomIn"
         >
           <div class="i-carbon-zoom-in h-3.5 w-3.5" />
@@ -165,13 +265,12 @@ function toggleSource() {
     </div>
 
     <!-- Mermaid 渲染图 -->
-    <div v-else-if="svgHtml" class="mermaid-svg-container overflow-auto p-4">
-      <div
-        class="flex justify-center origin-top-left"
-        :style="{ transform: `scale(${zoom})` }"
-      >
-        <div v-html="svgHtml" />
-      </div>
+    <div
+      v-else-if="svgHtml"
+      ref="containerRef"
+      class="mermaid-svg-container relative overflow-hidden"
+    >
+      <div ref="svgWrapperRef" v-html="svgHtml" />
     </div>
 
     <!-- 加载中 -->
@@ -187,8 +286,12 @@ function toggleSource() {
   border: 1px solid hsl(var(--border));
 }
 
-.mermaid-svg-container svg {
-  max-width: 100%;
-  height: auto;
+.mermaid-svg-container {
+  min-height: 200px;
+  cursor: grab;
+}
+
+.mermaid-svg-container:active {
+  cursor: grabbing;
 }
 </style>

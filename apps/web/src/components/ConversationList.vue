@@ -132,9 +132,6 @@ async function deleteSelected() {
           </button>
         </div>
       </div>
-      <div v-else class="text-xs text-muted-foreground px-2 py-1">
-        <span class="opacity-60 font-sans">⌘ / Ctrl + 点击多选</span>
-      </div>
     </template>
 
     <template #loading>
