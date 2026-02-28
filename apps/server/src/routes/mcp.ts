@@ -1,5 +1,6 @@
 import type { MCPServersConfig } from '@locus-agent/shared'
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import { getMCPConfig, saveMCPConfig } from '../agent/mcp/config.js'
 import { mcpManager } from '../agent/mcp/manager.js'
@@ -115,4 +116,45 @@ mcpRoutes.post('/restart/:name', async (c) => {
       500,
     )
   }
+})
+
+/**
+ * GET /api/mcp/events — SSE 订阅 MCP 状态变化
+ */
+mcpRoutes.get('/events', async (c) => {
+  return streamSSE(c, async (stream) => {
+    // 发送当前状态作为初始化
+    const currentStatus = mcpManager.getStatus()
+    await stream.writeSSE({
+      event: 'init',
+      data: JSON.stringify(currentStatus),
+    })
+
+    // 监听状态变化
+    const listener = (event: { name: string, status: string, error?: string, tools: string[], disabled: boolean }) => {
+      stream.writeSSE({
+        event: 'statusChange',
+        data: JSON.stringify(event),
+      }).catch(() => {
+        // 客户端断开时忽略写入错误
+      })
+    }
+
+    mcpManager.on('statusChange', listener)
+
+    // 保持连接直到客户端断开
+    try {
+      // 每 30 秒发送 ping 保持连接
+      while (true) {
+        await stream.sleep(30000)
+        await stream.writeSSE({ event: 'ping', data: '' })
+      }
+    }
+    catch {
+      // 客户端断开或出错，清理监听器
+    }
+    finally {
+      mcpManager.off('statusChange', listener)
+    }
+  })
 })

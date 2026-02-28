@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import type { MCPServerConfig, MCPServerStatus } from '@locus-agent/shared'
+import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/shared'
 import { Switch, useToast } from '@locus-agent/ui'
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import {
   fetchMCPConfig,
   fetchMCPLogs,
   fetchMCPStatus,
   restartMCPServer,
+  subscribeMCPStatus,
   updateMCPConfig,
 } from '@/api/chat'
 import MonacoEditor from '@/components/MonacoEditor.vue'
@@ -28,6 +29,9 @@ const isMcpLogPanelOpen = ref(false)
 const isMcpLogsLoading = ref(false)
 const mcpLogs = ref<string[]>([])
 
+/** SSE 订阅关闭函数 */
+let unsubscribeMCP: (() => void) | null = null
+
 /** 已展开工具列表的 server 名称集合 */
 const expandedTools = ref<Set<string>>(new Set())
 
@@ -44,6 +48,19 @@ function mcpStatusOf(name: string): MCPServerStatus | undefined {
   return mcpStatus.value.find(s => s.name === name)
 }
 
+function applyMCPStatus(statusList?: MCPServerStatus[]) {
+  if (!statusList)
+    return
+  mcpStatus.value = statusList
+}
+
+function isServerInitializing(name: string): boolean {
+  const cfg = mcpServers.value[name]
+  if (!cfg || cfg.disabled)
+    return false
+  return mcpStatusOf(name)?.status === 'connecting'
+}
+
 function statusColor(status?: string): string {
   switch (status) {
     case 'connected': return 'text-green-500'
@@ -58,6 +75,7 @@ function statusLabel(status?: string): string {
     case 'connected': return '已连接'
     case 'connecting': return '连接中'
     case 'error': return '错误'
+    case 'disconnected': return '休眠中'
     default: return '未连接'
   }
 }
@@ -72,8 +90,51 @@ async function loadMCP() {
     fetchMCPStatus(),
   ])
   mcpServers.value = config?.mcpServers ?? {}
-  mcpStatus.value = status
+  applyMCPStatus(status)
   syncJsonText()
+}
+
+/** 处理单个服务器状态变化 */
+function handleStatusChange(event: { name: string, status: string, error?: string, tools: string[], disabled: boolean }) {
+  const existing = mcpStatus.value.find(s => s.name === event.name)
+  if (existing) {
+    existing.status = event.status as any
+    existing.error = event.error
+    existing.tools = event.tools
+    existing.disabled = event.disabled
+  }
+  else {
+    mcpStatus.value.push({
+      name: event.name,
+      status: event.status as MCPServerConnectionStatus,
+      error: event.error,
+      tools: event.tools,
+      disabled: event.disabled,
+    })
+  }
+}
+
+/** 启动 SSE 订阅 */
+function startSSE() {
+  stopSSE()
+  unsubscribeMCP = subscribeMCPStatus(
+    (initStatus) => {
+      // 初始化时完整替换状态
+      applyMCPStatus(initStatus)
+    },
+    (change) => {
+      // 状态变化时增量更新
+      handleStatusChange(change)
+    },
+  )
+}
+
+/** 停止 SSE 订阅 */
+function stopSSE() {
+  if (unsubscribeMCP) {
+    unsubscribeMCP()
+    unsubscribeMCP = null
+  }
 }
 
 async function loadMCPLogs() {
@@ -145,8 +206,7 @@ async function saveMCP() {
       return
     }
     toast.success('MCP 配置已保存')
-    if (result.status)
-      mcpStatus.value = result.status
+    applyMCPStatus(result.status)
     mcpServers.value = servers
     syncJsonText()
   }
@@ -165,8 +225,7 @@ async function onRestartAll() {
       toast.error(result.message || '重启失败')
       return
     }
-    if (result.status)
-      mcpStatus.value = result.status
+    applyMCPStatus(result.status)
     toast.success('MCP 已重启')
   }
   finally {
@@ -180,8 +239,7 @@ async function onRestartOne(name: string) {
     toast.error(result.message || `重启 ${name} 失败`)
     return
   }
-  if (result.status)
-    mcpStatus.value = result.status
+  applyMCPStatus(result.status)
 }
 
 function resetAddForm() {
@@ -254,8 +312,7 @@ async function addServer() {
       return
     }
     toast.success(`已添加 ${name}`)
-    if (result.status)
-      mcpStatus.value = result.status
+    applyMCPStatus(result.status)
   }
   finally {
     isMcpSaving.value = false
@@ -275,8 +332,7 @@ async function removeServer(name: string) {
       toast.error(result.message || '删除失败')
       return
     }
-    if (result.status)
-      mcpStatus.value = result.status
+    applyMCPStatus(result.status)
   }
   finally {
     isMcpSaving.value = false
@@ -309,8 +365,7 @@ async function toggleDisabled(name: string) {
       syncJsonText()
       return
     }
-    if (result.status)
-      mcpStatus.value = result.status
+    applyMCPStatus(result.status)
   }
   finally {
     isMcpSaving.value = false
@@ -323,6 +378,11 @@ async function toggleDisabled(name: string) {
 
 onMounted(() => {
   loadMCP()
+  startSSE()
+})
+
+onUnmounted(() => {
+  stopSSE()
 })
 </script>
 
@@ -408,11 +468,15 @@ onMounted(() => {
                 class="h-2 w-2 rounded-full flex-shrink-0"
                 :class="{
                   'bg-green-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connected',
-                  'bg-yellow-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'connecting',
+                  'bg-yellow-500': isServerInitializing(name as string) || (!cfg.disabled && mcpStatusOf(name as string)?.status === 'connecting'),
                   'bg-red-500': !cfg.disabled && mcpStatusOf(name as string)?.status === 'error',
                   'bg-muted-foreground/30': cfg.disabled || !mcpStatusOf(name as string) || mcpStatusOf(name as string)?.status === 'disconnected',
                 }"
-                :title="cfg.disabled ? '未启用' : (mcpStatusOf(name as string)?.error || statusLabel(mcpStatusOf(name as string)?.status))"
+                :title="cfg.disabled
+                  ? '未启用'
+                  : (isServerInitializing(name as string)
+                    ? '初始化中'
+                    : (mcpStatusOf(name as string)?.error || statusLabel(mcpStatusOf(name as string)?.status)))"
               />
 
               <!-- 主行：名字 · 状态 · 工具数 -->
@@ -420,7 +484,7 @@ onMounted(() => {
                 <span class="font-medium text-foreground">{{ name }}</span>
                 <span class="text-muted-foreground mx-1">·</span>
                 <span :class="cfg.disabled ? 'text-muted-foreground' : statusColor(mcpStatusOf(name as string)?.status)">
-                  {{ cfg.disabled ? '未启用' : statusLabel(mcpStatusOf(name as string)?.status) }}
+                  {{ cfg.disabled ? '未启用' : (isServerInitializing(name as string) ? '初始化中' : statusLabel(mcpStatusOf(name as string)?.status)) }}
                 </span>
                 <template v-if="mcpStatusOf(name as string)?.tools?.length">
                   <span class="text-muted-foreground mx-1">·</span>
@@ -430,7 +494,7 @@ onMounted(() => {
 
               <!-- 展开工具 -->
               <button
-                v-if="mcpStatusOf(name as string)?.tools?.length"
+                v-if="!isServerInitializing(name as string) && mcpStatusOf(name as string)?.tools?.length"
                 class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 @click="toggleToolsExpanded(name as string)"
               >
@@ -442,7 +506,7 @@ onMounted(() => {
               </button>
 
               <!-- 操作 -->
-              <div class="flex items-center gap-0.5 flex-shrink-0">
+              <div v-if="!isServerInitializing(name as string)" class="flex items-center gap-0.5 flex-shrink-0">
                 <Switch
                   :model-value="!cfg.disabled"
                   :disabled="isMcpSaving"
@@ -463,6 +527,10 @@ onMounted(() => {
                 >
                   <div class="i-carbon-trash-can h-3.5 w-3.5" />
                 </button>
+              </div>
+              <div v-else class="flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0">
+                <span class="i-carbon-circle-dash h-3 w-3 animate-spin" />
+                初始化中
               </div>
             </div>
 

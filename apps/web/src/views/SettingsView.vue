@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import { DEFAULT_API_BASES } from '@locus-agent/shared'
+import type { ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/chat'
 import AppNavRail from '@/components/AppNavRail.vue'
@@ -26,16 +27,41 @@ const loadError = ref<string | null>(null)
 const requiresRestart = ref(false)
 
 const runtimeInfo = ref<{ provider: string, model: string, contextWindow: number } | null>(null)
-const currentApiKeyMasked = ref<string | null>(null)
 const apiKeysMasked = ref<Partial<Record<LLMProviderType, string | null>>>({})
 
-const form = ref({
-  provider: 'openai' as LLMProviderType,
-  apiKey: '',
-  apiBase: '',
-  customMode: 'openai-compatible' as CustomProviderMode,
-  port: 3000,
-})
+// Active provider (which one is currently selected for use)
+const activeProvider = ref<LLMProviderType>('openai')
+
+// Port configuration (separate from provider configs)
+const port = ref<number>(3000)
+
+// Provider-specific configurations
+const providerConfigs = reactive<ProviderConfigs>({})
+
+// Helper to initialize provider config
+function initProviderConfig(
+  provider: LLMProviderType,
+  _existingKeyMasked: string | null,
+  apiBase?: string,
+  customMode?: CustomProviderMode,
+  model?: string,
+): void {
+  providerConfigs[provider] = {
+    apiKey: '',
+    apiBase: apiBase || (provider === 'custom' ? '' : (DEFAULT_API_BASES[provider] || '')),
+    customMode: customMode || 'openai-compatible',
+    model: model || DEFAULT_MODELS[provider] || '',
+  }
+}
+
+// Initialize all provider configs
+function initAllProviderConfigs() {
+  for (const p of LLM_PROVIDERS) {
+    if (!providerConfigs[p.value]) {
+      initProviderConfig(p.value, null)
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -55,13 +81,36 @@ async function loadConfig() {
       return
     }
 
-    form.value.provider = config.provider
-    form.value.apiBase = config.apiBase || (config.provider === 'custom' ? '' : (DEFAULT_API_BASES[config.provider] || ''))
-    form.value.customMode = config.customMode || 'openai-compatible'
-    form.value.port = config.port
+    // Set active provider and port
+    activeProvider.value = config.provider
+    port.value = config.port
 
+    // Store masked API keys for all providers
     apiKeysMasked.value = config.apiKeys ?? {}
-    currentApiKeyMasked.value = apiKeysMasked.value[config.provider] ?? config.apiKeyMasked ?? null
+
+    // Initialize all provider configs
+    initAllProviderConfigs()
+
+    // Load config for each provider from the response
+    for (const p of LLM_PROVIDERS) {
+      const isActiveProvider = p.value === config.provider
+
+      // For the active provider, use the saved apiBase, customMode and model
+      // For others, they may not have specific settings yet
+      providerConfigs[p.value] = {
+        apiKey: '',
+        apiBase: isActiveProvider
+          ? (config.apiBase || (p.value === 'custom' ? '' : (DEFAULT_API_BASES[p.value] || '')))
+          : (p.value === 'custom' ? '' : (DEFAULT_API_BASES[p.value] || '')),
+        customMode: isActiveProvider
+          ? (config.customMode || 'openai-compatible')
+          : 'openai-compatible',
+        model: isActiveProvider
+          ? (config.model || DEFAULT_MODELS[p.value] || '')
+          : (DEFAULT_MODELS[p.value] || ''),
+      }
+    }
+
     runtimeInfo.value = config.runtime ?? null
     requiresRestart.value = false
   }
@@ -80,59 +129,129 @@ async function saveConfig() {
 
   isSaving.value = true
   try {
-    const port = Number(form.value.port)
-    if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    // Validate port
+    const portNum = Number(port.value)
+    if (!Number.isFinite(portNum) || portNum < 1 || portNum > 65535) {
       toast.error('端口必须是 1-65535 之间的数字')
       return
     }
 
-    const apiBase = form.value.apiBase.trim()
+    // Get current active provider's config
+    const activeConfig = providerConfigs[activeProvider.value]
+    if (!activeConfig) {
+      toast.error('配置加载异常，请刷新重试')
+      return
+    }
 
-    // 自定义提供商验证
-    if (form.value.provider === 'custom' && !apiBase) {
+    const apiBase = activeConfig.apiBase.trim()
+
+    // Validate custom provider
+    if (activeProvider.value === 'custom' && !apiBase) {
       toast.error('自定义提供商必须填写 API Base URL')
       return
     }
 
+    // Build payload for active provider
     const payload: {
       provider: LLMProviderType
       apiKey?: string
       apiBase: string
+      model?: string
       customMode?: CustomProviderMode
       port: number
     } = {
-      provider: form.value.provider,
+      provider: activeProvider.value,
       apiBase,
-      port,
+      port: portNum,
     }
 
-    if (form.value.provider === 'custom') {
-      payload.customMode = form.value.customMode
+    // Add model if specified (not empty and not default)
+    const activeModel = activeConfig.model.trim()
+    if (activeModel && activeModel !== DEFAULT_MODELS[activeProvider.value]) {
+      payload.model = activeModel
     }
 
-    const trimmedKey = form.value.apiKey.trim()
-    if (!trimmedKey && !currentApiKeyMasked.value) {
-      toast.error('API Key 不能为空')
+    if (activeProvider.value === 'custom') {
+      payload.customMode = activeConfig.customMode
+    }
+
+    const trimmedKey = activeConfig.apiKey.trim()
+    const existingKeyMasked = apiKeysMasked.value[activeProvider.value]
+    if (!trimmedKey && !existingKeyMasked) {
+      toast.error(`API Key 不能为空 (${LLM_PROVIDERS.find(p => p.value === activeProvider.value)?.label || activeProvider.value})`)
       return
     }
     if (trimmedKey)
       payload.apiKey = trimmedKey
 
+    // First save: active provider config
     const result = await updateSettingsConfig(payload)
     if (!result.success) {
       toast.error(result.message || '保存失败')
       return
     }
 
+    // Save API keys for other providers that have been modified
+    const otherProviders = LLM_PROVIDERS.filter(p => p.value !== activeProvider.value)
+    for (const providerMeta of otherProviders) {
+      const provider = providerMeta.value
+      const config = providerConfigs[provider]
+      if (!config)
+        continue
+
+      const keyTrimmed = config.apiKey.trim()
+      // Only save if there's a new API key entered
+      if (keyTrimmed) {
+        const otherPayload: {
+          provider: LLMProviderType
+          apiKey: string
+          apiBase?: string
+          model?: string
+          customMode?: CustomProviderMode
+        } = {
+          provider,
+          apiKey: keyTrimmed,
+        }
+
+        // Only include apiBase if it's different from default or explicitly set
+        const apiBaseTrimmed = config.apiBase.trim()
+        if (apiBaseTrimmed && apiBaseTrimmed !== DEFAULT_API_BASES[provider]) {
+          otherPayload.apiBase = apiBaseTrimmed
+        }
+        else if (provider === 'custom' && apiBaseTrimmed) {
+          otherPayload.apiBase = apiBaseTrimmed
+        }
+
+        // Only include model if it's different from default
+        const modelTrimmed = config.model.trim()
+        if (modelTrimmed && modelTrimmed !== DEFAULT_MODELS[provider]) {
+          otherPayload.model = modelTrimmed
+        }
+
+        if (provider === 'custom') {
+          otherPayload.customMode = config.customMode
+        }
+
+        // Save this provider's config (don't show toast for each)
+        await updateSettingsConfig(otherPayload)
+      }
+    }
+
     toast.success('设置已保存')
     requiresRestart.value = !!result.requiresRestart
 
-    form.value.apiKey = ''
+    // Reset API key fields and refresh config
+    for (const p of LLM_PROVIDERS) {
+      const config = providerConfigs[p.value]
+      if (config) {
+        config.apiKey = ''
+      }
+    }
+
     if (result.config) {
       apiKeysMasked.value = result.config.apiKeys ?? apiKeysMasked.value
-      currentApiKeyMasked.value = apiKeysMasked.value[form.value.provider] ?? result.config.apiKeyMasked ?? currentApiKeyMasked.value
       runtimeInfo.value = result.config.runtime ?? runtimeInfo.value
-      // 同步 chatStore 以确保 ChatInput 显示一致的配置
+      // Sync chatStore to ensure ChatInput shows consistent config
       chatStore.provider = result.config.provider
       chatStore.modelName = result.config.model ?? ''
       chatStore.customMode = result.config.customMode ?? 'openai-compatible'
@@ -186,7 +305,7 @@ async function saveConfig() {
       </header>
 
       <main class="flex-1 overflow-y-auto">
-        <!-- 响应式容器：移动端保持紧凑，桌面端扩展为宽屏布局 -->
+        <!-- Responsive container -->
         <div class="container-chat lg:max-w-5xl xl:max-w-6xl p-4 lg:p-6">
           <div
             v-if="isLoading"
@@ -211,16 +330,14 @@ async function saveConfig() {
           </div>
 
           <template v-else>
-            <!-- 布局策略：
-                 - 桌面端：左右均衡两列
-                 - 移动端：单列堆叠
-            -->
+            <!-- Layout: desktop 2-column, mobile 1-column -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              <!-- 左列 -->
+              <!-- Left column -->
               <div class="space-y-4 lg:space-y-6">
                 <SettingsLLMCard
-                  v-model:form="form"
-                  v-model:current-api-key-masked="currentApiKeyMasked"
+                  v-model:provider-configs="providerConfigs"
+                  v-model:port="port"
+                  v-model:active-provider="activeProvider"
                   :runtime-info="runtimeInfo"
                   :requires-restart="requiresRestart"
                   :is-loading="isLoading"
@@ -229,7 +346,7 @@ async function saveConfig() {
                 />
               </div>
 
-              <!-- 右列 -->
+              <!-- Right column -->
               <div class="space-y-4 lg:space-y-6">
                 <SettingsWhitelistCard />
                 <SettingsEmbeddingCard />

@@ -1,6 +1,7 @@
 import type { MCPClient } from '@ai-sdk/mcp'
 import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/shared'
 import type { Tool } from 'ai'
+import EventEmitter from 'node:events'
 import process from 'node:process'
 import { createMCPClient } from '@ai-sdk/mcp'
 import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio'
@@ -18,6 +19,17 @@ const MAX_LOG_LINES = 1_000
 
 type LogLevel = 'info' | 'warn' | 'error'
 
+/**
+ * MCP 状态变化事件类型
+ */
+export interface MCPStatusChangeEvent {
+  name: string
+  status: MCPServerConnectionStatus
+  error?: string
+  tools: string[]
+  disabled: boolean
+}
+
 interface ServerEntry {
   client: MCPClient
   tools: Record<string, Tool>
@@ -29,7 +41,7 @@ interface ServerEntry {
   lastActiveAt: number
 }
 
-class MCPManager {
+class MCPManager extends EventEmitter {
   private servers = new Map<string, ServerEntry>()
   private serverConfigs = new Map<string, MCPServerConfig>()
   private reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -38,6 +50,23 @@ class MCPManager {
   private reconnectAttempts = new Map<string, number>()
   private lastErrorLogAt = new Map<string, number>()
   private logs: string[] = []
+
+  /**
+   * 发送状态变化事件
+   */
+  private emitStatusChange(name: string): void {
+    const entry = this.servers.get(name)
+    if (!entry)
+      return
+    const event: MCPStatusChangeEvent = {
+      name,
+      status: entry.status,
+      error: entry.error,
+      tools: entry.toolNames,
+      disabled: entry.disabled,
+    }
+    this.emit('statusChange', event)
+  }
 
   async initialize(): Promise<void> {
     const config = await getMCPConfig()
@@ -210,6 +239,7 @@ class MCPManager {
     entry.disabled = false
     entry.error = undefined
     this.servers.set(name, entry)
+    this.emitStatusChange(name)
 
     try {
       const transport = this.createTransport(config)
@@ -254,12 +284,14 @@ class MCPManager {
       entry.lastActiveAt = Date.now()
       this.reconnectAttempts.delete(name)
       this.logServer('info', name, `connected, ${entry.toolNames.length} tools: ${entry.toolNames.join(', ')}`)
+      this.emitStatusChange(name)
       this.scheduleIdleDisconnectIfNeeded(name)
     }
     catch (error) {
       entry.status = 'error'
       entry.error = this.formatErrorMessage(error)
       this.logServer('error', name, `connection failed: ${entry.error}`)
+      this.emitStatusChange(name)
       this.scheduleReconnect(name, 'connect-failed')
     }
   }
@@ -293,6 +325,7 @@ class MCPManager {
     if (options.preserveEntry) {
       entry.status = 'disconnected'
       this.servers.set(name, entry)
+      this.emitStatusChange(name)
       this.logServer('info', name, `disconnected (${options.reason})`)
       return
     }
@@ -366,6 +399,7 @@ class MCPManager {
     if (connectionLike && entry.status === 'connected') {
       entry.status = 'error'
       entry.error = message
+      this.emitStatusChange(name)
       const logKey = `${name}:uncaught:recoverable-connection`
       const now = Date.now()
       const last = this.lastErrorLogAt.get(logKey) ?? 0
@@ -379,6 +413,7 @@ class MCPManager {
 
     entry.status = 'error'
     entry.error = message
+    this.emitStatusChange(name)
 
     const logKey = `${name}:uncaught:${timeoutLike ? 'timeout' : 'other'}`
     const now = Date.now()

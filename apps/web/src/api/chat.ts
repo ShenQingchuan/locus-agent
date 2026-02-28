@@ -829,3 +829,56 @@ export async function restartMCPServer(
     return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
+
+/**
+ * MCP 状态变化事件
+ */
+export interface MCPStatusChangeEvent {
+  name: string
+  status: 'connected' | 'connecting' | 'error' | 'disconnected'
+  error?: string
+  tools: string[]
+  disabled: boolean
+}
+
+/**
+ * 订阅 MCP 状态变化（SSE）
+ * @param onInit 初始化时回调，接收当前所有状态
+ * @param onChange 状态变化时回调
+ * @returns 关闭 SSE 连接的函数
+ */
+export function subscribeMCPStatus(
+  onInit: (status: MCPServerStatus[]) => void,
+  onChange: (event: MCPStatusChangeEvent) => void,
+): () => void {
+  const eventSource = new EventSource('/api/mcp/events')
+
+  eventSource.addEventListener('init', (e) => {
+    try {
+      const data = JSON.parse(e.data) as MCPServerStatus[]
+      onInit(data)
+    }
+    catch {
+      // 忽略解析错误
+    }
+  })
+
+  eventSource.addEventListener('statusChange', (e) => {
+    try {
+      const data = JSON.parse(e.data) as MCPStatusChangeEvent
+      onChange(data)
+    }
+    catch {
+      // 忽略解析错误
+    }
+  })
+
+  eventSource.addEventListener('error', () => {
+    // SSE 会自动重连，这里不需要额外处理
+  })
+
+  // 返回关闭函数
+  return () => {
+    eventSource.close()
+  }
+}
