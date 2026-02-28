@@ -70,6 +70,9 @@ function fitAndInitPanzoom() {
 
   disposePanzoom()
 
+  // Clear stale transform so measurements are accurate
+  wrapper.style.transform = ''
+
   // Remove mermaid's inline dimensions so we can measure the intrinsic size
   svgEl.removeAttribute('width')
   svgEl.style.maxWidth = 'none'
@@ -198,6 +201,13 @@ function toggleSource() {
   showSource.value = !showSource.value
 }
 
+watch(showSource, async (val) => {
+  if (!val && svgHtml.value) {
+    await nextTick()
+    fitAndInitPanzoom()
+  }
+})
+
 onBeforeUnmount(() => {
   disposePanzoom()
 })
@@ -238,7 +248,7 @@ onBeforeUnmount(() => {
           :title="showSource ? 'Show preview' : 'Show source'"
           @click="toggleSource"
         >
-          <div :class="showSource ? 'i-carbon-chart-bar' : 'i-carbon-code'" class="h-3.5 w-3.5" />
+          <div :class="showSource ? 'i-icon-park-twotone:tree-diagram' : 'i-carbon-code'" class="h-3.5 w-3.5" />
         </button>
         <button
           class="p-1 rounded hover:bg-muted"
@@ -253,7 +263,7 @@ onBeforeUnmount(() => {
 
     <!-- 源代码展示 -->
     <div v-if="showSource" class="p-4">
-      <pre class="text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
+      <pre class="text-dark dark:text-light text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
     </div>
 
     <!-- 错误状态 -->
@@ -261,7 +271,7 @@ onBeforeUnmount(() => {
       <p class="text-sm text-red-500 mb-2">
         {{ error }}
       </p>
-      <pre class="text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
+      <pre class="text-dark dark:text-light text-xs overflow-auto p-2 rounded bg-muted/30 font-mono">{{ node.code }}</pre>
     </div>
 
     <!-- Mermaid 渲染图 -->
@@ -270,7 +280,7 @@ onBeforeUnmount(() => {
       ref="containerRef"
       class="mermaid-svg-container relative overflow-hidden"
     >
-      <div ref="svgWrapperRef" v-html="svgHtml" />
+      <div ref="svgWrapperRef" class="flex items-center justify-center" v-html="svgHtml" />
     </div>
 
     <!-- 加载中 -->
