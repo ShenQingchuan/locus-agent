@@ -11,9 +11,9 @@ const toggleDark = useToggle(isDark)
 const { openSearch } = useGlobalSearch()
 
 const currentModule = computed(() => {
-  if (route.name === 'memories')
-    return 'memories'
-  return 'chat'
+  if (route.name === 'chat' || route.name === 'memories' || route.name === 'coding')
+    return route.name
+  return ''
 })
 
 function navigateTo(name: string) {
@@ -38,6 +38,11 @@ const navItems: NavItem[] = [
     key: 'memories',
     icon: 'i-material-symbols:book-2',
     title: '记忆',
+  },
+  {
+    key: 'coding',
+    icon: 'i-fa7-solid:leaf',
+    title: '编程',
   },
 ]
 </script>

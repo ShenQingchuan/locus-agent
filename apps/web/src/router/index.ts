@@ -18,6 +18,11 @@ const router = createRouter({
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
     },
+    {
+      path: '/coding',
+      name: 'coding',
+      component: () => import('@/views/CodingView.vue'),
+    },
   ],
 })
 
