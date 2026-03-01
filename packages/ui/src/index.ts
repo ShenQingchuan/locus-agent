@@ -1,9 +1,15 @@
 export { default as CommandPalette } from './components/CommandPalette.vue'
 export type { CommandGroup, CommandItem } from './components/CommandPalette.vue'
+export { default as DirectoryBrowserModal } from './components/DirectoryBrowserModal.vue'
+// Re-export component prop types
+export type { DirectoryBrowserEntry } from './components/DirectoryBrowserModal.vue'
+export { default as DirectoryPicker } from './components/DirectoryPicker.vue'
+export type { DirectoryPickerEntry, DirectorySelection } from './components/DirectoryPicker.vue'
 // Components
 export { default as Dropdown } from './components/Dropdown.vue'
-// Re-export component prop types
 export type { DropdownItem } from './components/Dropdown.vue'
+export { default as FileTree } from './components/FileTree.vue'
+export type { FileTreeNode } from './components/FileTree.vue'
 export { default as List, type ListItemSelectMode } from './components/List.vue'
 export { default as ListItem, type ListItemAction } from './components/ListItem.vue'
 export { default as Modal } from './components/Modal.vue'

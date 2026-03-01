@@ -23,3 +23,4 @@ export {
   MULTI_WORD_COMMANDS,
   TOOL_DEFAULT_RISK,
 } from './whitelist.js'
+export type * from './workspace.js'
