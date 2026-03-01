@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useQueryCache } from '@pinia/colada'
-import { onMounted, ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppNavRail from '@/components/AppNavRail.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -14,6 +14,11 @@ const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 const queryCache = useQueryCache()
+
+// Title editing state
+const isEditingTitle = ref(false)
+const editedTitle = ref('')
+const titleInputRef = ref<HTMLInputElement | null>(null)
 
 // 标记是否正在同步，避免 watch 循环
 const isSyncingFromUrl = ref(false)
@@ -153,14 +158,63 @@ function handleNewChat() {
 
 const isGeneratingTitle = ref(false)
 
+// Start editing title mode
+function startEditingTitle() {
+  if (!chatStore.currentConversationId)
+    return
+  editedTitle.value = chatStore.currentConversation?.title || ''
+  isEditingTitle.value = true
+  // Focus input after DOM update
+  nextTick(() => {
+    titleInputRef.value?.focus()
+  })
+}
+
+// Cancel editing title
+function cancelEditingTitle() {
+  isEditingTitle.value = false
+  editedTitle.value = ''
+}
+
+// Save title manually
+async function saveTitle() {
+  const conversationId = chatStore.currentConversationId
+  if (!conversationId)
+    return
+
+  const newTitle = editedTitle.value.trim()
+  if (newTitle && newTitle !== chatStore.currentConversation?.title) {
+    await chatStore.updateTitle(conversationId, newTitle)
+    queryCache.invalidateQueries({ key: ['conversations'] })
+  }
+  isEditingTitle.value = false
+  editedTitle.value = ''
+}
+
+// Handle keydown in title input
+function handleTitleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    saveTitle()
+  }
+  else if (e.key === 'Escape') {
+    cancelEditingTitle()
+  }
+}
+
+// Generate title using AI
 async function handleGenerateTitle() {
   const conversationId = chatStore.currentConversationId
   if (!conversationId || isGeneratingTitle.value)
     return
+
   isGeneratingTitle.value = true
   try {
     await chatStore.generateTitle(conversationId)
     queryCache.invalidateQueries({ key: ['conversations'] })
+    // Exit edit mode after generation
+    isEditingTitle.value = false
+    editedTitle.value = ''
   }
   finally {
     isGeneratingTitle.value = false
@@ -197,23 +251,49 @@ async function handleGenerateTitle() {
             />
           </button>
 
-          <!-- Title -->
-          <h1 class="text-sm font-medium text-foreground truncate max-w-[200px] sm:max-w-none">
+          <!-- Title: Editable input or static display -->
+          <div v-if="isEditingTitle && chatStore.currentConversationId" class="flex items-center gap-1">
+            <input
+              ref="titleInputRef"
+              v-model="editedTitle"
+              type="text"
+              class="text-sm font-medium text-foreground bg-muted rounded px-2 py-1 w-[200px] sm:w-[280px] border-none outline-none focus:ring-2 focus:ring-ring"
+              :placeholder="isGeneratingTitle ? '正在智能生成标题 ...' : '输入会话标题'
+              "
+              :disabled="isGeneratingTitle"
+              @keydown="handleTitleKeydown"
+              @blur="saveTitle"
+            >
+            <!-- Magic wand button for AI generation -->
+            <button
+              class="btn-ghost btn-icon flex-shrink-0"
+              :class="{ 'opacity-50 pointer-events-none': isGeneratingTitle }"
+              title="智能生成标题"
+              @click="handleGenerateTitle"
+            >
+              <div v-if="isGeneratingTitle" class="i-svg-spinners:ring-resize h-4 w-4" />
+              <div v-else class="i-streamline-plump:magic-wand-1-remix h-4 w-4" />
+            </button>
+          </div>
+          <h1
+            v-else
+            class="text-sm font-medium text-foreground truncate max-w-[200px] sm:max-w-none cursor-pointer hover:text-muted-foreground transition-colors"
+            :class="{ 'text-muted-foreground': !chatStore.currentConversation?.title }"
+            @click="startEditingTitle"
+          >
             {{ chatStore.currentConversation?.title || '新会话' }}
           </h1>
         </div>
 
         <div class="flex items-center gap-1">
-          <!-- Generate title button -->
+          <!-- Generate title button (triggers edit mode) -->
           <button
-            v-if="chatStore.currentConversationId"
+            v-if="chatStore.currentConversationId && !isEditingTitle"
             class="btn-ghost btn-icon"
-            :class="{ 'opacity-50 pointer-events-none': isGeneratingTitle }"
             title="智能生成标题"
-            @click="handleGenerateTitle"
+            @click="startEditingTitle"
           >
-            <div v-if="isGeneratingTitle" class="i-svg-spinners:ring-resize h-4 w-4" />
-            <div v-else class="i-ix:rename text-lg" />
+            <div class="i-ix:rename text-lg" />
           </button>
 
           <!-- New chat button (mobile) -->

@@ -921,6 +921,25 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
+   * Update conversation title manually
+   */
+  async function updateTitle(conversationId: string, title: string) {
+    try {
+      const updated = await updateConversation(conversationId, { title })
+      if (updated) {
+        // Update the conversation in local state
+        const idx = conversations.value.findIndex(c => c.id === conversationId)
+        if (idx !== -1) {
+          conversations.value[idx] = { ...conversations.value[idx]!, title: updated.title }
+        }
+      }
+    }
+    catch (err) {
+      console.warn('[chat store] Failed to update title:', err)
+    }
+  }
+
+  /**
    * 发送消息（或入队）
    * - 如果 LLM 空闲，直接发送
    * - 如果 LLM 正忙（isLoading），将消息放入队列，等待当前请求结束后自动发送
@@ -1444,5 +1463,6 @@ export const useChatStore = defineStore('chat', () => {
     cancelEditMessage,
     saveEditMessage,
     generateTitle,
+    updateTitle,
   }
 })
