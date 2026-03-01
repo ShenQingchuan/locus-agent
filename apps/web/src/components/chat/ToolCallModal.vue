@@ -85,7 +85,7 @@ const statusLabel = computed(() => {
     @close="emit('close')"
   >
     <!-- Header -->
-    <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 flex-shrink-0">
+    <div class="flex items-center gap-2 px-2 py-3 border-b border-white/10 flex-shrink-0">
       <div
         class="h-4 w-4 flex-shrink-0"
         :class="[statusIcon, statusIconClass]"

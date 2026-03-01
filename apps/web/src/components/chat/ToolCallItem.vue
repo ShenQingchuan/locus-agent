@@ -135,6 +135,7 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
  * To add a new tool with custom output, just add its name to this set.
  */
 const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
+const toolsHideSummaryRow = new Set<string>(['manage_todos'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -320,6 +321,10 @@ const questionResultPairs = computed<Array<{ question: string, answer: string }>
 const hideSummary = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName)
   && (props.tool.status === 'completed' || props.tool.status === 'error' || props.tool.status === 'interrupted'))
 
+const hideSummaryByTool = computed(() => toolsHideSummaryRow.has(props.tool.toolCall.toolName))
+
+const shouldHideSummary = computed(() => hideSummary.value || hideSummaryByTool.value)
+
 /** Whether this tool uses a custom inline output widget */
 const hasOutputWidget = computed(() => toolsWithOutputWidget.has(props.tool.toolCall.toolName))
 
@@ -445,7 +450,7 @@ watch(terminalOutput, () => {
 
     <!-- Other states: compact inline (hidden when tool has its own result display) -->
     <div
-      v-else-if="!hideSummary"
+      v-else-if="!shouldHideSummary"
       class="flex items-center gap-1.5 text-muted-foreground cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
       @click="modalOpen = true"
     >
