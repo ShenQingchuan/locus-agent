@@ -3,11 +3,14 @@ import type { Message } from '@/stores/chat'
 import { nextTick, ref, watch } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   messages: Message[]
   isLoading: boolean
   isStreaming: boolean
-}>()
+  scrollButtonRight?: string
+}>(), {
+  scrollButtonRight: 'calc((100% - min(100%, 48rem)) / 2 - 3.5rem)',
+})
 
 const containerRef = ref<HTMLElement | null>(null)
 const previousMessagesLength = ref(0)
@@ -139,7 +142,7 @@ defineExpose({ scrollToBottom })
   <div class="relative h-full">
     <div
       ref="containerRef"
-      class="h-full overflow-y-auto px-4 py-4 bg-background"
+      class="h-full overflow-y-auto overflow-x-hidden px-4 py-4 bg-background"
       @scroll.passive="onScroll"
     >
       <div class="max-w-3xl mx-auto">
@@ -192,18 +195,17 @@ defineExpose({ scrollToBottom })
 
     <!-- Scroll to bottom button -->
     <div class="absolute inset-0 pointer-events-none">
-      <div class="max-w-3xl mx-auto relative h-full">
-        <Transition name="fade">
-          <button
-            v-if="showScrollButton && messages.length > 0"
-            class="pointer-events-auto absolute bottom-3 -right-14 z-50 h-9 w-9 rounded-full border border-border bg-background text-foreground shadow-md flex items-center justify-center hover:bg-muted transition-all duration-200"
-            title="滚动到底部"
-            @click="handleScrollToBottomClick"
-          >
-            <div class="i-carbon-arrow-down h-4 w-4" />
-          </button>
-        </Transition>
-      </div>
+      <Transition name="fade">
+        <button
+          v-if="showScrollButton && messages.length > 0"
+          class="pointer-events-auto absolute bottom-3 z-50 h-9 w-9 rounded-full border border-border bg-background text-foreground shadow-md flex items-center justify-center hover:bg-muted transition-all duration-200"
+          :style="{ right: props.scrollButtonRight }"
+          title="滚动到底部"
+          @click="handleScrollToBottomClick"
+        >
+          <div class="i-carbon-arrow-down h-4 w-4" />
+        </button>
+      </Transition>
     </div>
   </div>
 </template>

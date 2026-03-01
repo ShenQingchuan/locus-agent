@@ -76,7 +76,7 @@ const leftPanel = useResizePanel({
 
 const assistantPanel = useResizePanel({
   initialWidth: getStoredPanelWidth(STORAGE_KEY_ASSISTANT_WIDTH, 360, 300, 680),
-  minWidth: 300,
+  minWidth: 450,
   maxWidth: 680,
   resizeFrom: 'left',
   onWidthChange: (width) => {
@@ -585,14 +585,13 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 :messages="chatStore.messages"
                 :is-loading="chatStore.isLoading"
                 :is-streaming="chatStore.isStreaming"
+                scroll-button-right="calc((100% - min(100%, 48rem)) / 2 + 2rem)"
               />
             </div>
 
-            <div class="px-4 xl:px-5 pb-3">
-              <p v-if="canUseAssistant" class="text-[11px] text-muted-foreground mb-2">
-                回车发送 · Shift+回车换行
-              </p>
+            <div class="px-0 pb-3">
               <ChatInput
+                class="px-2"
                 :disabled="!canUseAssistant"
                 :is-streaming="chatStore.isStreaming"
                 :show-bottom-hint="false"

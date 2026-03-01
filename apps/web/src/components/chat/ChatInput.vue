@@ -477,10 +477,5 @@ function handleKeydown(event: KeyboardEvent) {
         </div>
       </div>
     </div>
-
-    <!-- Hint text -->
-    <p v-if="showBottomHint !== false" class="text-xs text-muted-foreground/50 text-center mt-2">
-      回车发送 · Shift+回车换行
-    </p>
   </div>
 </template>
