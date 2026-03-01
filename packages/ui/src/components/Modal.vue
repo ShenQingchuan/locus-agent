@@ -49,7 +49,7 @@ watch(() => props.open, (isOpen) => {
 }, { immediate: true })
 
 const panelClasses = computed(() => [
-  'w-full rounded-lg border border-border bg-background p-4 shadow-lg max-h-[80vh] flex flex-col',
+  'w-full rounded-lg border border-border bg-background p-4 shadow-lg max-h-80vh flex flex-col z-9',
   props.maxWidth,
   props.panelClass,
 ].filter(Boolean).join(' '))
