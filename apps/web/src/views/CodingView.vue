@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import type {
+  Conversation,
   WorkspaceDirectoryEntry,
   WorkspaceTreeNode,
 } from '@locus-agent/shared'
 import type { FileTreeNode } from '@locus-agent/ui'
 import { DirectoryBrowserModal, FileTree, useToast } from '@locus-agent/ui'
-import { ref } from 'vue'
+import { useQueryCache } from '@pinia/colada'
+import { computed, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
+import ChatInput from '@/components/chat/ChatInput.vue'
+import ConversationList from '@/components/chat/ConversationList.vue'
+import MessageList from '@/components/chat/MessageList.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
+import { getConversationListQueryKey, useConversationListQuery, useConversationQuery } from '@/composables/queries'
+import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
+import { useResizePanel } from '@/composables/useResizePanel'
+import { useChatStore } from '@/stores/chat'
+import { createProjectKey } from '@/utils/projectKey'
 
 type CodingSection = 'planning' | 'workspace'
 
@@ -22,8 +32,122 @@ const isWorkspacePathLoading = ref(false)
 const currentBrowsePath = ref('')
 const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
+const currentWorkspaceRootPath = ref('')
+const currentProjectKey = ref<string | undefined>()
+const isHistoryOpen = ref(false)
+const dirtyConversations = new Set<string>()
 
 const toast = useToast()
+const chatStore = useChatStore()
+const queryCache = useQueryCache()
+
+const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
+const STORAGE_KEY_ASSISTANT_WIDTH = 'locus-agent:coding-assistant-width'
+
+function getStoredPanelWidth(storageKey: string, fallback: number, min: number, max: number): number {
+  if (typeof window === 'undefined')
+    return fallback
+
+  try {
+    const stored = localStorage.getItem(storageKey)
+    if (!stored)
+      return fallback
+    const parsed = Number.parseInt(stored, 10)
+    if (Number.isNaN(parsed))
+      return fallback
+    return Math.max(min, Math.min(max, parsed))
+  }
+  catch {
+    return fallback
+  }
+}
+
+const leftPanel = useResizePanel({
+  initialWidth: getStoredPanelWidth(STORAGE_KEY_LEFT_PANEL_WIDTH, 224, 200, 380),
+  minWidth: 200,
+  maxWidth: 380,
+  onWidthChange: (width) => {
+    localStorage.setItem(STORAGE_KEY_LEFT_PANEL_WIDTH, String(width))
+  },
+})
+
+const assistantPanel = useResizePanel({
+  initialWidth: getStoredPanelWidth(STORAGE_KEY_ASSISTANT_WIDTH, 360, 300, 680),
+  minWidth: 300,
+  maxWidth: 680,
+  resizeFrom: 'left',
+  onWidthChange: (width) => {
+    localStorage.setItem(STORAGE_KEY_ASSISTANT_WIDTH, String(width))
+  },
+})
+
+const {
+  width: leftPanelWidth,
+  panelRef: leftPanelRef,
+  isResizing: isLeftPanelResizing,
+  handleMouseDown: handleLeftPanelResizeStart,
+} = leftPanel
+
+const {
+  width: assistantPanelWidth,
+  panelRef: assistantPanelRef,
+  isResizing: isAssistantPanelResizing,
+  handleMouseDown: handleAssistantPanelResizeStart,
+} = assistantPanel
+
+const codingScope = computed(() => ({
+  space: 'coding' as const,
+  projectKey: currentProjectKey.value,
+}))
+
+const canUseAssistant = computed(() => !!currentProjectKey.value)
+
+provideMarkConversationDirty((conversationId: string) => {
+  dirtyConversations.add(conversationId)
+})
+
+const { data: conversationsData, isPending: isLoadingConversations } = useConversationListQuery(() => codingScope.value)
+const { data: conversationData } = useConversationQuery(() => chatStore.currentConversationId)
+
+watch(codingScope, (scope) => {
+  chatStore.setConversationScope(scope)
+}, { immediate: true })
+
+watch(conversationsData, (data) => {
+  if (data) {
+    chatStore.conversations = data
+  }
+})
+
+watch(conversationData, (data) => {
+  const activeConversationId = chatStore.currentConversationId
+  if (!activeConversationId)
+    return
+
+  if (data && data.conversation.id !== activeConversationId)
+    return
+
+  if (chatStore.isLoading || chatStore.isStreaming)
+    return
+
+  if (data) {
+    chatStore.applyConversationData(data, activeConversationId)
+  }
+  else if (data === null) {
+    chatStore.newConversation()
+  }
+})
+
+watch(() => chatStore.currentConversationId, (_newId, oldId) => {
+  if (oldId && dirtyConversations.has(oldId)) {
+    queryCache.invalidateQueries({ key: ['conversation', oldId] })
+    dirtyConversations.delete(oldId)
+  }
+})
+
+onMounted(async () => {
+  await chatStore.loadModelSettings()
+})
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -120,11 +244,15 @@ async function openCurrentBrowsePathAsWorkspace() {
   try {
     await runWithLoadingState(isWorkspaceLoading, async () => {
       const result = await workspaceApi.openWorkspace(currentBrowsePath.value)
+      const projectKey = await createProjectKey(result.rootPath)
       currentProjectName.value = result.rootName
+      currentWorkspaceRootPath.value = result.rootPath
+      currentProjectKey.value = projectKey
       workspaceTree.value = toFileTreeNodes(result.tree)
       selectedFileId.value = null
       activeSection.value = 'workspace'
       isWorkspacePickerOpen.value = false
+      isHistoryOpen.value = false
 
       if (result.truncated) {
         toast.warning('工作空间较大，已进行部分裁剪显示')
@@ -155,6 +283,50 @@ function goToParentBrowsePath() {
     loadBrowseEntries(parentPath)
   }
 }
+
+async function handleSend(content: string) {
+  if (!content.trim() || !canUseAssistant.value)
+    return
+
+  const targetConversationId = await chatStore.sendMessage(content)
+  if (targetConversationId) {
+    dirtyConversations.add(targetConversationId)
+  }
+  queryCache.invalidateQueries({ key: getConversationListQueryKey(codingScope.value) })
+}
+
+function handleStop() {
+  chatStore.stopGeneration()
+}
+
+function handleSelectConversation(id: string) {
+  chatStore.switchConversation(id)
+  isHistoryOpen.value = false
+}
+
+async function handleDeleteConversation(id: string) {
+  const confirmed = await toast.confirm({
+    title: '删除对话',
+    message: '确定要删除这个对话吗？删除后无法恢复。',
+    confirmText: '删除',
+    cancelText: '取消',
+    type: 'error',
+  })
+  if (!confirmed)
+    return
+
+  await chatStore.removeConversation(id)
+  queryCache.invalidateQueries({ key: getConversationListQueryKey(codingScope.value) })
+  toast.success('对话已删除')
+}
+
+function toggleHistory() {
+  if (!canUseAssistant.value)
+    return
+  isHistoryOpen.value = !isHistoryOpen.value
+}
+
+const currentProjectConversations = computed<Conversation[]>(() => chatStore.conversations)
 </script>
 
 <template>
@@ -162,7 +334,12 @@ function goToParentBrowsePath() {
     <AppNavRail />
 
     <div class="flex-1 min-w-0 flex">
-      <aside class="w-56 border-r border-border bg-sidebar-background flex flex-col">
+      <aside
+        ref="leftPanelRef"
+        class="min-w-0 border-r border-border bg-sidebar-background flex flex-col"
+        :class="isLeftPanelResizing ? '' : 'transition-[width] duration-150'"
+        :style="{ width: `${leftPanelWidth}px` }"
+      >
         <div class="px-3 py-3 border-b border-border min-h-12">
           <button
             class="w-full text-left text-xs text-muted-foreground truncate hover:text-foreground transition-colors"
@@ -200,6 +377,13 @@ function goToParentBrowsePath() {
           </button>
         </div>
       </aside>
+
+      <div
+        class="w-1 h-full cursor-col-resize hover:bg-border/60 transition-colors"
+        :class="isLeftPanelResizing ? 'bg-primary/40' : ''"
+        style="touch-action: none; user-select: none;"
+        @mousedown="handleLeftPanelResizeStart"
+      />
 
       <div class="flex-1 min-w-0 flex">
         <div class="flex-1 min-w-0 flex flex-col border-r border-border">
@@ -268,15 +452,70 @@ function goToParentBrowsePath() {
           </main>
         </div>
 
-        <aside class="w-80 xl:w-[340px] min-w-0 flex flex-col">
-          <div class="h-11 px-3 border-b border-border flex items-center">
-            <p class="text-sm font-medium">
-              研发助手
-            </p>
+        <div
+          class="w-1 h-full cursor-col-resize hover:bg-border/60 transition-colors"
+          :class="isAssistantPanelResizing ? 'bg-primary/40' : ''"
+          style="touch-action: none; user-select: none;"
+          @mousedown="handleAssistantPanelResizeStart"
+        />
+
+        <aside
+          ref="assistantPanelRef"
+          class="min-w-0 flex flex-col"
+          :class="isAssistantPanelResizing ? '' : 'transition-[width] duration-150'"
+          :style="{ width: `${assistantPanelWidth}px` }"
+        >
+          <div class="h-11 px-3 border-b border-border flex items-center justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-medium">
+                研发助手
+              </p>
+              <p v-if="currentWorkspaceRootPath" class="text-[10px] text-muted-foreground font-mono truncate">
+                {{ currentWorkspaceRootPath }}
+              </p>
+            </div>
+            <button
+              class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              :class="{ 'opacity-40 cursor-not-allowed': !canUseAssistant }"
+              title="项目会话历史"
+              :disabled="!canUseAssistant"
+              @click="toggleHistory"
+            >
+              <span class="i-material-symbols:history-rounded h-4 w-4" />
+            </button>
           </div>
 
-          <div class="flex-1 min-h-0 px-3 py-2.5">
-            <span class="text-xs text-muted-foreground">编码台助手区占位示意（对话与建议）</span>
+          <div v-if="isHistoryOpen" class="h-[320px] border-b border-border bg-sidebar-background/60">
+            <ConversationList
+              :conversations="currentProjectConversations"
+              :current-id="chatStore.currentConversationId ?? undefined"
+              :loading="isLoadingConversations"
+              class="h-full overflow-y-auto"
+              @select="handleSelectConversation"
+              @delete="handleDeleteConversation"
+            />
+          </div>
+
+          <div class="flex-1 min-h-0">
+            <MessageList
+              :messages="chatStore.messages"
+              :is-loading="chatStore.isLoading"
+              :is-streaming="chatStore.isStreaming"
+            />
+          </div>
+
+          <div class="px-4 xl:px-5 pb-3">
+            <p v-if="canUseAssistant" class="text-[11px] text-muted-foreground mb-2">
+              回车发送 · Shift+回车换行
+            </p>
+            <ChatInput
+              :disabled="!canUseAssistant"
+              :is-streaming="chatStore.isStreaming"
+              :show-bottom-hint="false"
+              disabled-placeholder="选择工作空间后才可开始对话"
+              @send="handleSend"
+              @stop="handleStop"
+            />
           </div>
         </aside>
       </div>

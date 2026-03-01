@@ -8,6 +8,13 @@
       "when": 1772158809493,
       "tag": "0000_complex_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772363122897,
+      "tag": "0001_yielding_jackal",
+      "breakpoints": true
     }
   ]
 }

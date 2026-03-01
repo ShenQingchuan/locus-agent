@@ -6,7 +6,7 @@ import ChatInput from '@/components/chat/ChatInput.vue'
 import MessageList from '@/components/chat/MessageList.vue'
 import Sidebar from '@/components/chat/Sidebar.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
-import { useConversationQuery } from '@/composables/queries'
+import { getConversationListQueryKey, useConversationQuery } from '@/composables/queries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useChatStore } from '@/stores/chat'
 
@@ -14,6 +14,7 @@ const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 const queryCache = useQueryCache()
+const chatScope = { space: 'chat' as const }
 
 // Title editing state
 const isEditingTitle = ref(false)
@@ -91,6 +92,7 @@ onMounted(async () => {
   }
 
   // 加载模型设置
+  chatStore.setConversationScope(chatScope)
   await chatStore.loadModelSettings()
 })
 
@@ -145,7 +147,7 @@ async function handleSend(content: string) {
   if (targetConversationId) {
     dirtyConversations.add(targetConversationId)
   }
-  queryCache.invalidateQueries({ key: ['conversations'] })
+  queryCache.invalidateQueries({ key: getConversationListQueryKey(chatScope) })
 }
 
 function handleStop() {
@@ -185,7 +187,7 @@ async function saveTitle() {
   const newTitle = editedTitle.value.trim()
   if (newTitle && newTitle !== chatStore.currentConversation?.title) {
     await chatStore.updateTitle(conversationId, newTitle)
-    queryCache.invalidateQueries({ key: ['conversations'] })
+    queryCache.invalidateQueries({ key: getConversationListQueryKey(chatScope) })
   }
   isEditingTitle.value = false
   editedTitle.value = ''
@@ -211,7 +213,7 @@ async function handleGenerateTitle() {
   isGeneratingTitle.value = true
   try {
     await chatStore.generateTitle(conversationId)
-    queryCache.invalidateQueries({ key: ['conversations'] })
+    queryCache.invalidateQueries({ key: getConversationListQueryKey(chatScope) })
     // Exit edit mode after generation
     isEditingTitle.value = false
     editedTitle.value = ''

@@ -1,6 +1,11 @@
 import type { Conversation, NewConversation } from '../db/schema.js'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { conversations, db } from '../db/index.js'
+
+interface ConversationScope {
+  space?: 'chat' | 'coding'
+  projectKey?: string
+}
 
 /**
  * 创建新会话
@@ -14,6 +19,36 @@ export async function createConversation(title?: string, id?: string): Promise<C
   const newConversation: NewConversation = {
     id: conversationId,
     title: title || '新会话',
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  await db.insert(conversations).values(newConversation)
+
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, conversationId))
+
+  return conversation
+}
+
+export async function createScopedConversation(
+  options: {
+    title?: string
+    id?: string
+    space?: 'chat' | 'coding'
+    projectKey?: string
+  },
+): Promise<Conversation> {
+  const conversationId = options.id || crypto.randomUUID()
+  const now = new Date()
+
+  const newConversation: NewConversation = {
+    id: conversationId,
+    title: options.title || '新会话',
+    space: options.space ?? 'chat',
+    projectKey: options.projectKey ?? null,
     createdAt: now,
     updatedAt: now,
   }
@@ -66,9 +101,29 @@ export async function getConversationWithMessages(id: string): Promise<{
  * 列出所有会话（按更新时间倒序）
  */
 export async function listConversations(): Promise<Conversation[]> {
+  return listScopedConversations({})
+}
+
+export async function listScopedConversations(scope: ConversationScope): Promise<Conversation[]> {
+  const predicates = []
+
+  if (scope.space) {
+    predicates.push(eq(conversations.space, scope.space))
+  }
+
+  if (scope.projectKey !== undefined) {
+    if (scope.projectKey.trim() === '') {
+      predicates.push(isNull(conversations.projectKey))
+    }
+    else {
+      predicates.push(eq(conversations.projectKey, scope.projectKey))
+    }
+  }
+
   const result = await db
     .select()
     .from(conversations)
+    .where(predicates.length > 0 ? and(...predicates) : undefined)
     .orderBy(desc(conversations.updatedAt))
 
   return result

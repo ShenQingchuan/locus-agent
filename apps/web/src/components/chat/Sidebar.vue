@@ -4,7 +4,7 @@ import { Dropdown, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useConversationListQuery } from '@/composables/queries'
+import { getConversationListQueryKey, useConversationListQuery } from '@/composables/queries'
 import { useChatStore } from '@/stores/chat'
 import ConversationList from './ConversationList.vue'
 
@@ -18,7 +18,8 @@ const route = useRoute()
 const queryCache = useQueryCache()
 
 // Pinia Colada 查询：缓存会话列表
-const { data: conversationsData, isPending: isLoadingConversations } = useConversationListQuery()
+const chatScope = { space: 'chat' as const }
+const { data: conversationsData, isPending: isLoadingConversations } = useConversationListQuery(() => chatScope)
 
 // 同步查询数据到 store
 watch(conversationsData, (data) => {
@@ -58,7 +59,7 @@ async function handleClearAll() {
 
   await Promise.all(ids.map(id => chatStore.removeConversation(id)))
   chatStore.newConversation()
-  queryCache.invalidateQueries({ key: ['conversations'] })
+  queryCache.invalidateQueries({ key: getConversationListQueryKey(chatScope) })
   toast.success('已清空所有对话')
 }
 
@@ -160,7 +161,7 @@ async function handleDeleteConversation(id: string) {
   if (confirmed) {
     await chatStore.removeConversation(id)
     toast.success('对话已删除')
-    queryCache.invalidateQueries({ key: ['conversations'] })
+    queryCache.invalidateQueries({ key: getConversationListQueryKey(chatScope) })
   }
 }
 </script>

@@ -9,6 +9,8 @@ export interface ResizePanelOptions {
   maxWidth?: number
   /** 宽度变更回调（用于持久化） */
   onWidthChange?: (width: number) => void
+  /** 拖拽边缘位置：right=右边缘，left=左边缘 */
+  resizeFrom?: 'right' | 'left'
 }
 
 /**
@@ -21,6 +23,7 @@ export function useResizePanel(options: ResizePanelOptions) {
     minWidth = 180,
     maxWidth = 500,
     onWidthChange,
+    resizeFrom = 'right',
   } = options
 
   const width = ref(initialWidth)
@@ -50,7 +53,8 @@ export function useResizePanel(options: ResizePanelOptions) {
 
     rafId = requestAnimationFrame(() => {
       const deltaX = e.clientX - startX.value
-      const newWidth = startWidth.value + deltaX
+      const directionFactor = resizeFrom === 'left' ? -1 : 1
+      const newWidth = startWidth.value + deltaX * directionFactor
       const clamped = Math.max(minWidth, Math.min(maxWidth, newWidth))
 
       width.value = clamped

@@ -23,7 +23,7 @@ import {
   removeRule,
 } from '../agent/whitelist.js'
 import { config } from '../config.js'
-import { conversationExists, createConversation, touchConversation } from '../services/conversation.js'
+import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
 import { addMessage } from '../services/message.js'
 
 export const chatRoutes = new Hono()
@@ -110,7 +110,20 @@ function convertToModelMessage(msg: SharedCoreMessage): ModelMessage {
 // POST /api/chat - Stream chat response
 chatRoutes.post('/', async (c) => {
   const body = await c.req.json<ChatRequest>()
-  const { conversationId, message, messages: historyMessages, confirmMode, thinkingMode } = body
+  const {
+    conversationId,
+    message,
+    messages: historyMessages,
+    confirmMode,
+    thinkingMode,
+    space,
+    projectKey,
+  } = body
+
+  const conversationSpace = space === 'coding' ? 'coding' : 'chat'
+  const conversationProjectKey = typeof projectKey === 'string' && projectKey.trim().length > 0
+    ? projectKey
+    : undefined
 
   // 验证请求
   if (!conversationId || !message) {
@@ -131,7 +144,32 @@ chatRoutes.post('/', async (c) => {
   if (!exists) {
     // 自动创建会话，使用消息的前 50 个字符作为标题
     const title = message.length > 50 ? `${message.substring(0, 50)}...` : message
-    await createConversation(title, conversationId)
+    await createScopedConversation({
+      title,
+      id: conversationId,
+      space: conversationSpace,
+      projectKey: conversationProjectKey,
+    })
+  }
+  else {
+    const existingConversation = await getConversation(conversationId)
+    if (existingConversation) {
+      const mismatchSpace = existingConversation.space !== conversationSpace
+      const mismatchProjectKey = (existingConversation.projectKey || null) !== (conversationProjectKey || null)
+
+      if (mismatchSpace || mismatchProjectKey) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: 'CONVERSATION_SCOPE_MISMATCH',
+              message: 'Conversation scope does not match the requested context',
+            },
+          },
+          400,
+        )
+      }
+    }
   }
 
   // 保存用户消息到数据库

@@ -1,14 +1,23 @@
 import { useQuery } from '@pinia/colada'
 import { fetchConversation, fetchConversations } from '@/api/chat'
 
+export interface ConversationScopeInput {
+  space?: 'chat' | 'coding'
+  projectKey?: string
+}
+
+export function getConversationListQueryKey(scope?: ConversationScopeInput) {
+  return ['conversations', scope?.space ?? 'chat', scope?.projectKey ?? ''] as const
+}
+
 /**
  * 会话列表查询（带缓存）
  * staleTime: 30s - 列表数据 30 秒内不重复请求
  */
-export function useConversationListQuery() {
+export function useConversationListQuery(scope?: () => ConversationScopeInput) {
   return useQuery({
-    key: ['conversations'],
-    query: fetchConversations,
+    key: () => getConversationListQueryKey(scope?.()),
+    query: () => fetchConversations(scope?.()),
     staleTime: 30_000,
   })
 }

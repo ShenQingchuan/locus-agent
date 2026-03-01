@@ -14,6 +14,8 @@ import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
 defineProps<{
   disabled?: boolean
   isStreaming?: boolean
+  showBottomHint?: boolean
+  disabledPlaceholder?: string
 }>()
 
 const emit = defineEmits<{
@@ -357,7 +359,13 @@ function handleKeydown(event: KeyboardEvent) {
         ref="textarea"
         v-model="input"
         class="w-full resize-none bg-transparent px-4 pt-4 min-h-[80px] pb-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        :placeholder="isEditing ? '编辑消息…' : isStreaming ? '输入消息（将在当前回答结束后发送）…' : '输入消息…'"
+        :placeholder="disabled && disabledPlaceholder
+          ? disabledPlaceholder
+          : isEditing
+            ? '编辑消息…'
+            : isStreaming
+              ? '输入消息（将在当前回答结束后发送）…'
+              : '输入消息…'"
         rows="1"
         :disabled="disabled"
         @keydown="handleKeydown"
@@ -471,7 +479,7 @@ function handleKeydown(event: KeyboardEvent) {
     </div>
 
     <!-- Hint text -->
-    <p class="text-xs text-muted-foreground/50 text-center mt-2">
+    <p v-if="showBottomHint !== false" class="text-xs text-muted-foreground/50 text-center mt-2">
       回车发送 · Shift+回车换行
     </p>
   </div>

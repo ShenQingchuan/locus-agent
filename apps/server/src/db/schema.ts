@@ -4,6 +4,10 @@ import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlit
 export const conversations = sqliteTable('conversations', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
+  /** 会话所属空间（chat/coding） */
+  space: text('space', { enum: ['chat', 'coding'] }).notNull().default('chat'),
+  /** 项目维度分组键（仅 coding 空间使用） */
+  projectKey: text('project_key'),
   /** 是否需要确认工具执行（true=需要确认，false=yolo 模式） */
   confirmMode: integer('confirm_mode', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' })
@@ -14,6 +18,8 @@ export const conversations = sqliteTable('conversations', {
     .$defaultFn(() => new Date()),
 }, t => [
   index('idx_conversations_updated_at').on(t.updatedAt),
+  index('idx_conversations_space_updated_at').on(t.space, t.updatedAt),
+  index('idx_conversations_space_project_updated_at').on(t.space, t.projectKey, t.updatedAt),
 ])
 
 export const messages = sqliteTable('messages', {

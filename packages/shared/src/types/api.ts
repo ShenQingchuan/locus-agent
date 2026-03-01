@@ -8,6 +8,10 @@ import type { AddToWhitelistPayload } from './whitelist.js'
 export interface ChatRequest {
   /** 会话 ID */
   conversationId: string
+  /** 会话所属空间（chat/coding） */
+  space?: 'chat' | 'coding'
+  /** 项目维度分组键（仅 coding 空间使用） */
+  projectKey?: string
   /** 用户消息内容 */
   message: string
   /** 历史消息（可选，用于无状态调用） */
@@ -34,6 +38,10 @@ export interface ChatResponse {
 export interface CreateConversationRequest {
   /** 会话标题 */
   title?: string
+  /** 会话所属空间（chat/coding） */
+  space?: 'chat' | 'coding'
+  /** 项目维度分组键（仅 coding 空间使用） */
+  projectKey?: string
 }
 
 /**

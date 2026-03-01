@@ -3,10 +3,10 @@ import { Hono } from 'hono'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import {
   conversationExists,
-  createConversation,
+  createScopedConversation,
   deleteConversation,
   getConversationWithMessages,
-  listConversations,
+  listScopedConversations,
   updateConversation,
 } from '../services/conversation.js'
 import { addMessage, getMessages, truncateMessages } from '../services/message.js'
@@ -16,17 +16,30 @@ export const conversationsRoutes = new Hono()
 
 // GET /api/conversations - List all conversations
 conversationsRoutes.get('/', async (c) => {
-  const result = await listConversations()
+  const spaceQuery = c.req.query('space')
+  const space = spaceQuery === 'chat' || spaceQuery === 'coding'
+    ? spaceQuery
+    : undefined
+  const projectKey = c.req.query('projectKey')
+
+  const result = await listScopedConversations({
+    space,
+    projectKey,
+  })
   return c.json({ conversations: result })
 })
 
 // POST /api/conversations - Create a new conversation
 conversationsRoutes.post('/', async (c) => {
   const body = await c.req.json()
-  const { title } = body
+  const { title, space, projectKey } = body
 
-  const conversation = await createConversation(title)
-  return c.json(conversation, 201)
+  const conversation = await createScopedConversation({
+    title,
+    space: space === 'coding' ? 'coding' : 'chat',
+    projectKey: typeof projectKey === 'string' ? projectKey : undefined,
+  })
+  return c.json({ conversation }, 201)
 })
 
 // GET /api/conversations/:id - Get a conversation with messages

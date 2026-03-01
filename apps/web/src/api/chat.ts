@@ -51,6 +51,8 @@ export interface DelegateDeltaEvent {
 
 export interface ChatStreamOptions {
   conversationId: string
+  space?: 'chat' | 'coding'
+  projectKey?: string
   message: string
   messages?: CoreMessage[]
   confirmMode?: boolean
@@ -96,6 +98,8 @@ function parseSSELine(line: string): SSEEvent | null {
 export async function streamChat(options: ChatStreamOptions): Promise<void> {
   const {
     conversationId,
+    space = 'chat',
+    projectKey,
     message,
     messages = [],
     confirmMode = true,
@@ -130,6 +134,8 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
       },
       body: JSON.stringify({
         conversationId,
+        space,
+        projectKey,
         message,
         messages,
         confirmMode,
@@ -427,9 +433,21 @@ export async function deleteWhitelistRule(ruleId: string): Promise<boolean> {
 /**
  * Fetch all conversations
  */
-export async function fetchConversations(): Promise<Conversation[]> {
+export async function fetchConversations(scope?: {
+  space?: 'chat' | 'coding'
+  projectKey?: string
+}): Promise<Conversation[]> {
   try {
-    const response = await fetch(`/api/conversations`, {
+    const params = new URLSearchParams()
+    if (scope?.space)
+      params.set('space', scope.space)
+    if (scope?.projectKey)
+      params.set('projectKey', scope.projectKey)
+
+    const query = params.toString()
+    const url = query ? `/api/conversations?${query}` : '/api/conversations'
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -486,14 +504,22 @@ export async function fetchConversation(
 /**
  * Create a new conversation
  */
-export async function createConversation(title?: string): Promise<Conversation | null> {
+export async function createConversation(options?: {
+  title?: string
+  space?: 'chat' | 'coding'
+  projectKey?: string
+}): Promise<Conversation | null> {
   try {
     const response = await fetch(`/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({
+        title: options?.title,
+        space: options?.space,
+        projectKey: options?.projectKey,
+      }),
     })
 
     if (!response.ok) {

@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, CoreMessage, CustomProviderMode, DelegateDelta, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Message as ApiMessage, Conversation, ConversationSpace, CoreMessage, CustomProviderMode, DelegateDelta, LLMProviderType, ToolCall, ToolResult, WhitelistRule } from '@locus-agent/shared'
 import type { PendingApproval, PendingQuestion, QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -81,6 +81,16 @@ interface ConversationRuntimeState {
   isProcessingQueue: boolean
 }
 
+interface ConversationScopeState {
+  currentConversationId: string | null
+  yoloMode: boolean
+}
+
+interface ConversationScope {
+  space: ConversationSpace
+  projectKey?: string
+}
+
 function createConversationRuntimeState(): ConversationRuntimeState {
   return {
     messages: [],
@@ -99,6 +109,49 @@ export const useChatStore = defineStore('chat', () => {
   // Conversation management
   const conversations = ref<Conversation[]>([])
   const currentConversationId = ref<string | null>(null)
+  const conversationScope = ref<ConversationScope>({ space: 'chat' })
+  // Yolo mode state (persisted per conversation scope)
+  const yoloMode = ref(false)
+  const scopeStates = ref<Record<string, ConversationScopeState>>({
+    'chat:': {
+      currentConversationId: null,
+      yoloMode: false,
+    },
+  })
+
+  function normalizeScope(scope: ConversationScope): ConversationScope {
+    return {
+      space: scope.space,
+      projectKey: scope.projectKey?.trim() || undefined,
+    }
+  }
+
+  function getScopeKey(scope: ConversationScope): string {
+    return `${scope.space}:${scope.projectKey ?? ''}`
+  }
+
+  function setConversationScope(scope: ConversationScope) {
+    const nextScope = normalizeScope(scope)
+    const currentScope = normalizeScope(conversationScope.value)
+    const currentKey = getScopeKey(currentScope)
+    const nextKey = getScopeKey(nextScope)
+
+    scopeStates.value[currentKey] = {
+      currentConversationId: currentConversationId.value,
+      yoloMode: yoloMode.value,
+    }
+
+    if (currentKey === nextKey)
+      return
+
+    conversationScope.value = nextScope
+    const nextState = scopeStates.value[nextKey]
+    currentConversationId.value = nextState?.currentConversationId ?? null
+    yoloMode.value = nextState?.yoloMode ?? false
+    if (!currentConversationId.value) {
+      clearConversationRuntimeState(null)
+    }
+  }
 
   // Conversation runtime state (isolated per conversation)
   const conversationRuntimeStates = ref<Record<string, ConversationRuntimeState>>({})
@@ -202,9 +255,6 @@ export const useChatStore = defineStore('chat', () => {
 
   const isSidebarCollapsed = ref(false)
   const sidebarWidth = ref(getStoredSidebarWidth())
-
-  // Yolo mode state (persisted per conversation)
-  const yoloMode = ref(false)
 
   // Think mode state
   const [thinkMode, toggleThinkMode] = useToggle(true)
@@ -1046,6 +1096,8 @@ export const useChatStore = defineStore('chat', () => {
       const optimisticConversation: Conversation = {
         id: conversationId,
         title: content.length > 50 ? `${content.substring(0, 50)}...` : content,
+        space: conversationScope.value.space,
+        projectKey: conversationScope.value.projectKey ?? null,
         confirmMode: !yoloMode.value,
         createdAt: now,
         updatedAt: now,
@@ -1090,6 +1142,8 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await streamChat({
         conversationId,
+        space: conversationScope.value.space,
+        projectKey: conversationScope.value.projectKey,
         message: content,
         messages: historyToSend,
         confirmMode: !yoloMode.value,
@@ -1456,6 +1510,7 @@ export const useChatStore = defineStore('chat', () => {
     // Conversation management state
     conversations,
     currentConversationId,
+    conversationScope,
     isSidebarCollapsed,
     sidebarWidth,
     yoloMode,
@@ -1501,6 +1556,7 @@ export const useChatStore = defineStore('chat', () => {
     // Conversation management actions
     loadModelSettings,
     saveModelSettings,
+    setConversationScope,
     switchConversation,
     applyConversationData,
     removeConversation,
