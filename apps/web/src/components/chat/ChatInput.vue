@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
-import type { QueuedMessage } from '@/stores/chat'
+import type { QueuedMessage } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'

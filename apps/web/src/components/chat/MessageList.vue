@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Message } from '@/stores/chat'
+import type { Message } from '@/composables/useAssistantRuntime'
 import { nextTick, ref, watch } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RiskLevel } from '@locus-agent/shared'
 import type { QuestionAnswer } from '@/api/chat'
-import type { ToolCallState } from '@/stores/chat'
+import type { ToolCallState } from '@/composables/useAssistantRuntime'
 import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import DiffViewer from '@/components/code/DiffViewer.vue'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QuestionAnswer } from '@/api/chat'
-import type { Message, MessagePart, ToolCallState } from '@/stores/chat'
+import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
 import MarkdownRender from 'markstream-vue'
