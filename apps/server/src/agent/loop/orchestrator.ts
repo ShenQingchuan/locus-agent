@@ -40,6 +40,15 @@ You have access to a persistent memory system via save_memory and search_memorie
 - Do NOT search memories on every single turn — only when relevant context would help
 - Do NOT save trivial or ephemeral information (e.g. "user said hello")
 
+## Todo Tracking
+
+You have access to a todo management tool: manage_todos.
+
+- Use it whenever the user asks for task planning, progress tracking, or a live checklist.
+- Keep todo content short, actionable, and outcome-oriented.
+- Prefer updating existing todo status ('in_progress' / 'completed') over creating duplicates.
+- Use 'list' when you need to verify the latest todo state.
+
 ## Diagram Generation
 
 When generating diagrams or visual representations:
@@ -158,51 +167,52 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     const responseData = await response.response
     const responseMessages = responseData.messages ?? []
 
-    if (streamResult.pendingToolCall) {
-      const tc = streamResult.pendingToolCall
+    if (streamResult.pendingToolCalls.length > 0) {
       messages.push(...responseMessages)
 
-      const pipelineResult = await executePendingToolCall({
-        pendingToolCall: tc,
-        model,
-        shouldConfirm,
-        abortSignal,
-        getToolApproval,
-        onToolPendingApproval,
-        onToolOutputDelta,
-        onQuestionPending,
-        getQuestionAnswer,
-        onDelegateDelta,
-        conversationId,
-        toolContext,
-        toolTimeoutMs,
-      })
+      for (const tc of streamResult.pendingToolCalls) {
+        const pipelineResult = await executePendingToolCall({
+          pendingToolCall: tc,
+          model,
+          shouldConfirm,
+          abortSignal,
+          getToolApproval,
+          onToolPendingApproval,
+          onToolOutputDelta,
+          onQuestionPending,
+          getQuestionAnswer,
+          onDelegateDelta,
+          conversationId,
+          toolContext,
+          toolTimeoutMs,
+        })
 
-      if (onToolCallResult) {
-        await onToolCallResult(
-          tc.toolCallId,
-          tc.toolName,
-          pipelineResult.result,
-          pipelineResult.isError,
-          pipelineResult.isInterrupted,
-        )
+        if (onToolCallResult) {
+          await onToolCallResult(
+            tc.toolCallId,
+            tc.toolName,
+            pipelineResult.result,
+            pipelineResult.isError,
+            pipelineResult.isInterrupted,
+          )
+        }
+
+        const resultText = typeof pipelineResult.result === 'string'
+          ? pipelineResult.result
+          : JSON.stringify(pipelineResult.result)
+
+        messages.push({
+          role: 'tool',
+          content: [{
+            type: 'tool-result',
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            output: pipelineResult.isError
+              ? { type: 'error-text', value: resultText }
+              : { type: 'text', value: resultText },
+          }],
+        })
       }
-
-      const resultText = typeof pipelineResult.result === 'string'
-        ? pipelineResult.result
-        : JSON.stringify(pipelineResult.result)
-
-      messages.push({
-        role: 'tool',
-        content: [{
-          type: 'tool-result',
-          toolCallId: tc.toolCallId,
-          toolName: tc.toolName,
-          output: pipelineResult.isError
-            ? { type: 'error-text', value: resultText }
-            : { type: 'text', value: resultText },
-        }],
-      })
       continue
     }
 

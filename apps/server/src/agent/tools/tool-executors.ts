@@ -2,6 +2,7 @@ import type { ToolName } from './tool-definitions.js'
 import type { StreamingToolExecutor, ToolExecutor } from './tool-runtime-types.js'
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
+import { executeManageTodos, formatManageTodosResult } from './manage_todos.js'
 import { executeReadFile, formatReadResult } from './read.js'
 import { executeSaveMemory, formatSaveMemoryResult } from './save_memory.js'
 import { executeSearchMemories, formatSearchMemoriesResult } from './search_memories.js'
@@ -45,6 +46,10 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     const result = await executeSearchMemories(args as Parameters<typeof executeSearchMemories>[0])
     return formatSearchMemoriesResult(result)
   },
+  manage_todos: async (args, _callbacks, context) => {
+    const result = await executeManageTodos(args as Parameters<typeof executeManageTodos>[0], context?.conversationId)
+    return formatManageTodosResult(result)
+  },
 }
 
 const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
@@ -55,6 +60,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   write_file: executeWriteFile as ToolExecutor,
   save_memory: executeSaveMemory as ToolExecutor,
   search_memories: executeSearchMemories as ToolExecutor,
+  manage_todos: executeManageTodos as ToolExecutor,
 }
 
 export function getBuiltinFormattedExecutor(toolName: string): StreamingToolExecutor | undefined {

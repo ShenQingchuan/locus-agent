@@ -23,19 +23,6 @@ const currentProjectName = 'locus-agent'
         <div class="p-2 space-y-0.5">
           <button
             class="w-full text-left px-2.5 py-2 rounded text-sm transition-colors"
-            :class="activeSection === 'planning'
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'"
-            @click="activeSection = 'planning'"
-          >
-            <span class="inline-flex items-center gap-2">
-              <span class="i-bi:kanban-fill h-4 w-4" />
-              任务编排
-            </span>
-          </button>
-
-          <button
-            class="w-full text-left px-2.5 py-2 rounded text-sm transition-colors"
             :class="activeSection === 'workspace'
               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
               : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'"
@@ -44,6 +31,19 @@ const currentProjectName = 'locus-agent'
             <span class="inline-flex items-center gap-2">
               <span class="i-streamline:computer-pc-desktop-remix h-4 w-4" />
               编码工作台
+            </span>
+          </button>
+
+          <button
+            class="w-full text-left px-2.5 py-2 rounded text-sm transition-colors"
+            :class="activeSection === 'planning'
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'"
+            @click="activeSection = 'planning'"
+          >
+            <span class="inline-flex items-center gap-2">
+              <span class="i-bi:kanban-fill h-4 w-4" />
+              任务编排
             </span>
           </button>
         </div>

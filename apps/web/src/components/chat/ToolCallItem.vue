@@ -95,6 +95,35 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
     const task = String(args.task ?? '')
     return `${agentName}: ${task.slice(0, 40)}${task.length > 40 ? '...' : ''}`
   },
+  manage_todos: (args) => {
+    const action = String(args.action ?? '')
+    const content = typeof args.content === 'string' ? args.content.trim() : ''
+    const status = String(args.status ?? '')
+    const taskId = String(args.taskId ?? '')
+
+    if (action === 'add' && content)
+      return content
+
+    if (action === 'update') {
+      if (content)
+        return content
+      if (status === 'completed')
+        return '标记为已完成'
+      if (status === 'in_progress')
+        return '标记为进行中'
+      if (taskId)
+        return `更新任务 ${taskId}`
+    }
+
+    if (action === 'delete' && taskId)
+      return `删除任务 ${taskId}`
+    if (action === 'list')
+      return '查看待办'
+    if (action === 'clear')
+      return '清理待办'
+
+    return '待办管理'
+  },
 }
 
 /**

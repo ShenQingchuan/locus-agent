@@ -11,7 +11,7 @@ interface StreamConsumeOptions {
 
 interface StreamConsumeResult {
   iterationText: string
-  pendingToolCall: PendingToolCall | null
+  pendingToolCalls: PendingToolCall[]
   finishReason: string
 }
 
@@ -26,7 +26,7 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
   } = options
 
   let iterationText = ''
-  let pendingToolCall: PendingToolCall | null = null
+  const pendingToolCalls: PendingToolCall[] = []
   const seenToolCallIds = new Set<string>()
   let finishReason = initialFinishReason
 
@@ -56,15 +56,13 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
           break
         }
         seenToolCallIds.add(part.toolCallId)
-        if (!pendingToolCall) {
-          pendingToolCall = {
-            toolCallId: part.toolCallId,
-            toolName: part.toolName,
-            args: part.input,
-          }
-          if (onToolCallStart) {
-            await onToolCallStart(part.toolCallId, part.toolName, part.input)
-          }
+        pendingToolCalls.push({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          args: part.input,
+        })
+        if (onToolCallStart) {
+          await onToolCallStart(part.toolCallId, part.toolName, part.input)
         }
         break
 
@@ -79,7 +77,7 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
 
   return {
     iterationText,
-    pendingToolCall,
+    pendingToolCalls,
     finishReason,
   }
 }

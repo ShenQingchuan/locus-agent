@@ -61,10 +61,17 @@ export interface Message {
   }
 }
 
+export interface TodoTask {
+  id: string
+  content: string
+  status: 'in_progress' | 'completed'
+}
+
 type ChatError = { code: string, message: string } | null
 
 interface ConversationRuntimeState {
   messages: Message[]
+  todoTasks: TodoTask[]
   isLoading: boolean
   error: ChatError
   currentStreamingMessageId: string | null
@@ -77,6 +84,7 @@ interface ConversationRuntimeState {
 function createConversationRuntimeState(): ConversationRuntimeState {
   return {
     messages: [],
+    todoTasks: [],
     isLoading: false,
     error: null,
     currentStreamingMessageId: null,
@@ -130,6 +138,10 @@ export const useChatStore = defineStore('chat', () => {
   const messages = computed<Message[]>({
     get: () => getConversationRuntimeState().messages,
     set: value => (getConversationRuntimeState().messages = value),
+  })
+  const todoTasks = computed<TodoTask[]>({
+    get: () => getConversationRuntimeState().todoTasks,
+    set: value => (getConversationRuntimeState().todoTasks = value),
   })
   const isLoading = computed<boolean>({
     get: () => getConversationRuntimeState().isLoading,
@@ -211,6 +223,8 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = computed(() => currentStreamingMessageId.value !== null)
   const hasPendingApprovals = computed(() => pendingApprovals.value.size > 0)
   const queuedMessageCount = computed(() => messageQueue.value.length)
+  const completedTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'completed').length)
+  const inProgressTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'in_progress').length)
 
   const currentConversation = computed(() =>
     conversations.value.find(c => c.id === currentConversationId.value),
@@ -377,6 +391,7 @@ export const useChatStore = defineStore('chat', () => {
     // Convert API messages to local Message format
     // We need to merge tool results from tool messages into assistant messages
     const convertedMessages: Message[] = []
+    let reconstructedTodos: TodoTask[] = []
 
     for (let i = 0; i < data.messages.length; i++) {
       const m = data.messages[i]!
@@ -421,6 +436,12 @@ export const useChatStore = defineStore('chat', () => {
                 status: toolResult.isError ? 'error' : 'completed',
                 output,
               }
+
+              if (!toolResult.isError && existingTc.toolCall.toolName === 'manage_todos') {
+                const parsed = parseManageTodosResult(toolResult.result)
+                if (parsed)
+                  reconstructedTodos = parsed
+              }
             }
           }
         }
@@ -451,6 +472,53 @@ export const useChatStore = defineStore('chat', () => {
 
     const runtimeState = getConversationRuntimeState(conversationId)
     runtimeState.messages = convertedMessages
+    runtimeState.todoTasks = reconstructedTodos
+  }
+
+  function parseManageTodosResult(result: unknown): TodoTask[] | null {
+    if (typeof result !== 'string')
+      return null
+
+    const lines = result.split('\n')
+    const todoLines = lines.filter((line) => {
+      const normalized = line.trim()
+      return /^\d+\.\s+\[(?:completed|in_progress)\]/.test(normalized) && normalized.includes(') ')
+    })
+    if (todoLines.length === 0) {
+      if (result.includes('Current todos: (empty)'))
+        return []
+      return null
+    }
+
+    const parsed: TodoTask[] = []
+    for (const line of todoLines) {
+      const normalized = line.trim()
+      const status = normalized.includes('[completed]')
+        ? 'completed'
+        : normalized.includes('[in_progress]')
+          ? 'in_progress'
+          : null
+      if (!status)
+        continue
+
+      const idStart = normalized.indexOf('(')
+      const idEnd = normalized.indexOf(')', idStart + 1)
+      if (idStart === -1 || idEnd === -1 || idEnd <= idStart + 1)
+        continue
+
+      const id = normalized.slice(idStart + 1, idEnd).trim()
+      const content = normalized.slice(idEnd + 1).trim()
+      if (!id || !content)
+        continue
+
+      parsed.push({
+        id,
+        status,
+        content,
+      })
+    }
+
+    return parsed
   }
 
   async function removeConversation(id: string) {
@@ -649,6 +717,13 @@ export const useChatStore = defineStore('chat', () => {
       if (hasMatch) {
         runtimeState.messages[messageIndex] = { ...message, toolCalls: newToolCalls }
       }
+
+      const matchedToolCall = message.toolCalls.find(tc => tc.toolCall.toolCallId === toolResult.toolCallId)?.toolCall
+      if (matchedToolCall && matchedToolCall.toolName === 'manage_todos' && !toolResult.isError) {
+        const parsed = parseManageTodosResult(toolResult.result)
+        if (parsed)
+          runtimeState.todoTasks = parsed
+      }
     }
     // Clear pending approval
     runtimeState.pendingApprovals.delete(toolResult.toolCallId)
@@ -832,6 +907,7 @@ export const useChatStore = defineStore('chat', () => {
   function clearMessages(conversationId: string | null = currentConversationId.value) {
     const runtimeState = getConversationRuntimeState(conversationId)
     runtimeState.messages = []
+    runtimeState.todoTasks = []
     runtimeState.messageQueue = []
     runtimeState.error = null
     runtimeState.currentStreamingMessageId = null
@@ -1391,6 +1467,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Current conversation state
     messages,
+    todoTasks,
     isLoading,
     error,
     currentStreamingMessageId,
@@ -1414,6 +1491,8 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     hasPendingApprovals,
     queuedMessageCount,
+    completedTodoCount,
+    inProgressTodoCount,
     currentConversation,
     contextTokensUsed,
     contextUsagePercentage,
