@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Conversation } from '@locus-agent/shared'
-import { List, useToast } from '@locus-agent/ui'
+import { List, ListItem, useToast, VirtualList } from '@locus-agent/ui'
 import { computed, ref } from 'vue'
 import ConversationListItem from './ConversationListItem.vue'
 
@@ -8,6 +8,8 @@ const props = defineProps<{
   conversations: Conversation[]
   currentId?: string
   loading?: boolean
+  virtualScroll?: boolean
+  itemHeight?: number
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +37,12 @@ const modelValue = computed(() => {
   // Single select: highlight currentId
   return props.currentId ? [props.currentId] : []
 })
+
+const hasConversations = computed(() => props.conversations.length > 0)
+
+function isConversationSelected(conversation: Conversation): boolean {
+  return modelValue.value.includes(conversation.id)
+}
 
 /**
  * Handle item click with Cmd/Ctrl multi-select support
@@ -97,71 +105,97 @@ async function deleteSelected() {
 </script>
 
 <template>
-  <List
-    :items="conversations"
-    item-key="id"
-    :model-value="modelValue"
-    select-mode="highlight"
-    :loading="loading"
-    list-class="space-y-1"
-    item-class="conversation-list-item rounded-lg transition-colors duration-150 text-sidebar-foreground px-3 py-2.5"
-    :class="{ 'px-2 py-2': !loading && conversations.length > 0 }"
-    @click="handleItemClick"
-  >
-    <template #header>
-      <!-- Multi-select toolbar -->
-      <div
-        v-if="isMultiSelectMode"
-        class="flex items-center justify-between w-full px-2 py-1 mb-1 rounded-md bg-accent/30 text-xs"
-      >
-        <span class="text-muted-foreground leading-none whitespace-nowrap">
-          已选 {{ selectedIds.size }} 项
-        </span>
-        <div class="flex items-center gap-1">
-          <button
-            class="px-1.5 py-0.5 rounded text-[11px] text-muted-foreground hover:bg-accent/70 transition-colors whitespace-nowrap"
-            @click="exitMultiSelect"
-          >
-            取消
-          </button>
-          <button
-            class="px-1.5 py-0.5 rounded text-[11px] text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap"
-            @click="deleteSelected"
-          >
-            批量删除
-          </button>
-        </div>
+  <div class="h-full flex flex-col">
+    <div
+      v-if="isMultiSelectMode"
+      class="flex items-center justify-between w-full px-2 py-1 mb-1 rounded-md bg-accent/30 text-xs"
+    >
+      <span class="text-muted-foreground leading-none whitespace-nowrap">
+        已选 {{ selectedIds.size }} 项
+      </span>
+      <div class="flex items-center gap-1">
+        <button
+          class="px-1.5 py-0.5 rounded text-[11px] text-muted-foreground hover:bg-accent/70 transition-colors whitespace-nowrap"
+          @click="exitMultiSelect"
+        >
+          取消
+        </button>
+        <button
+          class="px-1.5 py-0.5 rounded text-[11px] text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap"
+          @click="deleteSelected"
+        >
+          批量删除
+        </button>
       </div>
-    </template>
+    </div>
 
-    <template #loading>
-      <div class="flex-col-center py-8 text-muted-foreground">
-        <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
-        <span class="text-xs mt-2 opacity-70">加载中...</span>
-      </div>
-    </template>
+    <div v-if="loading" class="flex-1 flex-col-center py-8 text-muted-foreground">
+      <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
+      <span class="text-xs mt-2 opacity-70">加载中...</span>
+    </div>
 
-    <template #empty>
-      <div class="flex-col-center py-8 text-muted-foreground">
-        <div class="i-carbon-chat h-8 w-8 opacity-30" />
-        <span class="text-xs mt-2 opacity-70">暂无对话</span>
-      </div>
-    </template>
+    <div v-else-if="!hasConversations" class="flex-1 flex-col-center py-8 text-muted-foreground">
+      <div class="i-carbon-chat h-8 w-8 opacity-30" />
+      <span class="text-xs mt-2 opacity-70">暂无对话</span>
+    </div>
 
-    <template #default="{ item }">
-      <ConversationListItem :conversation="item" />
-    </template>
+    <VirtualList
+      v-else-if="virtualScroll"
+      :count="conversations.length"
+      :estimate-size="itemHeight ?? 56"
+      :overscan="8"
+      container-class="flex-1 min-h-0 px-2 py-2"
+      :get-item-key="index => conversations[index]?.id ?? index"
+    >
+      <template #default="{ index }">
+        <ListItem
+          v-if="conversations[index]"
+          :id="conversations[index]!.id"
+          :selected="isConversationSelected(conversations[index]!)"
+          select-mode="highlight"
+          item-class="conversation-list-item rounded-lg transition-colors duration-150 text-sidebar-foreground px-3 py-2.5"
+          @click="(_id, event) => handleItemClick(conversations[index]!, event)"
+        >
+          <ConversationListItem :conversation="conversations[index]!" />
+          <template #actions>
+            <button
+              class="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
+              title="删除对话"
+              @click.stop="emit('delete', conversations[index]!.id)"
+            >
+              <div class="i-carbon-trash-can h-3.5 w-3.5" />
+            </button>
+          </template>
+        </ListItem>
+      </template>
+    </VirtualList>
 
-    <template #actions="{ item }">
-      <button
-        class="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
-        title="删除对话"
-        @click.stop="emit('delete', item.id)"
-      >
-        <div class="i-carbon-trash-can h-3.5 w-3.5" />
-      </button>
-    </template>
-  </List>
+    <List
+      v-else
+      :items="conversations"
+      item-key="id"
+      :model-value="modelValue"
+      select-mode="highlight"
+      list-class="space-y-1"
+      item-class="conversation-list-item rounded-lg transition-colors duration-150 text-sidebar-foreground px-3 py-2.5"
+      class="px-2 py-2"
+      @click="handleItemClick"
+    >
+      <template #default="{ item }">
+        <ConversationListItem :conversation="item" />
+      </template>
+
+      <template #actions="{ item }">
+        <button
+          class="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
+          title="删除对话"
+          @click.stop="emit('delete', item.id)"
+        >
+          <div class="i-carbon-trash-can h-3.5 w-3.5" />
+        </button>
+      </template>
+    </List>
+  </div>
 </template>
 
 <style>

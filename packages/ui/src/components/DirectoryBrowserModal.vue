@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
 import Modal from './Modal.vue'
 
 export interface DirectoryBrowserEntry {
@@ -6,7 +7,7 @@ export interface DirectoryBrowserEntry {
   path: string
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   currentPath: string
   entries: DirectoryBrowserEntry[]
@@ -30,8 +31,70 @@ const emit = defineEmits<{
   refresh: []
   goParent: []
   navigate: [path: string]
+  submitPath: [path: string]
   confirm: []
 }>()
+
+const isEditingPath = ref(false)
+const draftPath = ref('')
+let submitTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearSubmitTimer() {
+  if (!submitTimer) {
+    return
+  }
+  clearTimeout(submitTimer)
+  submitTimer = null
+}
+
+function emitSubmitPath(path: string) {
+  const nextPath = path.trim()
+  if (nextPath) {
+    emit('submitPath', nextPath)
+  }
+}
+
+function scheduleSubmitPath(path: string) {
+  clearSubmitTimer()
+  submitTimer = setTimeout(() => {
+    emitSubmitPath(path)
+    submitTimer = null
+  }, 260)
+}
+
+watch(() => props.currentPath, (path) => {
+  if (!isEditingPath.value) {
+    draftPath.value = path
+  }
+}, { immediate: true })
+
+watch(draftPath, (path) => {
+  if (!isEditingPath.value) {
+    return
+  }
+  scheduleSubmitPath(path)
+})
+
+onBeforeUnmount(() => {
+  clearSubmitTimer()
+})
+
+function startEditPath() {
+  isEditingPath.value = true
+  draftPath.value = props.currentPath
+}
+
+function cancelEditPath() {
+  clearSubmitTimer()
+  isEditingPath.value = false
+  draftPath.value = props.currentPath
+}
+
+function submitPath() {
+  clearSubmitTimer()
+  emitSubmitPath(draftPath.value)
+  isEditingPath.value = false
+}
 </script>
 
 <template>
@@ -76,9 +139,23 @@ const emit = defineEmits<{
             刷新
           </span>
         </button>
-        <p class="flex-1 min-w-0 text-xs text-muted-foreground truncate font-mono">
-          {{ currentPath || '未选择路径' }}
-        </p>
+        <button
+          v-if="!isEditingPath"
+          class="flex-1 min-w-0 h-7 px-2 rounded text-left text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          @click="startEditPath"
+        >
+          <span class="truncate block font-mono">{{ currentPath || '未选择路径' }}</span>
+        </button>
+        <input
+          v-else
+          v-model="draftPath"
+          type="text"
+          class="flex-1 min-w-0 h-7 px-2 rounded border border-border bg-background text-xs text-foreground font-mono outline-none ring-0"
+          placeholder="输入路径后回车"
+          @keydown.enter.prevent="submitPath"
+          @keydown.esc.prevent="cancelEditPath"
+          @blur="submitPath"
+        >
       </div>
 
       <div class="flex-1 min-h-0 overflow-y-auto px-3 py-3">

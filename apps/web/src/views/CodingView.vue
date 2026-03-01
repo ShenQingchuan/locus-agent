@@ -7,6 +7,7 @@ import type {
 import type { FileTreeNode } from '@locus-agent/ui'
 import { DirectoryBrowserModal, FileTree, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
+import { useLocalStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -31,9 +32,11 @@ const isWorkspacePickerLoading = ref(false)
 const isWorkspacePathLoading = ref(false)
 const currentBrowsePath = ref('')
 const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
+const allBrowseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
-const currentWorkspaceRootPath = ref('')
+let browseRequestToken = 0
 const currentProjectKey = ref<string | undefined>()
+const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
 const isHistoryOpen = ref(false)
 const dirtyConversations = new Set<string>()
 
@@ -147,6 +150,27 @@ watch(() => chatStore.currentConversationId, (_newId, oldId) => {
 
 onMounted(async () => {
   await chatStore.loadModelSettings()
+
+  const savedPath = lastWorkspacePath.value.trim()
+  if (!savedPath) {
+    return
+  }
+
+  try {
+    await runWithLoadingState(isWorkspaceLoading, async () => {
+      const result = await workspaceApi.openWorkspace(savedPath)
+      const projectKey = await createProjectKey(result.rootPath)
+      currentProjectName.value = result.rootName
+      currentProjectKey.value = projectKey
+      workspaceTree.value = toFileTreeNodes(result.tree)
+      selectedFileId.value = null
+      currentBrowsePath.value = result.rootPath
+      activeSection.value = 'workspace'
+    })
+  }
+  catch {
+    lastWorkspacePath.value = ''
+  }
 })
 
 function sleep(ms: number) {
@@ -197,22 +221,79 @@ function handleFileSelect(node: FileTreeNode) {
   }
 }
 
-async function loadBrowseEntries(path: string) {
+function filterDirectoryEntries(entries: WorkspaceDirectoryEntry[], keyword: string): WorkspaceDirectoryEntry[] {
+  const query = keyword.trim().toLowerCase()
+  if (!query) {
+    return entries
+  }
+  return entries.filter(entry => entry.name.toLowerCase().includes(query))
+}
+
+function splitInputPath(inputPath: string): { browsePath: string, keyword: string } {
+  const trimmed = inputPath.trim()
+  if (!trimmed) {
+    return { browsePath: '', keyword: '' }
+  }
+
+  const normalized = trimmed.endsWith('/')
+    ? trimmed.slice(0, -1)
+    : trimmed
+
+  if (trimmed.endsWith('/')) {
+    return { browsePath: normalized || '/', keyword: '' }
+  }
+
+  const slashIndex = normalized.lastIndexOf('/')
+  if (slashIndex <= 0) {
+    return { browsePath: normalized, keyword: '' }
+  }
+
+  return {
+    browsePath: normalized.slice(0, slashIndex),
+    keyword: normalized.slice(slashIndex + 1),
+  }
+}
+
+async function loadBrowseEntries(path: string, options: { silent?: boolean, keyword?: string } = {}) {
   if (!path) {
     return
   }
 
+  const token = ++browseRequestToken
+
   try {
     await runWithLoadingState(isWorkspacePathLoading, async () => {
       const result = await workspaceApi.fetchWorkspaceDirectories(path)
+
+      if (token !== browseRequestToken) {
+        return
+      }
+
       currentBrowsePath.value = result.path
-      browseEntries.value = result.entries
+      allBrowseEntries.value = result.entries
+      browseEntries.value = filterDirectoryEntries(result.entries, options.keyword || '')
       isBrowseTruncated.value = result.truncated
     })
   }
   catch (error) {
-    toast.error(error instanceof Error ? error.message : '加载目录失败')
+    if (!options.silent) {
+      toast.error(error instanceof Error ? error.message : '加载目录失败')
+    }
   }
+}
+
+function handlePathInput(path: string) {
+  const { browsePath, keyword } = splitInputPath(path)
+  if (!browsePath) {
+    return
+  }
+
+  if (currentBrowsePath.value === browsePath && allBrowseEntries.value.length > 0) {
+    browseEntries.value = filterDirectoryEntries(allBrowseEntries.value, keyword)
+    return
+  }
+
+  loadBrowseEntries(browsePath, { silent: true, keyword })
 }
 
 async function openWorkspacePicker() {
@@ -246,8 +327,8 @@ async function openCurrentBrowsePathAsWorkspace() {
       const result = await workspaceApi.openWorkspace(currentBrowsePath.value)
       const projectKey = await createProjectKey(result.rootPath)
       currentProjectName.value = result.rootName
-      currentWorkspaceRootPath.value = result.rootPath
       currentProjectKey.value = projectKey
+      lastWorkspacePath.value = result.rootPath
       workspaceTree.value = toFileTreeNodes(result.tree)
       selectedFileId.value = null
       activeSection.value = 'workspace'
@@ -468,15 +549,15 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
           <div class="h-11 px-3 border-b border-border flex items-center justify-between">
             <div class="min-w-0">
               <p class="text-sm font-medium">
-                研发助手
-              </p>
-              <p v-if="currentWorkspaceRootPath" class="text-[10px] text-muted-foreground font-mono truncate">
-                {{ currentWorkspaceRootPath }}
+                {{ isHistoryOpen ? '项目历史会话' : '研发助手' }}
               </p>
             </div>
             <button
               class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              :class="{ 'opacity-40 cursor-not-allowed': !canUseAssistant }"
+              :class="{
+                'opacity-40 cursor-not-allowed': !canUseAssistant,
+                'bg-muted text-foreground': canUseAssistant && isHistoryOpen,
+              }"
               title="项目会话历史"
               :disabled="!canUseAssistant"
               @click="toggleHistory"
@@ -485,38 +566,42 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
             </button>
           </div>
 
-          <div v-if="isHistoryOpen" class="h-[320px] border-b border-border bg-sidebar-background/60">
+          <div v-if="isHistoryOpen" class="flex-1 min-h-0 bg-sidebar-background/60">
             <ConversationList
               :conversations="currentProjectConversations"
               :current-id="chatStore.currentConversationId ?? undefined"
               :loading="isLoadingConversations"
-              class="h-full overflow-y-auto"
+              :virtual-scroll="true"
+              :item-height="58"
+              class="h-full"
               @select="handleSelectConversation"
               @delete="handleDeleteConversation"
             />
           </div>
 
-          <div class="flex-1 min-h-0">
-            <MessageList
-              :messages="chatStore.messages"
-              :is-loading="chatStore.isLoading"
-              :is-streaming="chatStore.isStreaming"
-            />
-          </div>
+          <template v-else>
+            <div class="flex-1 min-h-0">
+              <MessageList
+                :messages="chatStore.messages"
+                :is-loading="chatStore.isLoading"
+                :is-streaming="chatStore.isStreaming"
+              />
+            </div>
 
-          <div class="px-4 xl:px-5 pb-3">
-            <p v-if="canUseAssistant" class="text-[11px] text-muted-foreground mb-2">
-              回车发送 · Shift+回车换行
-            </p>
-            <ChatInput
-              :disabled="!canUseAssistant"
-              :is-streaming="chatStore.isStreaming"
-              :show-bottom-hint="false"
-              disabled-placeholder="选择工作空间后才可开始对话"
-              @send="handleSend"
-              @stop="handleStop"
-            />
-          </div>
+            <div class="px-4 xl:px-5 pb-3">
+              <p v-if="canUseAssistant" class="text-[11px] text-muted-foreground mb-2">
+                回车发送 · Shift+回车换行
+              </p>
+              <ChatInput
+                :disabled="!canUseAssistant"
+                :is-streaming="chatStore.isStreaming"
+                :show-bottom-hint="false"
+                disabled-placeholder="请选择工作空间后开始项目内对话。"
+                @send="handleSend"
+                @stop="handleStop"
+              />
+            </div>
+          </template>
         </aside>
       </div>
     </div>
@@ -533,6 +618,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
     @refresh="loadBrowseEntries(currentBrowsePath)"
     @go-parent="goToParentBrowsePath"
     @navigate="loadBrowseEntries"
+    @submit-path="handlePathInput"
     @confirm="openCurrentBrowsePathAsWorkspace"
   />
 </template>
