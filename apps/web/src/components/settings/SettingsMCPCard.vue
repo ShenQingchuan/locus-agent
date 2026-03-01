@@ -10,7 +10,7 @@ import {
   subscribeMCPStatus,
   updateMCPConfig,
 } from '@/api/chat'
-import MonacoEditor from '@/components/MonacoEditor.vue'
+import MonacoEditor from '@/components/code/MonacoEditor.vue'
 
 const toast = useToast()
 

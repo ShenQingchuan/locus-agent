@@ -7,12 +7,12 @@ import { useQueryCache } from '@pinia/colada'
 import { onClickOutside, onKeyStroke } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import * as api from '@/api/knowledge'
-import AppNavRail from '@/components/AppNavRail.vue'
 import AddTagsModal from '@/components/knowledge/AddTagsModal.vue'
 import MemoriesComposer from '@/components/knowledge/MemoriesComposer.vue'
 import MemoriesTagSidebar from '@/components/knowledge/MemoriesTagSidebar.vue'
 import MemoryNoteCard from '@/components/knowledge/MemoryNoteCard.vue'
 import NoteEditor from '@/components/knowledge/NoteEditor.vue'
+import AppNavRail from '@/components/layout/AppNavRail.vue'
 import {
   useNotesListQuery,
   useSearchNotesQuery,

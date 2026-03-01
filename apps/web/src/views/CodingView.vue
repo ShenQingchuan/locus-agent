@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import AppNavRail from '@/components/AppNavRail.vue'
+import AppNavRail from '@/components/layout/AppNavRail.vue'
 
 type CodingSection = 'planning' | 'workspace'
 
