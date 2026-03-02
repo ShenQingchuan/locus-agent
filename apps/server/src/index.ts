@@ -13,6 +13,7 @@ import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
 import { settingsRoutes } from './routes/settings.js'
 import { tagsRoutes } from './routes/tags.js'
+import { tasksRoutes } from './routes/tasks.js'
 import { workspaceRoutes } from './routes/workspace.js'
 import {
   ensureDataDir,
@@ -53,6 +54,7 @@ export function createApp(): Hono {
   app.route('/api/settings', settingsRoutes)
   app.route('/api/embedding', embeddingRoutes)
   app.route('/api/mcp', mcpRoutes)
+  app.route('/api/tasks', tasksRoutes)
   app.route('/api/workspace', workspaceRoutes)
 
   return app

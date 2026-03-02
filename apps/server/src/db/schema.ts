@@ -206,6 +206,68 @@ export const noteConversationsRelations = relations(noteConversations, ({ one })
   }),
 }))
 
+// ==================== Kanban Tasks ====================
+
+/** Spec-driven 任务（看板卡片） */
+export const tasks = sqliteTable('tasks', {
+  id: text('id').primaryKey(),
+  /** 任务标题（卡片上显示） */
+  title: text('title').notNull(),
+  /** Markdown 规格说明（SpecCoding 核心内容） */
+  spec: text('spec').notNull().default(''),
+  /** 看板列状态 */
+  status: text('status', { enum: ['backlog', 'in_progress', 'done'] }).notNull().default('backlog'),
+  /** 优先级：0=无, 1=低, 2=中, 3=高 */
+  priority: integer('priority').notNull().default(0),
+  /** 列内排序序号（越小越靠前） */
+  sortOrder: integer('sort_order').notNull().default(0),
+  /** 项目维度分组键（同 conversations.projectKey） */
+  projectKey: text('project_key').notNull(),
+  /** 主关联对话 ID */
+  conversationId: text('conversation_id')
+    .references(() => conversations.id, { onDelete: 'set null' }),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_tasks_project_status_sort').on(t.projectKey, t.status, t.sortOrder),
+  index('idx_tasks_conversation_id').on(t.conversationId),
+])
+
+/** 任务-对话关联（多对多，支持一任务多对话） */
+export const taskConversations = sqliteTable('task_conversations', {
+  taskId: text('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  conversationId: text('conversation_id')
+    .notNull()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+}, t => [
+  primaryKey({ columns: [t.taskId, t.conversationId] }),
+])
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  primaryConversation: one(conversations, {
+    fields: [tasks.conversationId],
+    references: [conversations.id],
+  }),
+  taskConversations: many(taskConversations),
+}))
+
+export const taskConversationsRelations = relations(taskConversations, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskConversations.taskId],
+    references: [tasks.id],
+  }),
+  conversation: one(conversations, {
+    fields: [taskConversations.conversationId],
+    references: [conversations.id],
+  }),
+}))
+
 // ==================== Types ====================
 
 export type Conversation = typeof conversations.$inferSelect
@@ -220,3 +282,5 @@ export type Note = typeof notes.$inferSelect
 export type NewNote = typeof notes.$inferInsert
 export type Tag = typeof tags.$inferSelect
 export type NewTag = typeof tags.$inferInsert
+export type Task = typeof tasks.$inferSelect
+export type NewTask = typeof tasks.$inferInsert

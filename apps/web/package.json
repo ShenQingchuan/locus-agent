@@ -29,6 +29,7 @@
     "prosemirror-model": "catalog:prosekit-family",
     "shiki": "catalog:highlight",
     "vue": "catalog:vue-family",
+    "vue-draggable-plus": "catalog:vue-family",
     "vue-router": "catalog:vue-family"
   },
   "devDependencies": {

@@ -25,3 +25,4 @@ export {
 } from './whitelist.js'
 export type * from './workspace.js'
 export type * from './git.js'
+export type * from './task.js'

@@ -12,6 +12,7 @@ import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
 import MessageList from '@/components/chat/MessageList.vue'
 import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
+import KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { getConversationListQueryKey, useConversationListQuery, useConversationQuery } from '@/composables/queries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -35,6 +36,7 @@ const allBrowseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
 let browseRequestToken = 0
 const currentProjectKey = ref<string | undefined>()
+const kanbanBoardRef = ref<InstanceType<typeof KanbanBoard> | null>(null)
 const isHistoryOpen = ref(false)
 const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-collapsed', false)
 const dirtyConversations = new Set<string>()
@@ -585,6 +587,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
             <button
               v-if="activeSection === 'planning'"
               class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded px-1.5 py-1 transition-colors"
+              @click="kanbanBoardRef?.openCreate()"
             >
               <div class="i-carbon-add h-4 w-4" />
               <span>新建任务</span>
@@ -592,18 +595,14 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
           </header>
 
           <main class="flex-1 min-h-0">
-            <section
-              v-if="activeSection === 'planning'"
-              class="h-full min-h-0 grid grid-cols-1 md:grid-cols-3 md:divide-x divide-border"
-            >
-              <div class="min-h-0 overflow-y-auto px-3 py-2.5">
-                <span class="text-xs text-muted-foreground">Kanban Backlog 占位示意</span>
-              </div>
-              <div class="min-h-0 overflow-y-auto px-3 py-2.5">
-                <span class="text-xs text-muted-foreground">Kanban In Progress 占位示意</span>
-              </div>
-              <div class="min-h-0 overflow-y-auto px-3 py-2.5">
-                <span class="text-xs text-muted-foreground">Kanban Done 占位示意</span>
+            <section v-if="activeSection === 'planning'" class="h-full min-h-0">
+              <KanbanBoard
+                v-if="currentProjectKey"
+                ref="kanbanBoardRef"
+                :project-key="currentProjectKey"
+              />
+              <div v-else class="h-full flex items-center justify-center">
+                <span class="text-xs text-muted-foreground">请先选择工作空间</span>
               </div>
             </section>
 
