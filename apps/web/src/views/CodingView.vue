@@ -615,6 +615,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
 
               <section v-else class="h-full min-h-0">
                 <SessionChangesPanel
+                  v-if="currentProjectKey"
                   :files="gitStatus.files.value"
                   :summary="gitStatus.summary.value"
                   :is-loading="gitStatus.isLoading.value"
@@ -633,6 +634,13 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                   @stage="gitStatus.stage"
                   @unstage="gitStatus.unstage"
                 />
+                <div v-else class="h-full flex items-center justify-center">
+                  <div class="text-center">
+                    <span class="i-material-symbols:folder-managed-outline h-8 w-8 text-muted-foreground/50 mx-auto block mb-2" />
+                    <span class="text-sm text-muted-foreground block">请先选择工作空间</span>
+                    <span class="text-xs text-muted-foreground/80 block mt-1">点击左侧「工作目录」打开项目</span>
+                  </div>
+                </div>
               </section>
             </main>
           </template>
