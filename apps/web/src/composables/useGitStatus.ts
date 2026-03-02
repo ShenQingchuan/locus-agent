@@ -198,7 +198,11 @@ export function useGitStatus(workspacePath: Ref<string>) {
     const path = workspacePath.value
     if (!path)
       return
-    return await workspaceApi.pushChanges(path)
+    const result = await workspaceApi.pushChanges(path)
+    if (result.success) {
+      invalidateAll()
+    }
+    return result
   }
 
   return {
