@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import Modal from './Modal.vue'
 
 export interface DirectoryBrowserEntry {
@@ -37,6 +37,9 @@ const emit = defineEmits<{
 
 const isEditingPath = ref(false)
 const draftPath = ref('')
+const activeEntryIndex = ref(-1)
+const isTabCompleting = ref(false)
+const entryListRef = ref<HTMLElement | null>(null)
 let submitTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearSubmitTimer() {
@@ -72,7 +75,17 @@ watch(draftPath, (path) => {
   if (!isEditingPath.value) {
     return
   }
+  if (isTabCompleting.value) {
+    return
+  }
+  activeEntryIndex.value = -1
   scheduleSubmitPath(path)
+})
+
+watch(() => props.entries, () => {
+  if (!isTabCompleting.value) {
+    activeEntryIndex.value = -1
+  }
 })
 
 onBeforeUnmount(() => {
@@ -81,12 +94,14 @@ onBeforeUnmount(() => {
 
 function startEditPath() {
   isEditingPath.value = true
+  activeEntryIndex.value = -1
   draftPath.value = props.currentPath
 }
 
 function cancelEditPath() {
   clearSubmitTimer()
   isEditingPath.value = false
+  activeEntryIndex.value = -1
   draftPath.value = props.currentPath
 }
 
@@ -94,6 +109,79 @@ function submitPath() {
   clearSubmitTimer()
   emitSubmitPath(draftPath.value)
   isEditingPath.value = false
+}
+
+function cycleEntry(direction: 1 | -1) {
+  const length = props.entries.length
+  if (length === 0) {
+    return
+  }
+
+  const nextIndex = activeEntryIndex.value < 0
+    ? (direction > 0 ? 0 : length - 1)
+    : (activeEntryIndex.value + direction + length) % length
+
+  activeEntryIndex.value = nextIndex
+  const entry = props.entries[nextIndex]!
+
+  isTabCompleting.value = true
+  clearSubmitTimer()
+  draftPath.value = entry.path
+
+  nextTick(() => {
+    isTabCompleting.value = false
+    const el = entryListRef.value?.children[nextIndex] as HTMLElement | undefined
+    el?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+async function handleTabKey(event: KeyboardEvent) {
+  // Flush any pending debounced submit so entries reflect current input keyword
+  if (submitTimer) {
+    clearSubmitTimer()
+    emitSubmitPath(draftPath.value)
+    // Wait for parent to filter entries and Vue to propagate the prop update
+    await nextTick()
+  }
+
+  if (props.entries.length === 0) {
+    return
+  }
+
+  // Single match: auto-complete and trigger navigation into the directory
+  if (props.entries.length === 1) {
+    const entry = props.entries[0]!
+    isTabCompleting.value = true
+    clearSubmitTimer()
+    activeEntryIndex.value = -1
+    draftPath.value = `${entry.path}/`
+
+    nextTick(() => {
+      isTabCompleting.value = false
+      emitSubmitPath(draftPath.value)
+    })
+    return
+  }
+
+  // Multiple matches: cycle through entries
+  cycleEntry(event.shiftKey ? -1 : 1)
+}
+
+function handleEnterKey() {
+  // If tab-cycling with an active entry, navigate into it
+  if (activeEntryIndex.value >= 0 && props.entries[activeEntryIndex.value]) {
+    const entry = props.entries[activeEntryIndex.value]!
+    activeEntryIndex.value = -1
+    isEditingPath.value = false
+    emit('navigate', entry.path)
+    return
+  }
+  submitPath()
+}
+
+function handleBlur() {
+  activeEntryIndex.value = -1
+  submitPath()
 }
 </script>
 
@@ -151,10 +239,11 @@ function submitPath() {
           v-model="draftPath"
           type="text"
           class="flex-1 min-w-0 h-7 px-2 rounded border border-border bg-background text-xs text-foreground font-mono outline-none ring-0"
-          placeholder="输入路径后回车"
-          @keydown.enter.prevent="submitPath"
+          placeholder="输入路径后回车，Tab 补全"
+          @keydown.enter.prevent="handleEnterKey"
           @keydown.esc.prevent="cancelEditPath"
-          @blur="submitPath"
+          @keydown.tab.prevent="handleTabKey"
+          @blur="handleBlur"
         >
       </div>
 
@@ -171,11 +260,14 @@ function submitPath() {
             <span>{{ emptyText }}</span>
           </div>
         </div>
-        <div v-else class="space-y-0.5">
+        <div v-else ref="entryListRef" class="space-y-0.5">
           <button
-            v-for="entry in entries"
+            v-for="(entry, index) in entries"
             :key="entry.path"
-            class="w-full h-9 px-2.5 rounded text-left text-sm text-foreground hover:bg-accent/60 transition-colors"
+            :class="[
+              'w-full h-9 px-2.5 rounded text-left text-sm text-foreground transition-colors',
+              index === activeEntryIndex ? 'bg-accent' : 'hover:bg-accent/60',
+            ]"
             @click="emit('navigate', entry.path)"
           >
             <span class="inline-flex items-center gap-2 min-w-0">
