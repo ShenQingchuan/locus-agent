@@ -35,14 +35,14 @@ const navItems: NavItem[] = [
     title: '对话',
   },
   {
-    key: 'memories',
-    icon: 'i-material-symbols:book-2',
-    title: '记忆',
-  },
-  {
     key: 'coding',
     icon: 'i-fa7-solid:leaf',
     title: '编程',
+  },
+  {
+    key: 'memories',
+    icon: 'i-material-symbols:book-2',
+    title: '记忆',
   },
 ]
 </script>

@@ -553,11 +553,20 @@ workspaceRoutes.get('/git/watch', async (c) => {
         let gitWatcher: ReturnType<typeof fsWatch> | null = null
         try {
           gitWatcher = fsWatch(join(directoryPath, '.git'), (_, filename) => {
-            if (filename === 'index' || filename === 'HEAD')
+            if (filename === 'index' || filename === 'HEAD' || filename === 'packed-refs')
               notify()
           })
         }
         catch { /* .git dir watch failed, continue with workspace watcher only */ }
+
+        // Watch .git/refs/ recursively for push/fetch/pull (remote tracking ref updates)
+        let refsWatcher: ReturnType<typeof fsWatch> | null = null
+        try {
+          refsWatcher = fsWatch(join(directoryPath, '.git', 'refs'), { recursive: true }, () => {
+            notify()
+          })
+        }
+        catch { /* refs watch failed, fallback to staleTime polling */ }
 
         // Watch workspace recursively for file edits (exclude .git/ internals)
         let workspaceWatcher: ReturnType<typeof fsWatch> | null = null
@@ -574,6 +583,7 @@ workspaceRoutes.get('/git/watch', async (c) => {
 
         function cleanup() {
           gitWatcher?.close()
+          refsWatcher?.close()
           workspaceWatcher?.close()
           clearInterval(keepalive)
           if (debounceTimer)
