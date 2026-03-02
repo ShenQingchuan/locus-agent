@@ -66,14 +66,17 @@ function handleStartExecution() {
           />
           <div
             v-else
-            class="i-carbon-document h-4 w-4 text-primary"
+            class="i-icon-park-solid:guide-board h-4 w-4 text-primary"
           />
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="text-xs font-medium text-foreground truncate">{{ planTitle }}</span>
-            <span class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal flex-shrink-0">
-              {{ status === 'pending' ? '生成中...' : status === 'error' ? '失败' : '实现计划' }}
+            <span v-if="status === 'pending'" class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal flex-shrink-0">
+              生成中...
+            </span>
+            <span v-else-if="status === 'error'" class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal flex-shrink-0">
+              生成失败
             </span>
           </div>
           <p class="text-xs text-muted-foreground mt-0.5 truncate">

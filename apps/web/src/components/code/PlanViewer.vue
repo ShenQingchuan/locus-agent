@@ -31,9 +31,6 @@ const planTitle = computed(() => {
       <h1 class="text-sm font-semibold truncate">
         {{ planTitle }}
       </h1>
-      <span class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full leading-normal flex-shrink-0">
-        实现计划
-      </span>
     </header>
 
     <!-- Content -->

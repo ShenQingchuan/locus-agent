@@ -223,12 +223,13 @@ async function handleSubmit() {
     return
 
   if (isEditing.value) {
-    // Edit mode: save the edited message and re-send
-    const conversationId = await chatStore.saveEditMessage(chatStore.editingMessageId!, input.value)
+    const editContent = input.value
+    const editMessageId = chatStore.editingMessageId!
+    input.value = ''
+    const conversationId = await chatStore.saveEditMessage(editMessageId, editContent)
     if (conversationId) {
       markDirty(conversationId)
     }
-    input.value = ''
     return
   }
 
