@@ -40,6 +40,7 @@ function handleViewPlan() {
 
 function handleStartExecution() {
   chatStore.setCodingMode('build')
+  chatStore.sendMessage('开始执行计划')
 }
 </script>
 
