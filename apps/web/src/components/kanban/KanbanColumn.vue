@@ -17,6 +17,7 @@ const emit = defineEmits<{
   move: [taskId: string, targetStatus: TaskStatus]
   delete: [taskId: string]
   reorder: [event: { taskId: string, targetStatus: TaskStatus, targetIndex: number }]
+  switchConversation: [conversationId: string]
 }>()
 
 const listRef = ref<HTMLElement | null>(null)
@@ -80,6 +81,7 @@ useDraggable(listRef, taskList, {
           @click="emit('select', task.id)"
           @move="(s) => emit('move', task.id, s)"
           @delete="emit('delete', task.id)"
+          @switch-conversation="(cid) => emit('switchConversation', cid)"
         />
       </div>
 

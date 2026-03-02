@@ -14,6 +14,7 @@ const emit = defineEmits<{
   close: []
   updated: []
   deleted: []
+  switchConversation: [conversationId: string]
 }>()
 
 const { data: detailData } = useTaskDetailQuery(() => props.taskId)
@@ -139,39 +140,19 @@ const priorityOptions = [
       </div>
 
       <!-- Linked conversations -->
-      <div v-if="detailData.conversationIds?.length" class="text-xs text-muted-foreground">
-        <span>关联对话：{{ detailData.conversationIds.length }} 个</span>
-      </div>
-
-      <!-- AI Actions placeholder (Phase 2) -->
-      <div class="flex gap-2 border-t border-border pt-2">
-        <button
-          type="button"
-          disabled
-          class="px-2.5 py-1 text-xs rounded-md border border-border text-muted-foreground opacity-50 cursor-not-allowed"
-          title="Phase 2: AI 补充 Spec"
-        >
-          <div class="i-carbon-machine-learning-model h-3 w-3 inline-block mr-0.5 align-middle" />
-          AI 补充 Spec
-        </button>
-        <button
-          type="button"
-          disabled
-          class="px-2.5 py-1 text-xs rounded-md border border-border text-muted-foreground opacity-50 cursor-not-allowed"
-          title="Phase 2: AI 拆分子任务"
-        >
-          <div class="i-carbon-flow h-3 w-3 inline-block mr-0.5 align-middle" />
-          AI 拆分子任务
-        </button>
-        <button
-          type="button"
-          disabled
-          class="px-2.5 py-1 text-xs rounded-md border border-border text-muted-foreground opacity-50 cursor-not-allowed"
-          title="Phase 2: 基于 Spec 开始实现"
-        >
-          <div class="i-carbon-play h-3 w-3 inline-block mr-0.5 align-middle" />
-          开始实现
-        </button>
+      <div v-if="detailData.conversationIds?.length">
+        <label class="text-xs text-muted-foreground mb-1 block">关联对话</label>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="cid in detailData.conversationIds"
+            :key="cid"
+            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+            @click="emit('switchConversation', cid); emit('close')"
+          >
+            <div class="i-carbon-chat h-3 w-3" />
+            <span class="font-mono">{{ cid.slice(0, 8) }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- Save/Delete -->

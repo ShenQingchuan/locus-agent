@@ -116,6 +116,7 @@ chatRoutes.post('/', async (c) => {
     messages: historyMessages,
     confirmMode,
     thinkingMode,
+    codingMode,
     space,
     projectKey,
   } = body
@@ -221,7 +222,9 @@ chatRoutes.post('/', async (c) => {
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,
         thinkingMode: effectiveThinkingMode,
+        codingMode: conversationSpace === 'coding' ? codingMode : undefined,
         conversationId,
+        projectKey: conversationProjectKey,
 
         // 思考过程增量回调
         onReasoningDelta: async (delta) => {

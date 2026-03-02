@@ -57,6 +57,29 @@ When generating diagrams or visual representations:
 2. Or use ASCII art as fallback.
 `
 
+const PLAN_MODE_PROMPT = `
+## Plan Mode (当前处于规划模式)
+
+你现在处于 **Plan 模式**。在此模式下，你的首要任务是帮助用户制定清晰、可执行的实现计划，而不是直接编码。
+
+**Plan 模式行为规范：**
+1. 先充分理解用户需求，必要时提问澄清
+2. 阅读相关代码文件，了解现有架构和模式
+3. 制定结构化的实现计划，包含：
+   - 目标概述
+   - 需要修改/新建的文件清单
+   - 每个文件的具体改动描述
+   - 实现步骤和顺序
+   - 潜在风险和注意事项
+4. 使用 write_plan 工具将计划写入文件（路径：~/.local/share/locus-agent/coding-plans/[计划目标]-[短唯一id].md）
+5. 计划文件命名要求：用简短的英文或拼音描述计划目标，加上 6 位随机 ID，例如 \`add-auth-flow-a3f8k2.md\`
+6. 等待用户确认计划后，如用户说"开始"或"执行"，建议用户切换到 Build 模式开始实现
+
+**禁止在 Plan 模式下：**
+- 直接修改项目源代码（str_replace、write_file 仅可用于写入计划文件）
+- 跳过规划直接实现
+`
+
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
   const {
     messages: initialMessages,
@@ -73,17 +96,24 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     abortSignal,
     confirmMode: confirmModeOpt = false,
     thinkingMode = true,
+    codingMode,
     getToolApproval,
     onQuestionPending,
     getQuestionAnswer,
     conversationId,
+    projectKey,
     onDelegateDelta,
     toolTimeoutMs = 0,
   } = options
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
   const messages: ModelMessage[] = [...initialMessages]
-  const toolContext = { conversationId }
+  const toolContext = { conversationId, projectKey }
+
+  // 根据 codingMode 扩展 system prompt
+  const effectiveSystemPrompt = codingMode === 'plan'
+    ? `${systemPrompt}\n\n${PLAN_MODE_PROMPT}`
+    : systemPrompt
 
   let totalInputTokens = 0
   let totalOutputTokens = 0
@@ -107,7 +137,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       try {
         response = await streamText({
           model,
-          system: systemPrompt,
+          system: effectiveSystemPrompt,
           messages,
           tools: getMergedTools(),
           abortSignal,

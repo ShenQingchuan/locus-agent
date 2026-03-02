@@ -115,6 +115,15 @@ export const useChatStore = defineStore('chat', () => {
   // Think mode state
   const [thinkMode, toggleThinkMode] = useToggle(true)
 
+  // Coding mode: build (直接编码) / plan (先规划再编码) — 仅 Coding 空间可用
+  const codingMode = ref<'build' | 'plan'>('build')
+  function toggleCodingMode() {
+    codingMode.value = codingMode.value === 'build' ? 'plan' : 'build'
+  }
+  function setCodingMode(mode: 'build' | 'plan') {
+    codingMode.value = mode
+  }
+
   // Model provider & model name (synced with server settings)
   const provider = ref<LLMProviderType>('anthropic')
   const modelName = ref('')
@@ -388,6 +397,7 @@ export const useChatStore = defineStore('chat', () => {
     conversationScope,
     yoloMode,
     thinkMode,
+    codingMode,
     provider,
     modelName,
     conversations,
@@ -547,6 +557,7 @@ export const useChatStore = defineStore('chat', () => {
     sidebarWidth,
     yoloMode,
     thinkMode,
+    codingMode,
     provider,
     modelName,
     customMode,
@@ -596,6 +607,8 @@ export const useChatStore = defineStore('chat', () => {
     setSidebarWidth,
     toggleYoloMode,
     toggleThinkMode,
+    toggleCodingMode,
+    setCodingMode,
 
     // Message actions
     addMessage,

@@ -2,6 +2,8 @@ import { askQuestionTool } from './ask_question.js'
 import { bashTool } from './bash.js'
 import { delegateTool } from './delegate.js'
 import { globTool } from './glob.js'
+import { manageKanbanTool } from './manage_kanban.js'
+import { readPlanTool, writePlanTool } from './manage_plans.js'
 import { manageTodosTool } from './manage_todos.js'
 import { readFileTool } from './read.js'
 import { saveMemoryTool } from './save_memory.js'
@@ -20,6 +22,9 @@ export const tools = {
   save_memory: saveMemoryTool,
   search_memories: searchMemoriesTool,
   manage_todos: manageTodosTool,
+  manage_kanban: manageKanbanTool,
+  write_plan: writePlanTool,
+  read_plan: readPlanTool,
 }
 
 export type ToolName = keyof typeof tools

@@ -600,6 +600,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 v-if="currentProjectKey"
                 ref="kanbanBoardRef"
                 :project-key="currentProjectKey"
+                @switch-conversation="handleSelectConversation"
               />
               <div v-else class="h-full flex items-center justify-center">
                 <span class="text-xs text-muted-foreground">请先选择工作空间</span>
@@ -696,6 +697,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 :disabled="!canUseAssistant"
                 :is-streaming="chatStore.isStreaming"
                 :show-bottom-hint="false"
+                show-coding-mode
                 disabled-placeholder="请选择工作空间后开始项目内对话。"
                 @send="handleSend"
                 @stop="handleStop"

@@ -12,6 +12,7 @@ const emit = defineEmits<{
   click: []
   move: [status: 'backlog' | 'in_progress' | 'done']
   delete: []
+  switchConversation: [conversationId: string]
 }>()
 
 const priorityConfig = {
@@ -82,11 +83,14 @@ function handleAction(key: string) {
       >
         {{ priority.label }}
       </span>
-      <div
+      <button
         v-if="task.conversationId"
-        class="i-carbon-chat h-3 w-3 text-muted-foreground"
-        title="已关联对话"
-      />
+        class="inline-flex items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors"
+        title="跳转到关联对话"
+        @click.stop="emit('switchConversation', task.conversationId!)"
+      >
+        <div class="i-carbon-chat h-3 w-3" />
+      </button>
     </div>
   </div>
 </template>

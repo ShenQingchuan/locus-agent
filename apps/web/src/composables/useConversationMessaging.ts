@@ -19,6 +19,7 @@ interface CreateConversationMessagingOptions {
   conversationScope: Ref<ConversationScope>
   yoloMode: Ref<boolean>
   thinkMode: Ref<boolean>
+  codingMode: Ref<'build' | 'plan'>
   provider: Ref<LLMProviderType>
   modelName: Ref<string>
   conversations: Ref<Conversation[]>
@@ -118,6 +119,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
       scope: options.conversationScope.value,
       confirmMode: !options.yoloMode.value,
       thinkingMode: options.thinkMode.value,
+      codingMode: options.conversationScope.value.space === 'coding' ? options.codingMode.value : undefined,
       onReasoningDelta: (delta) => {
         options.appendReasoningToMessage(assistantMessageId, delta, conversationId)
       },

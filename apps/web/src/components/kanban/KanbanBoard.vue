@@ -12,6 +12,10 @@ const props = defineProps<{
   projectKey: string
 }>()
 
+const emit = defineEmits<{
+  switchConversation: [conversationId: string]
+}>()
+
 const queryCache = useQueryCache()
 const { data: tasks, isPending: isLoading } = useTasksListQuery(() => props.projectKey)
 
@@ -105,6 +109,7 @@ defineExpose({ openCreate })
       @move="handleMove"
       @delete="handleDelete"
       @reorder="handleReorder"
+      @switch-conversation="(cid) => emit('switchConversation', cid)"
     />
   </section>
 
@@ -124,5 +129,6 @@ defineExpose({ openCreate })
     @close="handleDetailClose"
     @updated="handleDetailUpdated"
     @deleted="handleDetailDeleted"
+    @switch-conversation="(cid) => emit('switchConversation', cid)"
   />
 </template>

@@ -20,6 +20,8 @@ export interface ChatRequest {
   thinkingMode?: boolean
   /** 是否需要确认工具执行（false = yolo 模式，默认 true） */
   confirmMode?: boolean
+  /** Coding 空间模式：build（直接编码）/ plan（先规划再编码） */
+  codingMode?: 'build' | 'plan'
 }
 
 /**

@@ -17,10 +17,13 @@ export interface AgentLoopOptions {
   abortSignal?: AbortSignal
   confirmMode?: boolean | (() => boolean)
   thinkingMode?: boolean
+  /** Coding 空间模式：build（直接编码）/ plan（先规划再编码） */
+  codingMode?: 'build' | 'plan'
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
   onQuestionPending?: (toolCallId: string, questions: QuestionItem[]) => void | Promise<void>
   getQuestionAnswer?: (toolCallId: string, questions: QuestionItem[]) => Promise<QuestionAnswer[]>
   conversationId?: string
+  projectKey?: string
   onDelegateDelta?: (toolCallId: string, delta: DelegateDelta) => void | Promise<void>
   toolTimeoutMs?: number
 }

@@ -11,11 +11,13 @@ import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
 import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
 
-defineProps<{
+const props = defineProps<{
   disabled?: boolean
   isStreaming?: boolean
   showBottomHint?: boolean
   disabledPlaceholder?: string
+  /** 是否显示 Build/Plan 模式切换（仅 Coding 空间使用） */
+  showCodingMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -254,6 +256,13 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  // Shift+Tab 切换 Build/Plan 模式（仅 Coding 空间）
+  if (event.key === 'Tab' && event.shiftKey && props.showCodingMode) {
+    event.preventDefault()
+    chatStore.toggleCodingMode()
+    return
+  }
+
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     handleSubmit()
@@ -371,28 +380,65 @@ function handleKeydown(event: KeyboardEvent) {
         @keydown="handleKeydown"
       />
 
+      <!-- Build/Plan mode toggle row (Coding 空间独有) -->
+      <div v-if="showCodingMode" class="flex items-center justify-between px-3 pt-1.5">
+        <div class="flex items-center bg-muted rounded-md p-0.5">
+          <button
+            class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
+            :class="chatStore.codingMode === 'build'
+              ? 'bg-background text-foreground shadow-sm font-medium'
+              : 'text-muted-foreground hover:text-foreground'"
+            @click="chatStore.setCodingMode('build')"
+          >
+            Build
+          </button>
+          <button
+            class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
+            :class="chatStore.codingMode === 'plan'
+              ? 'bg-background text-foreground shadow-sm font-medium'
+              : 'text-muted-foreground hover:text-foreground'"
+            @click="chatStore.setCodingMode('plan')"
+          >
+            Plan
+          </button>
+        </div>
+        <Dropdown :items="modeItems" placement="top-end" persistent @select="handleModeSelect">
+          <template #trigger>
+            <button
+              class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+              aria-label="切换模式"
+            >
+              <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
+              <span>选项</span>
+              <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+            </button>
+          </template>
+        </Dropdown>
+      </div>
+
       <!-- Bottom toolbar -->
       <div class="flex items-center justify-between px-3 py-2">
         <div class="flex items-center gap-1.5">
-          <!-- Mode selector dropdown -->
-          <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
-            <template #trigger>
-              <button
-                class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
-                aria-label="切换模式"
-              >
-                <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
-                <span>选项</span>
-                <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
-              </button>
-            </template>
-          </Dropdown>
+          <!-- Mode selector dropdown (Chat 页面显示，Coding 页面已移到上方) -->
+          <template v-if="!showCodingMode">
+            <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
+              <template #trigger>
+                <button
+                  class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+                  aria-label="切换模式"
+                >
+                  <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
+                  <span>选项</span>
+                  <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+                </button>
+              </template>
+            </Dropdown>
+            <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
+          </template>
           <!-- Session whitelist popover (triggered from dropdown menu) -->
           <div v-if="whitelistOpen" class="absolute left-0 bottom-full mb-1 z-[999]">
             <SessionWhitelistPopover @close="whitelistOpen = false" />
           </div>
-
-          <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
 
           <!-- Provider + model inline -->
           <Select

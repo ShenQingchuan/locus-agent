@@ -4,6 +4,7 @@ export interface ToolOutputCallbacks {
 
 export interface ToolExecutionContext {
   conversationId?: string
+  projectKey?: string
 }
 
 export type ToolExecutor<T = unknown, R = unknown> = (args: T) => Promise<R>
