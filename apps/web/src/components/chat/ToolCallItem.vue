@@ -7,6 +7,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import DiffViewer from '@/components/code/DiffViewer.vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import DelegateCard from './DelegateCard.vue'
+import PlanCard from './PlanCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import ToolCallModal from './ToolCallModal.vue'
 import WhitelistPopover from './WhitelistPopover.vue'
@@ -135,7 +136,7 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
  * To add a new tool with custom output, just add its name to this set.
  */
 const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
-const toolsHideSummaryRow = new Set<string>(['manage_todos'])
+const toolsHideSummaryRow = new Set<string>(['manage_todos', 'write_plan'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -202,6 +203,29 @@ const isAskQuestion = computed(() => props.tool.toolCall.toolName === 'ask_quest
 
 /** Whether this is a delegate tool */
 const isDelegate = computed(() => props.tool.toolCall.toolName === 'delegate')
+
+/** Whether this is a write_plan tool */
+const isWritePlan = computed(() => props.tool.toolCall.toolName === 'write_plan')
+
+/** write_plan tool arguments */
+const writePlanArgs = computed(() => {
+  if (!isWritePlan.value)
+    return null
+  const args = props.tool.toolCall.args
+  return {
+    filename: String(args.filename ?? ''),
+    content: String(args.content ?? ''),
+  }
+})
+
+const writePlanStatus = computed<'pending' | 'completed' | 'error'>(() => {
+  const s = props.tool.status
+  if (s === 'error' || s === 'interrupted')
+    return 'error'
+  if (s === 'completed')
+    return 'completed'
+  return 'pending'
+})
 
 /** Whether this is a bash tool */
 const isBash = computed(() => props.tool.toolCall.toolName === 'bash')
@@ -578,6 +602,14 @@ watch(bashExpanded, (expanded) => {
       :iterations="delegateMeta?.iterations"
       :usage="delegateMeta ? { inputTokens: delegateMeta.inputTokens, outputTokens: delegateMeta.outputTokens, totalTokens: delegateMeta.totalTokens } : undefined"
       class="mt-1.5"
+    />
+
+    <!-- Plan card for write_plan tool -->
+    <PlanCard
+      v-if="isWritePlan && writePlanArgs"
+      :filename="writePlanArgs.filename"
+      :content="writePlanArgs.content"
+      :status="writePlanStatus"
     />
 
     <!-- Inline diff for completed / error states -->

@@ -3,6 +3,7 @@ import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
+import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -172,21 +173,39 @@ const assistantModelLabel = computed<string | null>(() => {
     return null
   return props.message.model || '未记录模型'
 })
+
+const fullTextContent = computed(() => {
+  const parts = displayParts.value
+    .filter(p => p.type === 'text' && p.content)
+    .map(p => (p as { type: 'text', content: string }).content)
+  return parts.join('\n\n') || props.message.content
+})
+
+const { copy, copied } = useClipboard()
 </script>
 
 <template>
-  <!-- Typography-based message layout with alignment -->
-  <article
-    class="py-2"
-    :class="isUser ? 'flex justify-end' : ''"
-  >
-    <!-- User message: right aligned -->
+  <article class="py-2">
+    <!-- User message -->
     <template v-if="isUser">
       <div
-        class="max-w-[95%] text-right group rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors duration-200"
+        class="max-w-full group rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors duration-200"
         :class="isEditing ? 'bg-yellow-400/15 dark:bg-yellow-500/20' : ''"
       >
-        <div class="flex items-center gap-1 justify-end">
+        <div class="flex items-center gap-1">
+          <div class="i-carbon-user text-xs text-muted-foreground" />
+          <span class="text-xs text-muted-foreground block">用户</span>
+          <Tooltip :content="absoluteTime">
+            <span class="text-xs text-muted-foreground/60 ml-2">{{ relativeTime }}</span>
+          </Tooltip>
+          <!-- Token count (hover only) -->
+          <span
+            v-if="messageTokens !== null"
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 ml-1"
+            :title="messageTokensTitle"
+          >
+            {{ messageTokensText }}
+          </span>
           <!-- 编辑按钮 -->
           <button
             class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -205,23 +224,17 @@ const assistantModelLabel = computed<string | null>(() => {
           >
             <div class="i-carbon-restart h-3 w-3" />
           </button>
-          <!-- Token count (hover only, left of timestamp) -->
-          <span
-            v-if="messageTokens !== null"
-            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-muted-foreground/50 mr-1"
-            :title="messageTokensTitle"
+          <!-- 复制按钮 -->
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            :title="copied ? '已复制' : '复制全文'"
+            @click="copy(fullTextContent)"
           >
-            {{ messageTokensText }}
-          </span>
-          <Tooltip :content="absoluteTime">
-            <span class="text-xs text-muted-foreground/60 mr-2">{{ relativeTime }}</span>
-          </Tooltip>
-          <span class="text-xs text-muted-foreground block">用户</span>
-          <div class="i-carbon-user text-xs text-muted-foreground" />
+            <div :class="copied ? 'i-carbon-checkmark' : 'i-carbon-copy'" class="h-3 w-3" />
+          </button>
         </div>
 
-        <!-- 正常显示 -->
-        <div class="prose prose-sm dark:prose-invert max-w-none text-right w-full">
+        <div class="prose prose-sm dark:prose-invert max-w-none w-full">
           <MarkdownRender
             :content="message.content"
             custom-id="locus"
@@ -253,6 +266,14 @@ const assistantModelLabel = computed<string | null>(() => {
           >
             {{ messageTokensText }}
           </span>
+          <!-- 复制按钮 -->
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            :title="copied ? '已复制' : '复制全文'"
+            @click="copy(fullTextContent)"
+          >
+            <div :class="copied ? 'i-carbon-checkmark' : 'i-carbon-copy'" class="h-3 w-3" />
+          </button>
         </div>
 
         <!-- Ordered parts: reasoning, text and tool calls interleaved -->
@@ -316,18 +337,6 @@ const assistantModelLabel = computed<string | null>(() => {
 </template>
 
 <style scoped>
-/* 用户消息中的 markdown 内容右对齐 */
-.text-right .markstream-vue {
-  text-align: right;
-}
-
-.text-right .markstream-vue .paragraph-node,
-.text-right .markstream-vue .heading-node,
-.text-right .markstream-vue .list-node {
-  text-align: right;
-}
-
-/* 展开时隐藏提示文字 */
 details[open] .reasoning-hint {
   display: none;
 }

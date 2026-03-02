@@ -171,8 +171,8 @@ export default defineConfig({
     // Input - shadcn v2: subtle border, slightly brighter bg in dark mode
     // Using bg-transparent lets the muted background show through naturally
     'input-field': 'flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:outline-none',
-    // Select: hide native arrow (macOS/Safari), use custom chevron with controlled spacing
-    'select-field': 'input-field appearance-none pr-9',
+    // Select: hide native arrow, use custom chevron with controlled spacing
+    'select-field': 'input-field appearance-none pr-10',
 
     // Textarea - shadcn v2: subtle border, focus uses ring
     'textarea-field': 'flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:outline-none',

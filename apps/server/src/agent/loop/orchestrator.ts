@@ -58,26 +58,28 @@ When generating diagrams or visual representations:
 `
 
 const PLAN_MODE_PROMPT = `
-## Plan Mode (当前处于规划模式)
+## Plan Mode
 
-你现在处于 **Plan 模式**。在此模式下，你的首要任务是帮助用户制定清晰、可执行的实现计划，而不是直接编码。
+You're in **Plan Mode**. Focus on creating clear, actionable implementation plans — not coding.
 
-**Plan 模式行为规范：**
-1. 先充分理解用户需求，必要时提问澄清
-2. 阅读相关代码文件，了解现有架构和模式
-3. 制定结构化的实现计划，包含：
-   - 目标概述
-   - 需要修改/新建的文件清单
-   - 每个文件的具体改动描述
-   - 实现步骤和顺序
-   - 潜在风险和注意事项
-4. 使用 write_plan 工具将计划写入文件（路径：~/.local/share/locus-agent/coding-plans/[计划目标]-[短唯一id].md）
-5. 计划文件命名要求：用简短的英文或拼音描述计划目标，加上 6 位随机 ID，例如 \`add-auth-flow-a3f8k2.md\`
-6. 等待用户确认计划后，如用户说"开始"或"执行"，建议用户切换到 Build 模式开始实现
+**Guidelines:**
+1. Understand requirements; ask questions if unclear
+2. Read relevant code to understand existing architecture
+3. Create a structured plan with:
+   - Goal summary
+   - Files to modify/create
+   - Specific changes per file
+   - Implementation steps
+   - Risks and considerations
+4. Use write_plan to save the plan to \`~/.local/share/locus-agent/coding-plans/[goal]-[6-char-id].md\`
+5. Filename format: brief English/pinyin description + 6-char random ID, e.g., \`add-auth-flow-a3f8k2.md\`
+6. **After calling write_plan, output NOTHING else** — the UI will display the plan card automatically
+7. Wait for user confirmation; suggest switching to Build mode to implement
 
-**禁止在 Plan 模式下：**
-- 直接修改项目源代码（str_replace、write_file 仅可用于写入计划文件）
-- 跳过规划直接实现
+**Prohibited in Plan Mode:**
+- Modifying source code (str_replace/write_file only for plan files)
+- Skipping planning and implementing directly
+- Outputting summaries/explanations after write_plan
 `
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {

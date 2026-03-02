@@ -190,7 +190,7 @@ watch(() => providerConfigs.value[activeTab.value]?.apiBase, (newValue) => {
               Anthropic 兼容
             </option>
           </select>
-          <div class="i-carbon-chevron-down absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <div class="i-ic:twotone-keyboard-arrow-down absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         </div>
         <p class="text-xs text-muted-foreground">
           选择与你自定义服务 API 格式兼容的模式

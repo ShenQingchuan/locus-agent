@@ -222,6 +222,12 @@ select,
   transition-property: background-color, border-color, color, opacity;
 }
 
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
 /* Remove native focus outline/ring globally (project preference). */
 :where(a, button, input, textarea, select, summary, [role="button"], [tabindex]):focus,
 :where(a, button, input, textarea, select, summary, [role="button"], [tabindex]):focus-visible {

@@ -322,7 +322,7 @@ workspaceRoutes.get('/git/status', async (c) => {
 
     const [statusResult, numstatUnstagedResult, numstatStagedResult, aheadResult] = await Promise.all([
       runGit(directoryPath, ['status', '--porcelain', '-uall']),
-      runGit(directoryPath, ['diff', '--numstat']),          // unstaged: working tree vs index
+      runGit(directoryPath, ['diff', '--numstat']), // unstaged: working tree vs index
       runGit(directoryPath, ['diff', '--numstat', '--cached']), // staged: index vs HEAD
       runGit(directoryPath, ['rev-list', '--count', '@{u}..HEAD']), // commits ahead of upstream
     ])

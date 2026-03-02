@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { tool } from 'ai'
 import { z } from 'zod'
 
@@ -62,8 +62,7 @@ Use action "read" to read a specific file, or "list" to list all available plan 
   inputSchema: z.object({
     action: z.enum(['read', 'list'])
       .describe('"read" to read a specific plan file, "list" to list all plan files'),
-    filename: z.string().optional()
-      .describe('Plan filename to read (required for "read" action)'),
+    filename: z.string().optional().describe('Plan filename to read (required for "read" action)'),
   }),
 })
 

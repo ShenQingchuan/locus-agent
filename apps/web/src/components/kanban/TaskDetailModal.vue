@@ -104,32 +104,38 @@ const priorityOptions = [
       <div class="flex items-center gap-3">
         <div class="flex-1">
           <label class="text-xs text-muted-foreground mb-1 block">状态</label>
-          <select
-            v-model="editStatus"
-            class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <div class="relative">
+            <select
+              v-model="editStatus"
+              class="w-full rounded-md border border-border bg-background appearance-none px-2 pr-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <div class="i-ic:twotone-keyboard-arrow-down absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
         <div class="flex-1">
           <label class="text-xs text-muted-foreground mb-1 block">优先级</label>
-          <select
-            v-model.number="editPriority"
-            class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option v-for="opt in priorityOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <div class="relative">
+            <select
+              v-model.number="editPriority"
+              class="w-full rounded-md border border-border bg-background appearance-none px-2 pr-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option v-for="opt in priorityOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <div class="i-ic:twotone-keyboard-arrow-down absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
       </div>
 
       <!-- Spec -->
       <div>
         <label class="text-xs text-muted-foreground mb-1 block">
-          Spec / 规格说明
+          说明
         </label>
         <textarea
           v-model="editSpec"

@@ -264,8 +264,7 @@ function handleBlur() {
           <button
             v-for="(entry, index) in entries"
             :key="entry.path"
-            :class="[
-              'w-full h-9 px-2.5 rounded text-left text-sm text-foreground transition-colors',
+            class="w-full h-9 px-2.5 rounded text-left text-sm text-foreground transition-colors" :class="[
               index === activeEntryIndex ? 'bg-accent' : 'hover:bg-accent/60',
             ]"
             @click="emit('navigate', entry.path)"

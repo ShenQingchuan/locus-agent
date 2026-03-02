@@ -124,6 +124,15 @@ export const useChatStore = defineStore('chat', () => {
     codingMode.value = mode
   }
 
+  // Plan viewer state — Coding 页面中间面板展示实现计划
+  const viewingPlan = ref<{ filename: string, content: string } | null>(null)
+  function openPlan(filename: string, content: string) {
+    viewingPlan.value = { filename, content }
+  }
+  function closePlan() {
+    viewingPlan.value = null
+  }
+
   // Model provider & model name (synced with server settings)
   const provider = ref<LLMProviderType>('anthropic')
   const modelName = ref('')
@@ -558,6 +567,7 @@ export const useChatStore = defineStore('chat', () => {
     yoloMode,
     thinkMode,
     codingMode,
+    viewingPlan,
     provider,
     modelName,
     customMode,
@@ -609,6 +619,8 @@ export const useChatStore = defineStore('chat', () => {
     toggleThinkMode,
     toggleCodingMode,
     setCodingMode,
+    openPlan,
+    closePlan,
 
     // Message actions
     addMessage,

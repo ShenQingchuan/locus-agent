@@ -136,7 +136,8 @@ export async function executeReadFile(args: {
     const maxSpanEnd = startLine + HARD_MAX_LINES - 1
     endLine = Math.min(cappedEnd, maxSpanEnd)
     truncated = false
-  } else {
+  }
+  else {
     // Original offset+limit mode
     const userSpecifiedLimit = limit !== undefined
     const effectiveLimit = userSpecifiedLimit

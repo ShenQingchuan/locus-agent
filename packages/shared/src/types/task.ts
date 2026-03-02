@@ -9,7 +9,7 @@ export type TaskPriority = 0 | 1 | 2 | 3
 export interface Task {
   id: string
   title: string
-  /** Markdown 规格说明（SpecCoding 核心） */
+  /** Markdown Spec 说明 */
   spec: string
   status: TaskStatus
   priority: TaskPriority

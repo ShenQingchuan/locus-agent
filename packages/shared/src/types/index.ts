@@ -1,17 +1,19 @@
 export type * from './api.js'
 export type * from './conversation.js'
+export type * from './git.js'
 export type * from './knowledge.js'
 export type * from './mcp.js'
 export type * from './message.js'
 export type * from './provider.js'
+
 export {
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './provider.js'
-
 export type * from './sse-events.js'
+export type * from './task.js'
 export type * from './tool.js'
 export type * from './whitelist.js'
 export {
@@ -24,5 +26,3 @@ export {
   TOOL_DEFAULT_RISK,
 } from './whitelist.js'
 export type * from './workspace.js'
-export type * from './git.js'
-export type * from './task.js'

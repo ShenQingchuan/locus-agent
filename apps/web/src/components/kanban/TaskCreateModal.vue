@@ -77,7 +77,7 @@ const priorityOptions = [
 
       <!-- Title -->
       <div>
-        <label class="text-xs text-muted-foreground mb-1 block">标题</label>
+        <label class="text-xs text-muted-foreground mb-2 block">标题</label>
         <input
           v-model="title"
           type="text"
@@ -90,34 +90,40 @@ const priorityOptions = [
       <!-- Status + Priority row -->
       <div class="flex items-center gap-3">
         <div class="flex-1">
-          <label class="text-xs text-muted-foreground mb-1 block">状态</label>
-          <select
-            v-model="status"
-            class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <label class="text-xs text-muted-foreground mb-2 block">状态</label>
+          <div class="relative">
+            <select
+              v-model="status"
+              class="w-full rounded-md border border-border bg-background appearance-none px-2 pr-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <div class="i-ic:twotone-keyboard-arrow-down absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
         <div class="flex-1">
-          <label class="text-xs text-muted-foreground mb-1 block">优先级</label>
-          <select
-            v-model.number="priority"
-            class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option v-for="opt in priorityOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <label class="text-xs text-muted-foreground mb-2 block">优先级</label>
+          <div class="relative">
+            <select
+              v-model.number="priority"
+              class="w-full rounded-md border border-border bg-background appearance-none px-2 pr-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option v-for="opt in priorityOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <div class="i-ic:twotone-keyboard-arrow-down absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
       </div>
 
       <!-- Spec -->
       <div>
-        <label class="text-xs text-muted-foreground mb-1 block">
-          Spec / 规格说明
-          <span class="text-muted-foreground/60">（描述要构建什么、验收标准，而非怎么实现）</span>
+        <label class="flex items-center text-xs text-muted-foreground mb-2 block">
+          说明
+          <span class="text-muted-foreground/60 text-xs ml-1">描述需求目标、验收标准</span>
         </label>
         <textarea
           v-model="spec"

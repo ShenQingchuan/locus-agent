@@ -11,6 +11,7 @@ import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
 import MessageList from '@/components/chat/MessageList.vue'
+import PlanViewer from '@/components/code/PlanViewer.vue'
 import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
 import KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
@@ -485,68 +486,63 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
         ]"
         :style="{ width: isLeftSidebarCollapsed ? '48px' : `${leftPanelWidth}px` }"
       >
-        <!-- Header: workspace switcher -->
-        <div
-          class="border-b border-border min-h-12 flex items-center"
-          :class="isLeftSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
-        >
-          <button
-            v-if="isLeftSidebarCollapsed"
-            class="h-8 w-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="切换工作空间"
-            @click="openWorkspacePicker"
-          >
-            <span class="i-ic:round-folder-special h-4.5 w-4.5" />
-          </button>
-          <button
-            v-else
-            class="w-full text-left text-xs text-muted-foreground truncate hover:text-foreground transition-colors"
-            @click="openWorkspacePicker"
-          >
-            当前项目：<span class="font-mono text-foreground">{{ currentProjectName }}</span>
-          </button>
-        </div>
-
         <!-- Section buttons -->
         <div :class="isLeftSidebarCollapsed ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5'">
           <button
-            class="rounded transition-colors"
+            class="flex items-center rounded transition-colors text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
             :class="[
               isLeftSidebarCollapsed
                 ? 'h-8 w-8 inline-flex items-center justify-center'
                 : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'workspace'
+            ]"
+            :title="isLeftSidebarCollapsed ? '工作目录' : undefined"
+            @click="openWorkspacePicker"
+          >
+            <div v-if="isLeftSidebarCollapsed" class="i-material-symbols:folder-managed h-4 w-4" />
+            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
+              <span class="i-material-symbols:folder-managed h-4 w-4" />
+              工作目录
+            </div>
+          </button>
+
+          <button
+            class="flex items-center rounded transition-colors"
+            :class="[
+              isLeftSidebarCollapsed
+                ? 'h-8 w-8 inline-flex items-center justify-center'
+                : 'w-full text-left px-2.5 py-2 text-sm',
+              activeSection === 'workspace' && !chatStore.viewingPlan
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
             ]"
             :title="isLeftSidebarCollapsed ? '编码工作台' : undefined"
-            @click="activeSection = 'workspace'"
+            @click="activeSection = 'workspace'; chatStore.closePlan()"
           >
-            <span v-if="isLeftSidebarCollapsed" class="i-charm:git-request-cross h-4 w-4" />
-            <span v-else class="inline-flex items-center gap-2 whitespace-nowrap">
+            <div v-if="isLeftSidebarCollapsed" class="i-charm:git-request-cross h-4 w-4" />
+            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
               <span class="i-charm:git-request-cross h-4 w-4" />
               变更审阅
-            </span>
+            </div>
           </button>
 
           <button
-            class="rounded transition-colors"
+            class="flex items-center rounded transition-colors"
             :class="[
               isLeftSidebarCollapsed
                 ? 'h-8 w-8 inline-flex items-center justify-center'
                 : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'planning'
+              activeSection === 'planning' && !chatStore.viewingPlan
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
             ]"
             :title="isLeftSidebarCollapsed ? '任务编排' : undefined"
-            @click="activeSection = 'planning'"
+            @click="activeSection = 'planning'; chatStore.closePlan()"
           >
-            <span v-if="isLeftSidebarCollapsed" class="i-bi:kanban-fill h-4 w-4" />
-            <span v-else class="inline-flex items-center gap-2 whitespace-nowrap">
+            <div v-if="isLeftSidebarCollapsed" class="i-bi:kanban-fill h-4 w-4" />
+            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
               <span class="i-bi:kanban-fill h-4 w-4" />
               任务编排
-            </span>
+            </div>
           </button>
         </div>
 
@@ -580,55 +576,66 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
 
       <div class="flex-1 min-w-0 flex">
         <div class="flex-1 min-w-0 flex flex-col border-r border-border">
-          <header class="h-11 border-b border-border px-4 flex items-center justify-between">
-            <h1 class="text-sm font-semibold">
-              {{ activeSection === 'planning' ? '任务编排' : '变更审阅' }}
-            </h1>
-            <button
-              v-if="activeSection === 'planning'"
-              class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded px-1.5 py-1 transition-colors"
-              @click="kanbanBoardRef?.openCreate()"
-            >
-              <div class="i-carbon-add h-4 w-4" />
-              <span>新建任务</span>
-            </button>
-          </header>
+          <!-- Plan viewer (replaces normal content when a plan is open) -->
+          <PlanViewer
+            v-if="chatStore.viewingPlan"
+            :filename="chatStore.viewingPlan.filename"
+            :content="chatStore.viewingPlan.content"
+            @close="chatStore.closePlan()"
+          />
 
-          <main class="flex-1 min-h-0">
-            <section v-if="activeSection === 'planning'" class="h-full min-h-0">
-              <KanbanBoard
-                v-if="currentProjectKey"
-                ref="kanbanBoardRef"
-                :project-key="currentProjectKey"
-                @switch-conversation="handleSelectConversation"
-              />
-              <div v-else class="h-full flex items-center justify-center">
-                <span class="text-xs text-muted-foreground">请先选择工作空间</span>
-              </div>
-            </section>
+          <!-- Normal content -->
+          <template v-else>
+            <header class="h-11 border-b border-border px-4 flex items-center justify-between">
+              <h1 class="text-sm font-semibold">
+                {{ activeSection === 'planning' ? '任务编排' : '变更审阅' }}
+              </h1>
+              <button
+                v-if="activeSection === 'planning'"
+                class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded px-1.5 py-1 transition-colors"
+                @click="kanbanBoardRef?.openCreate()"
+              >
+                <div class="i-carbon-add h-4 w-4" />
+                <span>新建任务</span>
+              </button>
+            </header>
 
-            <section v-else class="h-full min-h-0">
-              <SessionChangesPanel
-                :files="gitStatus.files.value"
-                :summary="gitStatus.summary.value"
-                :is-loading="gitStatus.isLoading.value"
-                :is-refreshing="gitStatus.isRefreshing.value"
-                :is-git-repo="gitStatus.isGitRepo.value"
-                :selected-file-path="gitStatus.selectedFilePath.value"
-                :selected-file-staged="gitStatus.selectedFileStaged.value"
-                :selected-file-diff="gitStatus.selectedFileDiff.value"
-                :is-diff-loading="gitStatus.isDiffLoading.value"
-                :unpushed-commits="gitStatus.unpushedCommits.value"
-                @select="gitStatus.selectFile"
-                @refresh="gitStatus.refresh"
-                @commit="handleCommit"
-                @push="handlePush"
-                @discard="handleDiscard"
-                @stage="gitStatus.stage"
-                @unstage="gitStatus.unstage"
-              />
-            </section>
-          </main>
+            <main class="flex-1 min-h-0">
+              <section v-if="activeSection === 'planning'" class="h-full min-h-0">
+                <KanbanBoard
+                  v-if="currentProjectKey"
+                  ref="kanbanBoardRef"
+                  :project-key="currentProjectKey"
+                  @switch-conversation="handleSelectConversation"
+                />
+                <div v-else class="h-full flex items-center justify-center">
+                  <span class="text-xs text-muted-foreground">请先选择工作空间</span>
+                </div>
+              </section>
+
+              <section v-else class="h-full min-h-0">
+                <SessionChangesPanel
+                  :files="gitStatus.files.value"
+                  :summary="gitStatus.summary.value"
+                  :is-loading="gitStatus.isLoading.value"
+                  :is-refreshing="gitStatus.isRefreshing.value"
+                  :is-git-repo="gitStatus.isGitRepo.value"
+                  :selected-file-path="gitStatus.selectedFilePath.value"
+                  :selected-file-staged="gitStatus.selectedFileStaged.value"
+                  :selected-file-diff="gitStatus.selectedFileDiff.value"
+                  :is-diff-loading="gitStatus.isDiffLoading.value"
+                  :unpushed-commits="gitStatus.unpushedCommits.value"
+                  @select="gitStatus.selectFile"
+                  @refresh="gitStatus.refresh"
+                  @commit="handleCommit"
+                  @push="handlePush"
+                  @discard="handleDiscard"
+                  @stage="gitStatus.stage"
+                  @unstage="gitStatus.unstage"
+                />
+              </section>
+            </main>
+          </template>
         </div>
 
         <aside
@@ -648,11 +655,19 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
               :class="isAssistantPanelResizing ? 'bg-primary/50' : 'bg-transparent group-hover/resize:bg-primary/30'"
             />
           </div>
-          <div class="h-11 px-3 border-b border-border flex items-center justify-between">
+          <div class="min-h-13 px-3 py-1.5 border-b border-border flex items-center justify-between">
             <div class="min-w-0">
-              <p class="text-sm font-medium">
-                {{ isHistoryOpen ? '项目历史会话' : '研发助手' }}
+              <p v-if="isHistoryOpen" class="text-sm font-medium">
+                项目历史会话
               </p>
+              <template v-else>
+                <p class="text-sm font-medium leading-tight">
+                  研发助手
+                </p>
+                <p v-if="currentProjectKey" class="text-[11px] text-muted-foreground leading-tight truncate mt-0.5">
+                  当前项目：<span class="font-mono">{{ currentProjectName }}</span>
+                </p>
+              </template>
             </div>
             <button
               class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

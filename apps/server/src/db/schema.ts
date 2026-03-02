@@ -213,7 +213,7 @@ export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(),
   /** 任务标题（卡片上显示） */
   title: text('title').notNull(),
-  /** Markdown 规格说明（SpecCoding 核心内容） */
+  /** Markdown Spec 说明 */
   spec: text('spec').notNull().default(''),
   /** 看板列状态 */
   status: text('status', { enum: ['backlog', 'in_progress', 'done'] }).notNull().default('backlog'),

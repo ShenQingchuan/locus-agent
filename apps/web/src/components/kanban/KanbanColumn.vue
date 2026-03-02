@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Task, TaskStatus } from '@locus-agent/shared'
-import { type DraggableEvent, useDraggable } from 'vue-draggable-plus'
+import type { DraggableEvent } from 'vue-draggable-plus'
 import { computed, ref } from 'vue'
+import { useDraggable } from 'vue-draggable-plus'
 import KanbanCard from './KanbanCard.vue'
 
 const props = defineProps<{
