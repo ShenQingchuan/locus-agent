@@ -522,10 +522,10 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
             :title="isLeftSidebarCollapsed ? '编码工作台' : undefined"
             @click="activeSection = 'workspace'"
           >
-            <span v-if="isLeftSidebarCollapsed" class="i-streamline:computer-pc-desktop-remix h-4 w-4" />
+            <span v-if="isLeftSidebarCollapsed" class="i-charm:git-request-cross h-4 w-4" />
             <span v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-streamline:computer-pc-desktop-remix h-4 w-4" />
-              编码工作台
+              <span class="i-charm:git-request-cross h-4 w-4" />
+              变更审阅
             </span>
           </button>
 
@@ -582,7 +582,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
         <div class="flex-1 min-w-0 flex flex-col border-r border-border">
           <header class="h-11 border-b border-border px-4 flex items-center justify-between">
             <h1 class="text-sm font-semibold">
-              {{ activeSection === 'planning' ? '任务编排' : '编码界面' }}
+              {{ activeSection === 'planning' ? '任务编排' : '变更审阅' }}
             </h1>
             <button
               v-if="activeSection === 'planning'"
