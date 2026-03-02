@@ -17,17 +17,17 @@ const HARD_MAX_LINES = 10000
  * Read file tool definition (Vercel AI SDK format).
  *
  * Design notes:
- * - Uses `offset` + `limit` rather than `start_line` + `end_line`.
- *   LLMs reason better about "start from line X, read N lines" than
- *   computing an exact end line, and this avoids off-by-one confusion
- *   around inclusive vs exclusive bounds.
+ * - Supports two modes:
+ *   1. `offset` + `limit` — "start from line X, read N lines" (default)
+ *   2. `offset` + `end_line` — "read lines X through Y" (range mode)
+ * - When `end_line` is set, `limit` is ignored.
  * - `offset` is 1-based to match the line numbers shown in the output.
  */
 export const readFileTool = tool({
   description:
     'Read the contents of a file with line numbers. '
     + 'Returns up to 2000 lines by default. '
-    + 'Use `offset` and `limit` to paginate through large files.',
+    + 'Use `offset` and `limit` to paginate, or `offset` and `end_line` to read a specific range.',
   inputSchema: z.object({
     file_path: z
       .string()
@@ -43,7 +43,13 @@ export const readFileTool = tool({
       .int()
       .min(1)
       .optional()
-      .describe('Maximum number of lines to return (default: 2000)'),
+      .describe('Maximum number of lines to return (default: 2000). Ignored when end_line is set.'),
+    end_line: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('1-based inclusive end line number. When set, reads from offset (default 1) to end_line.'),
   }),
 })
 
@@ -92,8 +98,9 @@ export async function executeReadFile(args: {
   file_path: string
   offset?: number
   limit?: number
+  end_line?: number
 }): Promise<ReadFileResult> {
-  const { file_path, offset, limit } = args
+  const { file_path, offset, limit, end_line } = args
 
   const { resolvedPath, fileStat, text } = await readValidatedTextFile({
     inputPath: file_path,
@@ -119,21 +126,26 @@ export async function executeReadFile(args: {
   // --- Compute effective range ---
   const startLine = Math.max(1, offset ?? 1)
 
-  // When the caller does not supply `limit`, we auto-truncate at
-  // AUTO_TRUNCATE_LINES so the LLM context window stays manageable.
-  // When `limit` IS provided, we still cap at HARD_MAX_LINES as a
-  // safety net, but this is not considered "truncation" (the caller
-  // explicitly asked for a range).
-  const userSpecifiedLimit = limit !== undefined
-  const effectiveLimit = userSpecifiedLimit
-    ? Math.min(limit, HARD_MAX_LINES)
-    : AUTO_TRUNCATE_LINES
+  let endLine: number
+  let truncated: boolean
 
-  const endLine = Math.min(totalLines, startLine + effectiveLimit - 1)
+  if (end_line !== undefined) {
+    // Range mode: read from startLine to end_line (inclusive).
+    // Cap at totalLines and HARD_MAX_LINES span, never auto-truncate.
+    const cappedEnd = Math.min(end_line, totalLines)
+    const maxSpanEnd = startLine + HARD_MAX_LINES - 1
+    endLine = Math.min(cappedEnd, maxSpanEnd)
+    truncated = false
+  } else {
+    // Original offset+limit mode
+    const userSpecifiedLimit = limit !== undefined
+    const effectiveLimit = userSpecifiedLimit
+      ? Math.min(limit, HARD_MAX_LINES)
+      : AUTO_TRUNCATE_LINES
 
-  // Truncation means we auto-limited the output without the caller
-  // explicitly asking for it.
-  const truncated = !userSpecifiedLimit && endLine < totalLines
+    endLine = Math.min(totalLines, startLine + effectiveLimit - 1)
+    truncated = !userSpecifiedLimit && endLine < totalLines
+  }
 
   // --- Format output with line numbers ---
   const selectedLines = lines.slice(startLine - 1, endLine)
