@@ -160,7 +160,7 @@ function fileName(filePath: string): string {
       <!-- Loading -->
       <div v-if="isLoading" class="h-full flex items-center justify-center">
         <div class="inline-flex items-center gap-2 text-xs text-muted-foreground">
-          <span class="i-carbon-circle-dash h-4 w-4 animate-spin" />
+          <span class="i-svg-spinners:180-ring-with-bg h-4 w-4" />
           <span>正在检查变更...</span>
         </div>
       </div>
@@ -168,7 +168,7 @@ function fileName(filePath: string): string {
       <!-- Empty -->
       <div v-else-if="files.length === 0" class="h-full flex items-center justify-center px-3">
         <div class="text-center">
-          <span class="i-carbon-checkmark-outline h-5 w-5 text-muted-foreground/50 mx-auto block mb-1.5" />
+          <span class="i-mingcute:empty-box-fill h-5 w-5 text-muted-foreground/50 mx-auto block mb-1.5" />
           <span class="text-xs text-muted-foreground">暂无文件变更</span>
         </div>
       </div>

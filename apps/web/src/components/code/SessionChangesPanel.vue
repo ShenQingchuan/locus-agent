@@ -140,10 +140,26 @@ function goToNext() {
 
       <!-- Diff content -->
       <div class="flex-1 min-h-0 overflow-auto">
+        <!-- No changes at all -->
+        <div v-if="!isLoading && files.length === 0 && isGitRepo" class="h-full flex items-center justify-center">
+          <div class="text-center">
+            <span class="i-mingcute:empty-box-fill h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
+            <span class="text-xs text-muted-foreground">工作区暂无未提交的变更</span>
+          </div>
+        </div>
+
+        <!-- No file selected but has changes -->
+        <div v-else-if="!selectedFilePath && files.length > 0" class="h-full flex items-center justify-center">
+          <div class="text-center">
+            <span class="i-carbon-document-view h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
+            <span class="text-xs text-muted-foreground">选择左侧文件查看变更</span>
+          </div>
+        </div>
+
         <!-- Loading diff -->
-        <div v-if="isDiffLoading" class="h-full flex items-center justify-center">
+        <div v-else-if="isDiffLoading" class="h-full flex items-center justify-center">
           <div class="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <span class="i-carbon-circle-dash h-4 w-4 animate-spin" />
+            <span class="i-svg-spinners:180-ring-with-bg h-4 w-4" />
             <span>正在加载 diff...</span>
           </div>
         </div>
@@ -155,22 +171,6 @@ function goToNext() {
             :file-path="selectedFilePath ?? undefined"
             :diff-style="diffStyle"
           />
-        </div>
-
-        <!-- No file selected but has changes -->
-        <div v-else-if="!selectedFilePath && files.length > 0" class="h-full flex items-center justify-center">
-          <div class="text-center">
-            <span class="i-carbon-document-view h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
-            <span class="text-xs text-muted-foreground">选择左侧文件查看变更</span>
-          </div>
-        </div>
-
-        <!-- No changes at all -->
-        <div v-else-if="!isLoading && files.length === 0 && isGitRepo" class="h-full flex items-center justify-center">
-          <div class="text-center">
-            <span class="i-carbon-checkmark-outline h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
-            <span class="text-xs text-muted-foreground">工作区暂无未提交的变更</span>
-          </div>
         </div>
       </div>
     </div>
