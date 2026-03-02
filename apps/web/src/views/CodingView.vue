@@ -410,6 +410,30 @@ async function handleCommit() {
   }
 }
 
+async function handlePush() {
+  const confirmed = await toast.confirm({
+    title: '推送到远程',
+    message: '确定要将本地提交推送到远程仓库吗？',
+    confirmText: '推送',
+    cancelText: '取消',
+  })
+  if (!confirmed)
+    return
+
+  try {
+    const result = await gitStatus.push()
+    if (result?.success) {
+      toast.success('推送成功')
+    }
+    else {
+      toast.error(result?.message || '推送失败')
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '推送失败')
+  }
+}
+
 async function handleDiscard() {
   const confirmed = await toast.confirm({
     title: '回滚全部变更',
@@ -594,9 +618,11 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 :selected-file-staged="gitStatus.selectedFileStaged.value"
                 :selected-file-diff="gitStatus.selectedFileDiff.value"
                 :is-diff-loading="gitStatus.isDiffLoading.value"
+                :unpushed-commits="gitStatus.unpushedCommits.value"
                 @select="gitStatus.selectFile"
                 @refresh="gitStatus.refresh"
                 @commit="handleCommit"
+                @push="handlePush"
                 @discard="handleDiscard"
                 @stage="gitStatus.stage"
                 @unstage="gitStatus.unstage"

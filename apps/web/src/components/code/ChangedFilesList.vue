@@ -9,12 +9,14 @@ const props = defineProps<{
   isLoading: boolean
   isRefreshing: boolean
   summary: GitStatusResponse['summary']
+  unpushedCommits: number
 }>()
 
 const emit = defineEmits<{
   select: [filePath: string, staged: boolean]
   refresh: []
   commit: []
+  push: []
   discard: []
   stage: [filePaths: string[]]
   unstage: [filePaths: string[]]
@@ -128,29 +130,37 @@ function fileName(filePath: string): string {
         暂无文件变更
       </div>
 
-      <div class="flex items-center gap-0.5">
+      <div class="flex items-center">
         <button
-          class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           title="刷新"
           @click="emit('refresh')"
         >
-          <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': isRefreshing }" />
+          <span class="i-carbon-renew h-3 w-3" :class="{ 'animate-spin': isRefreshing }" />
         </button>
         <button
-          class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           title="提交暂存的变更"
           :disabled="stagedFiles.length === 0"
           @click="emit('commit')"
         >
-          <span class="i-carbon-checkmark h-3.5 w-3.5" />
+          <span class="i-carbon-checkmark h-3 w-3" />
         </button>
         <button
-          class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          :title="unpushedCommits > 0 ? `推送 ${unpushedCommits} 个提交到远程` : '没有待推送的提交'"
+          :disabled="unpushedCommits <= 0"
+          @click="emit('push')"
+        >
+          <span class="i-material-symbols:upload-2-rounded h-3 w-3" />
+        </button>
+        <button
+          class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           title="回滚全部变更"
           :disabled="summary.totalFiles === 0"
           @click="emit('discard')"
         >
-          <span class="i-carbon-reset h-3.5 w-3.5" />
+          <span class="i-carbon-reset h-3 w-3" />
         </button>
       </div>
     </div>

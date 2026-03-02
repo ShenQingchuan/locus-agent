@@ -316,13 +316,15 @@ workspaceRoutes.get('/git/status', async (c) => {
         isGitRepo: false,
         files: [],
         summary: { totalFiles: 0, totalAdditions: 0, totalDeletions: 0 },
+        unpushedCommits: 0,
       })
     }
 
-    const [statusResult, numstatUnstagedResult, numstatStagedResult] = await Promise.all([
+    const [statusResult, numstatUnstagedResult, numstatStagedResult, aheadResult] = await Promise.all([
       runGit(directoryPath, ['status', '--porcelain', '-uall']),
       runGit(directoryPath, ['diff', '--numstat']),          // unstaged: working tree vs index
       runGit(directoryPath, ['diff', '--numstat', '--cached']), // staged: index vs HEAD
+      runGit(directoryPath, ['rev-list', '--count', '@{u}..HEAD']), // commits ahead of upstream
     ])
 
     const unstagedNumstat = parseNumstat(numstatUnstagedResult.stdout)
@@ -356,6 +358,11 @@ workspaceRoutes.get('/git/status', async (c) => {
       }
     }
 
+    // -1 = no upstream tracking branch, 0+ = commits ahead
+    const unpushedCommits = aheadResult.exitCode === 0
+      ? Number.parseInt(aheadResult.stdout.trim(), 10) || 0
+      : -1
+
     return c.json({
       rootPath: directoryPath,
       isGitRepo: true,
@@ -365,6 +372,7 @@ workspaceRoutes.get('/git/status', async (c) => {
         totalAdditions,
         totalDeletions,
       },
+      unpushedCommits,
     })
   }
   catch (error) {
@@ -589,6 +597,27 @@ workspaceRoutes.get('/git/watch', async (c) => {
         'Connection': 'keep-alive',
       },
     })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+workspaceRoutes.post('/git/push', async (c) => {
+  try {
+    const body = await c.req.json<{ path: string }>()
+    const directoryPath = await resolveAllowedDirectory(body.path)
+
+    if (!await isGitRepo(directoryPath)) {
+      return c.json({ success: false, message: 'Not a git repository' }, 400)
+    }
+
+    const result = await runGit(directoryPath, ['push'])
+    if (result.exitCode !== 0) {
+      return c.json({ success: false, message: result.stderr || 'Failed to push' }, 400)
+    }
+
+    return c.json({ success: true, message: result.stderr || result.stdout || 'Push successful' })
   }
   catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)

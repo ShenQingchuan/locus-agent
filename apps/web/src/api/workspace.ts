@@ -2,6 +2,7 @@ import type {
   GitCommitResponse,
   GitDiffResponse,
   GitDiscardResponse,
+  GitPushResponse,
   GitStageResponse,
   GitStatusResponse,
   GitUnstageResponse,
@@ -79,5 +80,12 @@ export async function discardChanges(path: string, filePaths: string[] = []): Pr
   return request<GitDiscardResponse>('/workspace/git/discard', {
     method: 'POST',
     body: JSON.stringify({ path, filePaths }),
+  })
+}
+
+export async function pushChanges(path: string): Promise<GitPushResponse> {
+  return request<GitPushResponse>('/workspace/git/push', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
   })
 }

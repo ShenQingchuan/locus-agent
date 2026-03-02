@@ -105,6 +105,7 @@ export function useGitStatus(workspacePath: Ref<string>) {
     totalDeletions: 0,
   })
   const isGitRepo = computed(() => statusData.value?.isGitRepo ?? true)
+  const unpushedCommits = computed(() => statusData.value?.unpushedCommits ?? 0)
 
   // Clear isRefreshing when new data arrives
   watch(statusData, () => {
@@ -193,12 +194,20 @@ export function useGitStatus(workspacePath: Ref<string>) {
     return result
   }
 
+  async function push() {
+    const path = workspacePath.value
+    if (!path)
+      return
+    return await workspaceApi.pushChanges(path)
+  }
+
   return {
     files,
     summary,
     isLoading,
     isRefreshing,
     isGitRepo,
+    unpushedCommits,
     selectedFilePath,
     selectedFileStaged,
     selectedFileDiff,
@@ -209,5 +218,6 @@ export function useGitStatus(workspacePath: Ref<string>) {
     unstage,
     commit,
     discard,
+    push,
   }
 }

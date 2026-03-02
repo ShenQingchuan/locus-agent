@@ -14,12 +14,14 @@ const props = defineProps<{
   selectedFileStaged: boolean | undefined
   selectedFileDiff: string
   isDiffLoading: boolean
+  unpushedCommits: number
 }>()
 
 const emit = defineEmits<{
   select: [filePath: string, staged: boolean]
   refresh: []
   commit: []
+  push: []
   discard: []
   stage: [filePaths: string[]]
   unstage: [filePaths: string[]]
@@ -70,9 +72,11 @@ function goToNext() {
         :is-loading="isLoading"
         :is-refreshing="isRefreshing"
         :summary="summary"
+        :unpushed-commits="unpushedCommits"
         @select="(path, staged) => emit('select', path, staged)"
         @refresh="emit('refresh')"
         @commit="emit('commit')"
+        @push="emit('push')"
         @discard="emit('discard')"
         @stage="emit('stage', $event)"
         @unstage="emit('unstage', $event)"

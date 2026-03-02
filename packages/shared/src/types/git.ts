@@ -24,6 +24,8 @@ export interface GitStatusResponse {
     totalAdditions: number
     totalDeletions: number
   }
+  /** Number of local commits ahead of the upstream (0 = nothing to push, -1 = no upstream) */
+  unpushedCommits: number
 }
 
 export interface GitDiffResponse {
@@ -71,6 +73,11 @@ export interface GitUnstageRequest {
 }
 
 export interface GitUnstageResponse {
+  success: boolean
+  message?: string
+}
+
+export interface GitPushResponse {
   success: boolean
   message?: string
 }
