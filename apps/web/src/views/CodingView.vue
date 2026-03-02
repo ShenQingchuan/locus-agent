@@ -2,10 +2,8 @@
 import type {
   Conversation,
   WorkspaceDirectoryEntry,
-  WorkspaceTreeNode,
 } from '@locus-agent/shared'
-import type { FileTreeNode } from '@locus-agent/ui'
-import { DirectoryBrowserModal, FileTree, useToast } from '@locus-agent/ui'
+import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -13,9 +11,11 @@ import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
 import MessageList from '@/components/chat/MessageList.vue'
+import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { getConversationListQueryKey, useConversationListQuery, useConversationQuery } from '@/composables/queries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
+import { useGitStatus } from '@/composables/useGitStatus'
 import { useResizePanel } from '@/composables/useResizePanel'
 import { useChatStore } from '@/stores/chat'
 import { createProjectKey } from '@/utils/projectKey'
@@ -24,8 +24,6 @@ type CodingSection = 'planning' | 'workspace'
 
 const activeSection = ref<CodingSection>('planning')
 const currentProjectName = ref('未选择工作空间')
-const workspaceTree = ref<FileTreeNode[]>([])
-const selectedFileId = ref<string | null>(null)
 const isWorkspaceLoading = ref(false)
 const isWorkspacePickerOpen = ref(false)
 const isWorkspacePickerLoading = ref(false)
@@ -43,6 +41,7 @@ const dirtyConversations = new Set<string>()
 const toast = useToast()
 const chatStore = useChatStore()
 const queryCache = useQueryCache()
+const gitStatus = useGitStatus(currentBrowsePath)
 
 const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
 const STORAGE_KEY_ASSISTANT_WIDTH = 'locus-agent:coding-assistant-width'
@@ -162,8 +161,6 @@ onMounted(async () => {
       const projectKey = await createProjectKey(result.rootPath)
       currentProjectName.value = result.rootName
       currentProjectKey.value = projectKey
-      workspaceTree.value = toFileTreeNodes(result.tree)
-      selectedFileId.value = null
       currentBrowsePath.value = result.rootPath
       activeSection.value = 'workspace'
     })
@@ -203,21 +200,6 @@ async function runWithLoadingState(
       }
       target.value = false
     }
-  }
-}
-
-function toFileTreeNodes(nodes: WorkspaceTreeNode[]): FileTreeNode[] {
-  return nodes.map(node => ({
-    id: node.id,
-    label: node.label,
-    type: node.type,
-    children: node.children ? toFileTreeNodes(node.children) : undefined,
-  }))
-}
-
-function handleFileSelect(node: FileTreeNode) {
-  if (node.type === 'file') {
-    selectedFileId.value = node.id
   }
 }
 
@@ -329,8 +311,6 @@ async function openCurrentBrowsePathAsWorkspace() {
       currentProjectName.value = result.rootName
       currentProjectKey.value = projectKey
       lastWorkspacePath.value = result.rootPath
-      workspaceTree.value = toFileTreeNodes(result.tree)
-      selectedFileId.value = null
       activeSection.value = 'workspace'
       isWorkspacePickerOpen.value = false
       isHistoryOpen.value = false
@@ -406,6 +386,57 @@ function toggleHistory() {
     return
   isHistoryOpen.value = !isHistoryOpen.value
 }
+
+async function handleCommit() {
+  const message = window.prompt('请输入提交信息：')
+  if (!message?.trim())
+    return
+
+  try {
+    const result = await gitStatus.commit(message.trim())
+    if (result?.success) {
+      toast.success('提交成功')
+    }
+    else {
+      toast.error(result?.message || '提交失败')
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '提交失败')
+  }
+}
+
+async function handleDiscard() {
+  const confirmed = await toast.confirm({
+    title: '回滚全部变更',
+    message: '此操作将撤销所有未提交的变更，且无法恢复。确定继续？',
+    confirmText: '回滚',
+    cancelText: '取消',
+    type: 'error',
+  })
+  if (!confirmed)
+    return
+
+  try {
+    const result = await gitStatus.discard()
+    if (result?.success) {
+      toast.success('已回滚全部变更')
+    }
+    else {
+      toast.error(result?.message || '回滚失败')
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '回滚失败')
+  }
+}
+
+// Auto-refresh git status when agent finishes streaming
+watch(() => chatStore.isStreaming, (cur, prev) => {
+  if (prev && !cur) {
+    setTimeout(() => gitStatus.refresh(), 500)
+  }
+})
 
 const currentProjectConversations = computed<Conversation[]>(() => chatStore.conversations)
 </script>
@@ -497,38 +528,20 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
               </div>
             </section>
 
-            <section
-              v-else
-              class="h-full min-h-0 grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)]"
-            >
-              <aside class="min-h-0 border-b xl:border-b-0 xl:border-r border-border px-2 py-2">
-                <div v-if="isWorkspaceLoading" class="h-full flex items-center justify-center px-2">
-                  <div class="inline-flex items-center gap-2.5 text-xs text-muted-foreground">
-                    <span class="i-svg-spinners:90-ring-with-bg h-4 w-4" />
-                    <span>正在载入文件...</span>
-                  </div>
-                </div>
-                <template v-else-if="workspaceTree.length > 0">
-                  <FileTree
-                    :nodes="workspaceTree"
-                    :selected-id="selectedFileId"
-                    :item-height="28"
-                    container-class="h-full"
-                    :default-expanded="[workspaceTree[0]!.id]"
-                    @select="handleFileSelect"
-                  />
-                </template>
-                <div v-else class="h-full flex items-center justify-center px-2">
-                  <div class="inline-flex items-center gap-2 text-xs text-muted-foreground text-center">
-                    <span class="i-carbon-folder-add h-4 w-4 opacity-70" />
-                    <span>尚未选择工作空间</span>
-                  </div>
-                </div>
-              </aside>
-
-              <div class="min-h-0 px-3 py-2.5">
-                <span class="text-xs text-muted-foreground">编码台活动区占位示意（编辑器 + Git 改动）</span>
-              </div>
+            <section v-else class="h-full min-h-0">
+              <SessionChangesPanel
+                :files="gitStatus.files.value"
+                :summary="gitStatus.summary.value"
+                :is-loading="gitStatus.isLoading.value"
+                :is-git-repo="gitStatus.isGitRepo.value"
+                :selected-file-path="gitStatus.selectedFilePath.value"
+                :selected-file-diff="gitStatus.selectedFileDiff.value"
+                :is-diff-loading="gitStatus.isDiffLoading.value"
+                @select="gitStatus.selectFile"
+                @refresh="gitStatus.refresh"
+                @commit="handleCommit"
+                @discard="handleDiscard"
+              />
             </section>
           </main>
         </div>

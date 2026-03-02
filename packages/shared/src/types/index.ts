@@ -24,3 +24,4 @@ export {
   TOOL_DEFAULT_RISK,
 } from './whitelist.js'
 export type * from './workspace.js'
+export type * from './git.js'
