@@ -17,6 +17,17 @@ export interface ConfirmOptions {
   type?: ToastType
 }
 
+export interface PromptOptions {
+  title?: string
+  message?: string
+  placeholder?: string
+  defaultValue?: string
+  confirmText?: string
+  cancelText?: string
+  /** Render a textarea instead of single-line input */
+  multiline?: boolean
+}
+
 const toasts = ref<Toast[]>([])
 const confirmState = ref<{
   visible: boolean
@@ -25,6 +36,17 @@ const confirmState = ref<{
 }>({
   visible: false,
   options: { message: '' },
+  resolve: null,
+})
+const promptState = ref<{
+  visible: boolean
+  options: PromptOptions
+  inputValue: string
+  resolve: ((value: string | null) => void) | null
+}>({
+  visible: false,
+  options: {},
+  inputValue: '',
   resolve: null,
 })
 
@@ -101,9 +123,44 @@ export function useToast() {
     }
   }
 
+  function prompt(options: PromptOptions | string): Promise<string | null> {
+    const opts: PromptOptions = typeof options === 'string'
+      ? { title: options }
+      : options
+
+    return new Promise((resolve) => {
+      promptState.value = {
+        visible: true,
+        options: {
+          title: opts.title ?? '输入',
+          message: opts.message,
+          placeholder: opts.placeholder ?? '',
+          confirmText: opts.confirmText ?? '确定',
+          cancelText: opts.cancelText ?? '取消',
+          multiline: opts.multiline,
+        },
+        inputValue: opts.defaultValue ?? '',
+        resolve,
+      }
+    })
+  }
+
+  function resolvePrompt(value: string | null) {
+    if (promptState.value.resolve) {
+      promptState.value.resolve(value)
+    }
+    promptState.value = {
+      visible: false,
+      options: {},
+      inputValue: '',
+      resolve: null,
+    }
+  }
+
   return {
     toasts,
     confirmState,
+    promptState,
     show,
     remove,
     removeAll,
@@ -113,5 +170,7 @@ export function useToast() {
     info,
     confirm,
     resolveConfirm,
+    prompt,
+    resolvePrompt,
   }
 }

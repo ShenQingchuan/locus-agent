@@ -83,7 +83,7 @@ export default defineConfig({
     presetWebFonts({
       fonts: {
         sans: 'Archivo',
-        mono: 'Noto Sans Mono',
+        mono: 'Fira Code',
       },
     }),
   ],
@@ -133,6 +133,10 @@ export default defineConfig({
         'border': 'hsl(var(--sidebar-border))',
         'ring': 'hsl(var(--sidebar-ring))',
       },
+    },
+    text: {
+      '2xs': { fontSize: '0.625rem', lineHeight: '0.875rem' },
+      '3xs': { fontSize: '0.5rem', lineHeight: '0.75rem' },
     },
     borderRadius: {
       lg: 'var(--radius)',

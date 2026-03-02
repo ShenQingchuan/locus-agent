@@ -2,7 +2,9 @@ import type {
   GitCommitResponse,
   GitDiffResponse,
   GitDiscardResponse,
+  GitStageResponse,
   GitStatusResponse,
+  GitUnstageResponse,
   WorkspaceListResponse,
   WorkspaceRootsResponse,
   WorkspaceTreeResponse,
@@ -43,18 +45,33 @@ export async function fetchGitStatus(path: string): Promise<GitStatusResponse> {
   return request<GitStatusResponse>(`/workspace/git/status?${query.toString()}`)
 }
 
-export async function fetchGitDiff(path: string, file?: string): Promise<GitDiffResponse> {
+export async function fetchGitDiff(path: string, file?: string, staged?: boolean): Promise<GitDiffResponse> {
   const params = new URLSearchParams({ path })
-  if (file) {
+  if (file)
     params.set('file', file)
-  }
+  if (staged !== undefined)
+    params.set('staged', String(staged))
   return request<GitDiffResponse>(`/workspace/git/diff?${params.toString()}`)
 }
 
-export async function commitChanges(path: string, message: string): Promise<GitCommitResponse> {
+export async function stageFiles(path: string, filePaths: string[]): Promise<GitStageResponse> {
+  return request<GitStageResponse>('/workspace/git/stage', {
+    method: 'POST',
+    body: JSON.stringify({ path, filePaths }),
+  })
+}
+
+export async function unstageFiles(path: string, filePaths: string[]): Promise<GitUnstageResponse> {
+  return request<GitUnstageResponse>('/workspace/git/unstage', {
+    method: 'POST',
+    body: JSON.stringify({ path, filePaths }),
+  })
+}
+
+export async function commitChanges(path: string, message: string, filePaths: string[] = []): Promise<GitCommitResponse> {
   return request<GitCommitResponse>('/workspace/git/commit', {
     method: 'POST',
-    body: JSON.stringify({ path, message }),
+    body: JSON.stringify({ path, message, filePaths }),
   })
 }
 

@@ -7,6 +7,8 @@ export interface GitChangedFile {
   filePath: string
   /** Git status code */
   status: GitFileStatus
+  /** Whether this change is staged (in the index) */
+  staged: boolean
   /** Lines added (null if binary or unavailable) */
   additions: number | null
   /** Lines deleted (null if binary or unavailable) */
@@ -33,6 +35,8 @@ export interface GitDiffResponse {
 export interface GitCommitRequest {
   path: string
   message: string
+  /** Stage & commit only these files; empty = all changes */
+  filePaths?: string[]
 }
 
 export interface GitCommitResponse {
@@ -47,6 +51,26 @@ export interface GitDiscardRequest {
 }
 
 export interface GitDiscardResponse {
+  success: boolean
+  message?: string
+}
+
+export interface GitStageRequest {
+  path: string
+  filePaths: string[]
+}
+
+export interface GitStageResponse {
+  success: boolean
+  message?: string
+}
+
+export interface GitUnstageRequest {
+  path: string
+  filePaths: string[]
+}
+
+export interface GitUnstageResponse {
   success: boolean
   message?: string
 }

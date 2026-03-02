@@ -50,13 +50,13 @@ const navItems: NavItem[] = [
 <template>
   <nav class="flex flex-col items-center w-12 h-full bg-sidebar-background border-r border-sidebar-border flex-shrink-0">
     <!-- Search button -->
-    <div class="flex flex-col items-center pt-3 pb-1">
+    <div class="flex flex-col items-center pt-2 pb-1">
       <button
-        class="flex-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors duration-150"
+        class="flex-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors duration-150"
         title="搜索"
         @click="openSearch"
       >
-        <div class="i-ic:round-search h-5 w-5" />
+        <div class="i-ic:round-search" />
       </button>
     </div>
 

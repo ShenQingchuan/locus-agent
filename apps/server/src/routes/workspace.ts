@@ -4,6 +4,7 @@ import type {
   WorkspaceDirectoryEntry,
   WorkspaceTreeNode,
 } from '@locus-agent/shared'
+import { watch as fsWatch } from 'node:fs'
 import { readdir, readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join, relative, resolve, sep } from 'node:path'
@@ -215,12 +216,17 @@ async function isGitRepo(cwd: string): Promise<boolean> {
   return exitCode === 0
 }
 
-function parseStatusLine(line: string): { status: GitFileStatus, filePath: string } | null {
-  if (line.length < 4) {
-    return null
-  }
+/**
+ * Parse a single `git status --porcelain` line into entries.
+ * XY format: X = index (staged) status, Y = working-tree (unstaged) status.
+ * A file like `MM` produces TWO entries: one staged, one unstaged.
+ */
+function parseStatusEntries(line: string): Array<{ status: GitFileStatus, filePath: string, staged: boolean }> {
+  if (line.length < 4)
+    return []
 
-  const xy = line.slice(0, 2)
+  const x = line[0]!
+  const y = line[1]!
   let filePath = line.slice(3)
 
   // Handle renames: "R  old -> new"
@@ -229,27 +235,41 @@ function parseStatusLine(line: string): { status: GitFileStatus, filePath: strin
     filePath = filePath.slice(arrowIndex + 4)
   }
 
-  let status: GitFileStatus
-  if (xy === '??') {
-    status = '??'
-  }
-  else if (xy[0] === 'U' || xy[1] === 'U' || xy === 'AA' || xy === 'DD') {
-    status = 'U'
-  }
-  else if (xy[0] === 'R') {
-    status = 'R'
-  }
-  else if (xy[0] === 'A' || xy[1] === 'A') {
-    status = 'A'
-  }
-  else if (xy[0] === 'D' || xy[1] === 'D') {
-    status = 'D'
-  }
-  else {
-    status = 'M'
+  const entries: Array<{ status: GitFileStatus, filePath: string, staged: boolean }> = []
+
+  // Untracked
+  if (x === '?' && y === '?') {
+    entries.push({ status: '??', filePath, staged: false })
+    return entries
   }
 
-  return { status, filePath }
+  // Unmerged/conflict
+  if (x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D')) {
+    entries.push({ status: 'U', filePath, staged: false })
+    return entries
+  }
+
+  // Staged change (X is not ' ')
+  if (x !== ' ') {
+    let status: GitFileStatus = 'M'
+    if (x === 'A')
+      status = 'A'
+    else if (x === 'D')
+      status = 'D'
+    else if (x === 'R')
+      status = 'R'
+    entries.push({ status, filePath, staged: true })
+  }
+
+  // Unstaged change (Y is not ' ')
+  if (y !== ' ') {
+    let status: GitFileStatus = 'M'
+    if (y === 'D')
+      status = 'D'
+    entries.push({ status, filePath, staged: false })
+  }
+
+  return entries
 }
 
 function parseNumstat(output: string): Map<string, { additions: number | null, deletions: number | null }> {
@@ -299,51 +319,40 @@ workspaceRoutes.get('/git/status', async (c) => {
       })
     }
 
-    const [statusResult, numstatResult, numstatCachedResult] = await Promise.all([
+    const [statusResult, numstatUnstagedResult, numstatStagedResult] = await Promise.all([
       runGit(directoryPath, ['status', '--porcelain', '-uall']),
-      runGit(directoryPath, ['diff', '--numstat', 'HEAD']),
-      runGit(directoryPath, ['diff', '--numstat', '--cached', 'HEAD']),
+      runGit(directoryPath, ['diff', '--numstat']),          // unstaged: working tree vs index
+      runGit(directoryPath, ['diff', '--numstat', '--cached']), // staged: index vs HEAD
     ])
 
-    // Merge numstat from both staged and unstaged
-    const numstatMap = parseNumstat(numstatResult.stdout)
-    for (const [filePath, stats] of parseNumstat(numstatCachedResult.stdout)) {
-      const existing = numstatMap.get(filePath)
-      if (existing) {
-        existing.additions = (existing.additions ?? 0) + (stats.additions ?? 0)
-        existing.deletions = (existing.deletions ?? 0) + (stats.deletions ?? 0)
-      }
-      else {
-        numstatMap.set(filePath, stats)
-      }
-    }
+    const unstagedNumstat = parseNumstat(numstatUnstagedResult.stdout)
+    const stagedNumstat = parseNumstat(numstatStagedResult.stdout)
 
     const files: GitChangedFile[] = []
+    const uniquePaths = new Set<string>()
     let totalAdditions = 0
     let totalDeletions = 0
 
     for (const line of statusResult.stdout.split('\n')) {
-      const parsed = parseStatusLine(line)
-      if (!parsed) {
-        continue
-      }
+      for (const entry of parseStatusEntries(line)) {
+        const numstat = entry.staged ? stagedNumstat : unstagedNumstat
+        const stats = numstat.get(entry.filePath)
+        const additions = stats?.additions ?? null
+        const deletions = stats?.deletions ?? null
 
-      const stats = numstatMap.get(parsed.filePath)
-      const additions = stats?.additions ?? null
-      const deletions = stats?.deletions ?? null
+        files.push({
+          filePath: entry.filePath,
+          status: entry.status,
+          staged: entry.staged,
+          additions,
+          deletions,
+        })
 
-      files.push({
-        filePath: parsed.filePath,
-        status: parsed.status,
-        additions,
-        deletions,
-      })
-
-      if (additions !== null) {
-        totalAdditions += additions
-      }
-      if (deletions !== null) {
-        totalDeletions += deletions
+        uniquePaths.add(entry.filePath)
+        if (additions !== null)
+          totalAdditions += additions
+        if (deletions !== null)
+          totalDeletions += deletions
       }
     }
 
@@ -352,7 +361,7 @@ workspaceRoutes.get('/git/status', async (c) => {
       isGitRepo: true,
       files,
       summary: {
-        totalFiles: files.length,
+        totalFiles: uniquePaths.size,
         totalAdditions,
         totalDeletions,
       },
@@ -367,6 +376,7 @@ workspaceRoutes.get('/git/diff', async (c) => {
   try {
     const path = c.req.query('path')
     const file = c.req.query('file')
+    const staged = c.req.query('staged') // 'true' | 'false' | undefined
     const directoryPath = await resolveAllowedDirectory(path)
 
     if (!await isGitRepo(directoryPath)) {
@@ -388,7 +398,18 @@ workspaceRoutes.get('/git/diff', async (c) => {
         return c.json({ filePath: file, patch })
       }
 
-      // Tracked file: combine staged + unstaged diff against HEAD
+      // Staged diff: index vs HEAD
+      if (staged === 'true') {
+        const { stdout: patch } = await runGit(directoryPath, ['diff', '--cached', '--', file])
+        return c.json({ filePath: file, patch })
+      }
+      // Unstaged diff: working tree vs index
+      if (staged === 'false') {
+        const { stdout: patch } = await runGit(directoryPath, ['diff', '--', file])
+        return c.json({ filePath: file, patch })
+      }
+
+      // Default: all changes vs HEAD
       const { stdout: patch } = await runGit(directoryPath, ['diff', 'HEAD', '--', file])
       return c.json({ filePath: file, patch })
     }
@@ -402,19 +423,69 @@ workspaceRoutes.get('/git/diff', async (c) => {
   }
 })
 
-workspaceRoutes.post('/git/commit', async (c) => {
+workspaceRoutes.post('/git/stage', async (c) => {
   try {
-    const body = await c.req.json<{ path: string, message: string }>()
+    const body = await c.req.json<{ path: string, filePaths: string[] }>()
     const directoryPath = await resolveAllowedDirectory(body.path)
 
     if (!await isGitRepo(directoryPath)) {
       return c.json({ success: false, message: 'Not a git repository' }, 400)
     }
 
-    // Stage all changes
-    const addResult = await runGit(directoryPath, ['add', '-A'])
-    if (addResult.exitCode !== 0) {
-      return c.json({ success: false, message: addResult.stderr || 'Failed to stage changes' }, 400)
+    const args = body.filePaths.length > 0
+      ? ['add', '--', ...body.filePaths]
+      : ['add', '-A']
+    const result = await runGit(directoryPath, args)
+    if (result.exitCode !== 0) {
+      return c.json({ success: false, message: result.stderr || 'Failed to stage' }, 400)
+    }
+
+    return c.json({ success: true })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+workspaceRoutes.post('/git/unstage', async (c) => {
+  try {
+    const body = await c.req.json<{ path: string, filePaths: string[] }>()
+    const directoryPath = await resolveAllowedDirectory(body.path)
+
+    if (!await isGitRepo(directoryPath)) {
+      return c.json({ success: false, message: 'Not a git repository' }, 400)
+    }
+
+    const args = body.filePaths.length > 0
+      ? ['reset', 'HEAD', '--', ...body.filePaths]
+      : ['reset', 'HEAD']
+    const result = await runGit(directoryPath, args)
+    if (result.exitCode !== 0) {
+      return c.json({ success: false, message: result.stderr || 'Failed to unstage' }, 400)
+    }
+
+    return c.json({ success: true })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+workspaceRoutes.post('/git/commit', async (c) => {
+  try {
+    const body = await c.req.json<{ path: string, message: string, filePaths?: string[] }>()
+    const directoryPath = await resolveAllowedDirectory(body.path)
+
+    if (!await isGitRepo(directoryPath)) {
+      return c.json({ success: false, message: 'Not a git repository' }, 400)
+    }
+
+    // If filePaths provided, stage them first; otherwise commit what's already staged
+    if (body.filePaths && body.filePaths.length > 0) {
+      const addResult = await runGit(directoryPath, ['add', '--', ...body.filePaths])
+      if (addResult.exitCode !== 0) {
+        return c.json({ success: false, message: addResult.stderr || 'Failed to stage changes' }, 400)
+      }
     }
 
     // Commit
@@ -429,6 +500,94 @@ workspaceRoutes.post('/git/commit', async (c) => {
       success: true,
       commitHash: hashMatch?.[1],
       message: commitResult.stdout.split('\n')[0],
+    })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Git file watcher — SSE endpoint
+// ---------------------------------------------------------------------------
+
+workspaceRoutes.get('/git/watch', async (c) => {
+  try {
+    const path = c.req.query('path')
+    const directoryPath = await resolveAllowedDirectory(path)
+
+    if (!await isGitRepo(directoryPath)) {
+      return c.json({ error: 'Not a git repository' }, 400)
+    }
+
+    const encoder = new TextEncoder()
+
+    const stream = new ReadableStream({
+      start(controller) {
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+        function send(data: string) {
+          try {
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+          }
+          catch {
+            cleanup()
+          }
+        }
+
+        function notify() {
+          if (debounceTimer)
+            clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => send('changed'), 300)
+        }
+
+        // Watch .git/ directory for index/HEAD changes (staging, commit, branch switch)
+        let gitWatcher: ReturnType<typeof fsWatch> | null = null
+        try {
+          gitWatcher = fsWatch(join(directoryPath, '.git'), (_, filename) => {
+            if (filename === 'index' || filename === 'HEAD')
+              notify()
+          })
+        }
+        catch { /* .git dir watch failed, continue with workspace watcher only */ }
+
+        // Watch workspace recursively for file edits (exclude .git/ internals)
+        let workspaceWatcher: ReturnType<typeof fsWatch> | null = null
+        try {
+          workspaceWatcher = fsWatch(directoryPath, { recursive: true }, (_, filename) => {
+            if (filename && !filename.startsWith('.git/') && !filename.startsWith('.git\\'))
+              notify()
+          })
+        }
+        catch { /* recursive watch not supported, fallback to no auto-refresh */ }
+
+        // Keepalive to prevent proxy/browser timeout
+        const keepalive = setInterval(() => send('keepalive'), 30_000)
+
+        function cleanup() {
+          gitWatcher?.close()
+          workspaceWatcher?.close()
+          clearInterval(keepalive)
+          if (debounceTimer)
+            clearTimeout(debounceTimer)
+        }
+
+        c.req.raw.signal.addEventListener('abort', () => {
+          cleanup()
+          try {
+            controller.close()
+          }
+          catch { /* already closed */ }
+        })
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     })
   }
   catch (error) {

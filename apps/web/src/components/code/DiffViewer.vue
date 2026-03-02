@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { FileDiff, parsePatchFiles } from '@pierre/diffs'
+import { useDark } from '@vueuse/core'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -10,6 +11,8 @@ const props = defineProps<{
   /** Display style: split (side-by-side) or unified (stacked) */
   diffStyle?: 'split' | 'unified'
 }>()
+
+const isDark = useDark()
 
 const containerRef = ref<HTMLElement | null>(null)
 /** Fallback text shown when parsePatchFiles fails */
@@ -54,7 +57,7 @@ async function render() {
 
     instance = new FileDiff({
       theme: { dark: 'github-dark-default', light: 'min-light' },
-      themeType: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+      themeType: isDark.value ? 'dark' : 'light',
       diffStyle: props.diffStyle ?? 'unified',
       diffIndicators: 'bars',
       overflow: 'scroll',
@@ -80,7 +83,7 @@ function cleanup() {
   }
 }
 
-watch(() => [props.patch, props.diffStyle, props.filePath], render, { flush: 'post' })
+watch(() => [props.patch, props.diffStyle, props.filePath, isDark.value], render, { flush: 'post' })
 watch(containerRef, (el) => {
   if (el)
     render()
@@ -102,9 +105,12 @@ onBeforeUnmount(cleanup)
 
 <style>
 .diff-viewer-container {
+  --diffs-font-family: 'Fira Code', ui-monospace, monospace;
+  --diffs-header-font-family: 'Archivo', ui-sans-serif, sans-serif;
+  --diffs-font-size: 13px;
+  --diffs-line-height: 1.6;
+  --diffs-tab-size: 2;
   border-radius: 0.375rem;
   overflow: hidden;
-  font-size: 0.8125rem;
-  line-height: 1.6;
 }
 </style>

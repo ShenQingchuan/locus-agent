@@ -1,142 +1,212 @@
-import type { GitChangedFile, GitStatusResponse } from '@locus-agent/shared'
+import type { GitStatusResponse } from '@locus-agent/shared'
 import type { Ref } from 'vue'
-import { ref, watch } from 'vue'
+import { useQuery, useQueryCache } from '@pinia/colada'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 
+const SESSION_PREFIX = 'locus-agent:git-status:'
+
+function getSessionCache(path: string): GitStatusResponse | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_PREFIX + path)
+    return raw ? JSON.parse(raw) : null
+  }
+  catch {
+    return null
+  }
+}
+
+function setSessionCache(path: string, data: GitStatusResponse) {
+  try {
+    sessionStorage.setItem(SESSION_PREFIX + path, JSON.stringify(data))
+  }
+  catch { /* quota exceeded */ }
+}
+
+export function getGitStatusQueryKey(path: string) {
+  return ['git-status', path] as const
+}
+
 export function useGitStatus(workspacePath: Ref<string>) {
-  const files = ref<GitChangedFile[]>([])
-  const summary = ref<GitStatusResponse['summary']>({
+  const queryCache = useQueryCache()
+  const selectedFilePath = ref<string | null>(null)
+  const selectedFileStaged = ref<boolean | undefined>(undefined)
+  const isRefreshing = ref(false)
+
+  // Pre-populate Pinia Colada cache from sessionStorage before useQuery reads it
+  const initialPath = workspacePath.value
+  if (initialPath) {
+    const cached = getSessionCache(initialPath)
+    if (cached) {
+      queryCache.setQueryData(getGitStatusQueryKey(initialPath), cached)
+    }
+  }
+
+  // Also handle path changes after initial mount
+  watch(workspacePath, (path) => {
+    if (path) {
+      const cached = getSessionCache(path)
+      if (cached) {
+        queryCache.setQueryData(getGitStatusQueryKey(path), cached)
+      }
+    }
+    else {
+      selectedFilePath.value = null
+      selectedFileStaged.value = undefined
+    }
+  })
+
+  // --- File system watcher via SSE ---
+  let eventSource: EventSource | null = null
+
+  function connectWatcher(path: string) {
+    disconnectWatcher()
+    const url = `/api/workspace/git/watch?path=${encodeURIComponent(path)}`
+    eventSource = new EventSource(url)
+    eventSource.onmessage = (e) => {
+      if (e.data === 'changed')
+        invalidateAll()
+    }
+  }
+
+  function disconnectWatcher() {
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+  }
+
+  watch(workspacePath, (path) => {
+    if (path)
+      connectWatcher(path)
+    else
+      disconnectWatcher()
+  }, { immediate: true })
+
+  onScopeDispose(disconnectWatcher)
+
+  // --- Git Status Query ---
+  const { data: statusData, isPending: isLoading } = useQuery({
+    key: () => getGitStatusQueryKey(workspacePath.value),
+    query: async () => {
+      const path = workspacePath.value
+      const result = await workspaceApi.fetchGitStatus(path)
+      setSessionCache(path, result)
+      return result
+    },
+    staleTime: 60_000, // Watcher handles most updates; this is a safety net
+    enabled: () => !!workspacePath.value,
+  })
+
+  const files = computed(() => statusData.value?.files ?? [])
+  const summary = computed(() => statusData.value?.summary ?? {
     totalFiles: 0,
     totalAdditions: 0,
     totalDeletions: 0,
   })
-  const isLoading = ref(false)
-  const isGitRepo = ref(true)
-  const selectedFilePath = ref<string | null>(null)
-  const selectedFileDiff = ref('')
-  const isDiffLoading = ref(false)
+  const isGitRepo = computed(() => statusData.value?.isGitRepo ?? true)
 
-  let requestToken = 0
+  // Clear isRefreshing when new data arrives
+  watch(statusData, () => {
+    isRefreshing.value = false
+  })
 
-  async function refresh() {
-    const path = workspacePath.value
-    if (!path) {
-      return
+  // --- Git Diff Query ---
+  const { data: diffData, isPending: isDiffLoading } = useQuery({
+    key: () => ['git-diff', workspacePath.value, selectedFilePath.value!, selectedFileStaged.value ?? 'all'] as const,
+    query: () => workspaceApi.fetchGitDiff(workspacePath.value, selectedFilePath.value!, selectedFileStaged.value),
+    staleTime: 10_000,
+    enabled: () => !!workspacePath.value && !!selectedFilePath.value,
+  })
+
+  const selectedFileDiff = computed(() => diffData.value?.patch ?? '')
+
+  // Deselect file if it disappears from the list after refresh
+  watch(files, (newFiles) => {
+    if (selectedFilePath.value && !newFiles.some(f => f.filePath === selectedFilePath.value)) {
+      selectedFilePath.value = null
+      selectedFileStaged.value = undefined
     }
+  })
 
-    const token = ++requestToken
-    isLoading.value = true
-
-    try {
-      const result = await workspaceApi.fetchGitStatus(path)
-
-      if (token !== requestToken) {
-        return
-      }
-
-      isGitRepo.value = result.isGitRepo
-      files.value = result.files
-      summary.value = result.summary
-
-      // If the currently selected file is no longer in the list, deselect it
-      if (selectedFilePath.value && !result.files.some(f => f.filePath === selectedFilePath.value)) {
-        selectedFilePath.value = null
-        selectedFileDiff.value = ''
-      }
-    }
-    catch {
-      if (token !== requestToken) {
-        return
-      }
-      files.value = []
-      summary.value = { totalFiles: 0, totalAdditions: 0, totalDeletions: 0 }
-    }
-    finally {
-      if (token === requestToken) {
-        isLoading.value = false
-      }
-    }
-  }
-
-  async function selectFile(filePath: string) {
+  function selectFile(filePath: string, staged?: boolean) {
     selectedFilePath.value = filePath
-    selectedFileDiff.value = ''
+    selectedFileStaged.value = staged
+  }
 
-    const path = workspacePath.value
-    if (!path) {
+  function refresh() {
+    if (!workspacePath.value)
       return
-    }
-
-    isDiffLoading.value = true
-    try {
-      const result = await workspaceApi.fetchGitDiff(path, filePath)
-      // Only apply if still the selected file
-      if (selectedFilePath.value === filePath) {
-        selectedFileDiff.value = result.patch
-      }
-    }
-    catch {
-      if (selectedFilePath.value === filePath) {
-        selectedFileDiff.value = ''
-      }
-    }
-    finally {
-      isDiffLoading.value = false
+    isRefreshing.value = true
+    queryCache.invalidateQueries({ key: getGitStatusQueryKey(workspacePath.value) })
+    if (selectedFilePath.value) {
+      queryCache.invalidateQueries({ key: ['git-diff', workspacePath.value, selectedFilePath.value] })
     }
   }
 
-  async function commit(message: string) {
-    const path = workspacePath.value
-    if (!path) {
-      return
-    }
+  function invalidateAll() {
+    queryCache.invalidateQueries({ key: ['git-status'] })
+    queryCache.invalidateQueries({ key: ['git-diff'] })
+  }
 
-    const result = await workspaceApi.commitChanges(path, message)
+  async function stage(filePaths: string[]) {
+    const path = workspacePath.value
+    if (!path || filePaths.length === 0)
+      return
+    await workspaceApi.stageFiles(path, filePaths)
+    invalidateAll()
+  }
+
+  async function unstage(filePaths: string[]) {
+    const path = workspacePath.value
+    if (!path || filePaths.length === 0)
+      return
+    await workspaceApi.unstageFiles(path, filePaths)
+    invalidateAll()
+  }
+
+  async function commit(message: string, filePaths: string[] = []) {
+    const path = workspacePath.value
+    if (!path)
+      return
+
+    const result = await workspaceApi.commitChanges(path, message, filePaths)
     if (result.success) {
       selectedFilePath.value = null
-      selectedFileDiff.value = ''
-      await refresh()
+      selectedFileStaged.value = undefined
+      invalidateAll()
     }
     return result
   }
 
   async function discard(filePaths: string[] = []) {
     const path = workspacePath.value
-    if (!path) {
+    if (!path)
       return
-    }
 
     const result = await workspaceApi.discardChanges(path, filePaths)
     if (result.success) {
       selectedFilePath.value = null
-      selectedFileDiff.value = ''
-      await refresh()
+      selectedFileStaged.value = undefined
+      invalidateAll()
     }
     return result
   }
-
-  watch(workspacePath, (path) => {
-    if (path) {
-      refresh()
-    }
-    else {
-      files.value = []
-      summary.value = { totalFiles: 0, totalAdditions: 0, totalDeletions: 0 }
-      selectedFilePath.value = null
-      selectedFileDiff.value = ''
-    }
-  })
 
   return {
     files,
     summary,
     isLoading,
+    isRefreshing,
     isGitRepo,
     selectedFilePath,
+    selectedFileStaged,
     selectedFileDiff,
     isDiffLoading,
     refresh,
     selectFile,
+    stage,
+    unstage,
     commit,
     discard,
   }

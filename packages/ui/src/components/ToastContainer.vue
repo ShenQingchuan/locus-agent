@@ -1,11 +1,36 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
+import { nextTick, watch } from 'vue'
 import { useToast } from '../composables/useToast'
 
-const { toasts, confirmState, remove, removeAll, resolveConfirm } = useToast()
+const { toasts, confirmState, promptState, remove, removeAll, resolveConfirm, resolvePrompt } = useToast()
+
+let promptInputRef: HTMLInputElement | HTMLTextAreaElement | null = null
+
+function setPromptInputRef(el: any) {
+  promptInputRef = el as HTMLInputElement | HTMLTextAreaElement | null
+}
+
+watch(() => promptState.value.visible, async (visible) => {
+  if (visible) {
+    await nextTick()
+    promptInputRef?.focus()
+  }
+})
+
+function handlePromptConfirm() {
+  const value = promptState.value.inputValue.trim()
+  if (value) {
+    resolvePrompt(value)
+  }
+}
 
 onKeyStroke('Escape', (e) => {
-  if (confirmState.value.visible) {
+  if (promptState.value.visible) {
+    e.preventDefault()
+    resolvePrompt(null)
+  }
+  else if (confirmState.value.visible) {
     e.preventDefault()
     resolveConfirm(false)
   }
@@ -16,6 +41,10 @@ onKeyStroke('Escape', (e) => {
 })
 
 onKeyStroke('Enter', (e) => {
+  if (promptState.value.visible) {
+    // handled by input @keydown.enter
+    return
+  }
   if (confirmState.value.visible) {
     e.preventDefault()
     resolveConfirm(true)
@@ -115,16 +144,86 @@ function getToastClass(type: string): string {
               {{ confirmState.options.cancelText }}
             </button>
             <button
-              class="px-3 py-1.5 text-sm rounded-md text-white transition-colors"
+              class="px-3 py-1.5 text-sm rounded-md transition-colors"
               :class="[
                 confirmState.options.type === 'error'
-                  ? 'bg-destructive hover:bg-destructive/90'
-                  : 'bg-primary hover:bg-primary/90',
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90',
               ]"
               @click="resolveConfirm(true)"
             >
               {{ confirmState.options.confirmText }}
             </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 输入对话框 -->
+    <Transition name="fade">
+      <div
+        v-if="promptState.visible"
+        class="fixed inset-0 z-50 flex items-center justify-center"
+      >
+        <div
+          class="absolute inset-0 bg-black/50"
+          @click="resolvePrompt(null)"
+        />
+
+        <div
+          class="relative bg-background border border-border rounded-lg shadow-xl w-full mx-4 p-5"
+          :class="promptState.options.multiline ? 'max-w-md' : 'max-w-sm'"
+        >
+          <h3 class="text-base font-medium text-foreground">
+            {{ promptState.options.title }}
+          </h3>
+          <p v-if="promptState.options.message" class="mt-1.5 text-sm text-muted-foreground">
+            {{ promptState.options.message }}
+          </p>
+
+          <!-- Multiline: textarea -->
+          <textarea
+            v-if="promptState.options.multiline"
+            :ref="setPromptInputRef"
+            v-model="promptState.inputValue"
+            rows="4"
+            class="mt-3 w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-ring resize-y min-h-20"
+            :placeholder="promptState.options.placeholder"
+            @keydown.enter.meta.prevent="handlePromptConfirm"
+            @keydown.enter.ctrl.prevent="handlePromptConfirm"
+          />
+
+          <!-- Single line: input -->
+          <input
+            v-else
+            :ref="setPromptInputRef"
+            v-model="promptState.inputValue"
+            type="text"
+            class="mt-3 w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+            :placeholder="promptState.options.placeholder"
+            @keydown.enter.prevent="handlePromptConfirm"
+          >
+
+          <div class="mt-4 flex items-center justify-between">
+            <span v-if="promptState.options.multiline" class="text-[10px] text-muted-foreground">
+              ⌘ Enter 提交
+            </span>
+            <span v-else />
+            <div class="flex gap-2">
+              <button
+                class="px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted transition-colors"
+                @click="resolvePrompt(null)"
+              >
+                {{ promptState.options.cancelText }}
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                :disabled="!promptState.inputValue.trim()"
+                @click="handlePromptConfirm"
+              >
+                {{ promptState.options.confirmText }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

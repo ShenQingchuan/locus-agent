@@ -25,4 +25,4 @@ export { default as VirtualList } from './components/VirtualList.vue'
 
 // Composables
 export { useToast } from './composables/useToast'
-export type { ConfirmOptions, Toast, ToastType } from './composables/useToast'
+export type { ConfirmOptions, PromptOptions, Toast, ToastType } from './composables/useToast'

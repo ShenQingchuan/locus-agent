@@ -8,17 +8,21 @@ const props = defineProps<{
   files: GitChangedFile[]
   summary: GitStatusResponse['summary']
   isLoading: boolean
+  isRefreshing: boolean
   isGitRepo: boolean
   selectedFilePath: string | null
+  selectedFileStaged: boolean | undefined
   selectedFileDiff: string
   isDiffLoading: boolean
 }>()
 
 const emit = defineEmits<{
-  select: [filePath: string]
+  select: [filePath: string, staged: boolean]
   refresh: []
   commit: []
   discard: []
+  stage: [filePaths: string[]]
+  unstage: [filePaths: string[]]
 }>()
 
 const diffStyle = ref<'unified' | 'split'>('unified')
@@ -35,13 +39,15 @@ const hasNext = computed(() => selectedFileIndex.value >= 0 && selectedFileIndex
 
 function goToPrev() {
   if (hasPrev.value) {
-    emit('select', props.files[selectedFileIndex.value - 1]!.filePath)
+    const file = props.files[selectedFileIndex.value - 1]!
+    emit('select', file.filePath, file.staged)
   }
 }
 
 function goToNext() {
   if (hasNext.value) {
-    emit('select', props.files[selectedFileIndex.value + 1]!.filePath)
+    const file = props.files[selectedFileIndex.value + 1]!
+    emit('select', file.filePath, file.staged)
   }
 }
 </script>
@@ -60,12 +66,16 @@ function goToNext() {
         v-else
         :files="files"
         :selected-file-path="selectedFilePath"
+        :selected-file-staged="selectedFileStaged"
         :is-loading="isLoading"
+        :is-refreshing="isRefreshing"
         :summary="summary"
-        @select="emit('select', $event)"
+        @select="(path, staged) => emit('select', path, staged)"
         @refresh="emit('refresh')"
         @commit="emit('commit')"
         @discard="emit('discard')"
+        @stage="emit('stage', $event)"
+        @unstage="emit('unstage', $event)"
       />
     </aside>
 
@@ -76,7 +86,9 @@ function goToNext() {
         v-if="selectedFilePath"
         class="h-9 px-3 border-b border-border flex items-center gap-2"
       >
-        <span class="text-xs font-mono truncate min-w-0 text-muted-foreground">{{ selectedFilePath }}</span>
+        <span class="text-xs truncate min-w-0 font-medium">
+          变更详情
+        </span>
         <div class="flex-shrink-0 ml-auto flex items-center gap-1">
           <!-- Split / Unified toggle -->
           <button
@@ -89,7 +101,7 @@ function goToNext() {
             title="Unified"
             @click="diffStyle = 'unified'"
           >
-            <span class="i-carbon-row-collapse h-3.5 w-3.5" />
+            <div class="i-carbon-row-collapse h-3.5 w-3.5" />
           </button>
           <button
             class="h-6 px-1.5 rounded text-[10px] transition-colors"
@@ -101,7 +113,7 @@ function goToNext() {
             title="Split"
             @click="diffStyle = 'split'"
           >
-            <span class="i-carbon-column h-3.5 w-3.5" />
+            <div class="i-carbon-column h-3.5 w-3.5" />
           </button>
 
           <span class="w-px h-4 bg-border mx-1" />
@@ -138,7 +150,11 @@ function goToNext() {
 
         <!-- Diff rendered -->
         <div v-else-if="selectedFileDiff" class="p-2">
-          <DiffViewer :patch="selectedFileDiff" :file-path="selectedFilePath ?? undefined" :diff-style="diffStyle" />
+          <DiffViewer
+            :patch="selectedFileDiff"
+            :file-path="selectedFilePath ?? undefined"
+            :diff-style="diffStyle"
+          />
         </div>
 
         <!-- No file selected but has changes -->

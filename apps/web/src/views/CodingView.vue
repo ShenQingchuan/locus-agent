@@ -22,20 +22,21 @@ import { createProjectKey } from '@/utils/projectKey'
 
 type CodingSection = 'planning' | 'workspace'
 
-const activeSection = ref<CodingSection>('planning')
+const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')
 const currentProjectName = ref('未选择工作空间')
 const isWorkspaceLoading = ref(false)
 const isWorkspacePickerOpen = ref(false)
 const isWorkspacePickerLoading = ref(false)
 const isWorkspacePathLoading = ref(false)
-const currentBrowsePath = ref('')
+const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
+const currentBrowsePath = ref(lastWorkspacePath.value.trim())
 const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const allBrowseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
 let browseRequestToken = 0
 const currentProjectKey = ref<string | undefined>()
-const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
 const isHistoryOpen = ref(false)
+const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-collapsed', false)
 const dirtyConversations = new Set<string>()
 
 const toast = useToast()
@@ -162,7 +163,6 @@ onMounted(async () => {
       currentProjectName.value = result.rootName
       currentProjectKey.value = projectKey
       currentBrowsePath.value = result.rootPath
-      activeSection.value = 'workspace'
     })
   }
   catch {
@@ -314,10 +314,6 @@ async function openCurrentBrowsePathAsWorkspace() {
       activeSection.value = 'workspace'
       isWorkspacePickerOpen.value = false
       isHistoryOpen.value = false
-
-      if (result.truncated) {
-        toast.warning('工作空间较大，已进行部分裁剪显示')
-      }
     })
   }
   catch (error) {
@@ -388,12 +384,20 @@ function toggleHistory() {
 }
 
 async function handleCommit() {
-  const message = window.prompt('请输入提交信息：')
-  if (!message?.trim())
+  const stagedCount = gitStatus.files.value.filter(f => f.staged).length
+  const message = await toast.prompt({
+    title: '提交变更',
+    message: `将提交 ${stagedCount} 个暂存文件`,
+    placeholder: 'feat: ...',
+    confirmText: '提交',
+    cancelText: '取消',
+    multiline: true,
+  })
+  if (!message)
     return
 
   try {
-    const result = await gitStatus.commit(message.trim())
+    const result = await gitStatus.commit(message)
     if (result?.success) {
       toast.success('提交成功')
     }
@@ -448,12 +452,28 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
     <div class="flex-1 min-w-0 flex">
       <aside
         ref="leftPanelRef"
-        class="min-w-0 border-r border-border bg-sidebar-background flex flex-col"
-        :class="isLeftPanelResizing ? '' : 'transition-[width] duration-150'"
-        :style="{ width: `${leftPanelWidth}px` }"
+        class="min-w-0 border-r border-border bg-sidebar-background flex flex-col relative"
+        :class="[
+          isLeftPanelResizing ? '' : 'transition-[width] duration-150',
+          isLeftSidebarCollapsed ? 'items-center' : '',
+        ]"
+        :style="{ width: isLeftSidebarCollapsed ? '48px' : `${leftPanelWidth}px` }"
       >
-        <div class="px-3 py-3 border-b border-border min-h-12">
+        <!-- Header: workspace switcher -->
+        <div
+          class="border-b border-border min-h-12 flex items-center"
+          :class="isLeftSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+        >
           <button
+            v-if="isLeftSidebarCollapsed"
+            class="h-8 w-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="切换工作空间"
+            @click="openWorkspacePicker"
+          >
+            <span class="i-ic:round-folder-special h-4.5 w-4.5" />
+          </button>
+          <button
+            v-else
             class="w-full text-left text-xs text-muted-foreground truncate hover:text-foreground transition-colors"
             @click="openWorkspacePicker"
           >
@@ -461,41 +481,76 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
           </button>
         </div>
 
-        <div class="p-2 space-y-0.5">
+        <!-- Section buttons -->
+        <div :class="isLeftSidebarCollapsed ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5'">
           <button
-            class="w-full text-left px-2.5 py-2 rounded text-sm transition-colors"
-            :class="activeSection === 'workspace'
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'"
+            class="rounded transition-colors"
+            :class="[
+              isLeftSidebarCollapsed
+                ? 'h-8 w-8 inline-flex items-center justify-center'
+                : 'w-full text-left px-2.5 py-2 text-sm',
+              activeSection === 'workspace'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
+            ]"
+            :title="isLeftSidebarCollapsed ? '编码工作台' : undefined"
             @click="activeSection = 'workspace'"
           >
-            <span class="inline-flex items-center gap-2">
+            <span v-if="isLeftSidebarCollapsed" class="i-streamline:computer-pc-desktop-remix h-4 w-4" />
+            <span v-else class="inline-flex items-center gap-2 whitespace-nowrap">
               <span class="i-streamline:computer-pc-desktop-remix h-4 w-4" />
               编码工作台
             </span>
           </button>
 
           <button
-            class="w-full text-left px-2.5 py-2 rounded text-sm transition-colors"
-            :class="activeSection === 'planning'
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'"
+            class="rounded transition-colors"
+            :class="[
+              isLeftSidebarCollapsed
+                ? 'h-8 w-8 inline-flex items-center justify-center'
+                : 'w-full text-left px-2.5 py-2 text-sm',
+              activeSection === 'planning'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
+            ]"
+            :title="isLeftSidebarCollapsed ? '任务编排' : undefined"
             @click="activeSection = 'planning'"
           >
-            <span class="inline-flex items-center gap-2">
+            <span v-if="isLeftSidebarCollapsed" class="i-bi:kanban-fill h-4 w-4" />
+            <span v-else class="inline-flex items-center gap-2 whitespace-nowrap">
               <span class="i-bi:kanban-fill h-4 w-4" />
               任务编排
             </span>
           </button>
         </div>
-      </aside>
 
-      <div
-        class="w-1 h-full cursor-col-resize hover:bg-border/60 transition-colors"
-        :class="isLeftPanelResizing ? 'bg-primary/40' : ''"
-        style="touch-action: none; user-select: none;"
-        @mousedown="handleLeftPanelResizeStart"
-      />
+        <!-- Collapse / Expand toggle (bottom) -->
+        <div class="mt-auto p-2 flex" :class="isLeftSidebarCollapsed ? 'justify-center' : 'justify-end'">
+          <button
+            class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            :title="isLeftSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+            @click="isLeftSidebarCollapsed = !isLeftSidebarCollapsed"
+          >
+            <span
+              class="h-3.5 w-3.5 transition-transform"
+              :class="isLeftSidebarCollapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-left'"
+            />
+          </button>
+        </div>
+
+        <!-- Resize handle (absolute, only when expanded) -->
+        <div
+          v-if="!isLeftSidebarCollapsed"
+          class="absolute top-0 -right-1.5 w-3 h-full cursor-col-resize z-10 group/resize"
+          style="touch-action: none; user-select: none;"
+          @mousedown="handleLeftPanelResizeStart"
+        >
+          <div
+            class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 transition-colors"
+            :class="isLeftPanelResizing ? 'bg-primary/50' : 'bg-transparent group-hover/resize:bg-primary/30'"
+          />
+        </div>
+      </aside>
 
       <div class="flex-1 min-w-0 flex">
         <div class="flex-1 min-w-0 flex flex-col border-r border-border">
@@ -533,32 +588,40 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 :files="gitStatus.files.value"
                 :summary="gitStatus.summary.value"
                 :is-loading="gitStatus.isLoading.value"
+                :is-refreshing="gitStatus.isRefreshing.value"
                 :is-git-repo="gitStatus.isGitRepo.value"
                 :selected-file-path="gitStatus.selectedFilePath.value"
+                :selected-file-staged="gitStatus.selectedFileStaged.value"
                 :selected-file-diff="gitStatus.selectedFileDiff.value"
                 :is-diff-loading="gitStatus.isDiffLoading.value"
                 @select="gitStatus.selectFile"
                 @refresh="gitStatus.refresh"
                 @commit="handleCommit"
                 @discard="handleDiscard"
+                @stage="gitStatus.stage"
+                @unstage="gitStatus.unstage"
               />
             </section>
           </main>
         </div>
 
-        <div
-          class="w-1 h-full cursor-col-resize hover:bg-border/60 transition-colors"
-          :class="isAssistantPanelResizing ? 'bg-primary/40' : ''"
-          style="touch-action: none; user-select: none;"
-          @mousedown="handleAssistantPanelResizeStart"
-        />
-
         <aside
           ref="assistantPanelRef"
-          class="min-w-0 flex flex-col"
+          class="min-w-0 flex flex-col relative"
           :class="isAssistantPanelResizing ? '' : 'transition-[width] duration-150'"
           :style="{ width: `${assistantPanelWidth}px` }"
         >
+          <!-- Resize handle (absolute, left edge) -->
+          <div
+            class="absolute top-0 -left-1.5 w-3 h-full cursor-col-resize z-10 group/resize"
+            style="touch-action: none; user-select: none;"
+            @mousedown="handleAssistantPanelResizeStart"
+          >
+            <div
+              class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 transition-colors"
+              :class="isAssistantPanelResizing ? 'bg-primary/50' : 'bg-transparent group-hover/resize:bg-primary/30'"
+            />
+          </div>
           <div class="h-11 px-3 border-b border-border flex items-center justify-between">
             <div class="min-w-0">
               <p class="text-sm font-medium">
