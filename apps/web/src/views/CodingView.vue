@@ -16,6 +16,7 @@ import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
 import KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { getConversationListQueryKey, useConversationListQuery, useConversationQuery } from '@/composables/queries'
+import { getTasksListQueryKey } from '@/composables/taskQueries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useGitStatus } from '@/composables/useGitStatus'
 import { useResizePanel } from '@/composables/useResizePanel'
@@ -389,6 +390,13 @@ function toggleHistory() {
   isHistoryOpen.value = !isHistoryOpen.value
 }
 
+function handleNewConversation() {
+  if (!canUseAssistant.value)
+    return
+  chatStore.newConversation()
+  isHistoryOpen.value = false
+}
+
 async function handleCommit() {
   const stagedCount = gitStatus.files.value.filter(f => f.staged).length
   const message = await toast.prompt({
@@ -469,10 +477,31 @@ async function handleDiscard() {
 watch(() => chatStore.isStreaming, (cur, prev) => {
   if (prev && !cur) {
     setTimeout(() => gitStatus.refresh(), 500)
+    if (currentProjectKey.value) {
+      queryCache.invalidateQueries({ key: getTasksListQueryKey(currentProjectKey.value) })
+    }
   }
 })
 
 const currentProjectConversations = computed<Conversation[]>(() => chatStore.conversations)
+
+const manageKanbanResultCount = computed(() => {
+  return chatStore.messages.reduce((count, message) => {
+    if (!message.toolCalls || message.toolCalls.length === 0)
+      return count
+    return count + message.toolCalls.filter(toolCallState =>
+      toolCallState.toolCall.toolName === 'manage_kanban' && !!toolCallState.result,
+    ).length
+  }, 0)
+})
+
+watch(manageKanbanResultCount, (current, previous) => {
+  if (current <= previous)
+    return
+  if (!currentProjectKey.value)
+    return
+  queryCache.invalidateQueries({ key: getTasksListQueryKey(currentProjectKey.value) })
+})
 </script>
 
 <template>
@@ -671,18 +700,32 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
                 </p>
               </template>
             </div>
-            <button
-              class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              :class="{
-                'opacity-40 cursor-not-allowed': !canUseAssistant,
-                'bg-muted text-foreground': canUseAssistant && isHistoryOpen,
-              }"
-              title="项目会话历史"
-              :disabled="!canUseAssistant"
-              @click="toggleHistory"
-            >
-              <span class="i-material-symbols:history-rounded h-4 w-4" />
-            </button>
+            <div class="flex items-center gap-1">
+              <button
+                class="h-7 inline-flex items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                :class="{
+                  'opacity-40 cursor-not-allowed': !canUseAssistant,
+                }"
+                title="新建会话"
+                :disabled="!canUseAssistant"
+                @click="handleNewConversation"
+              >
+                <span class="i-carbon-add h-3.5 w-3.5" />
+                <span>新建会话</span>
+              </button>
+              <button
+                class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                :class="{
+                  'opacity-40 cursor-not-allowed': !canUseAssistant,
+                  'bg-muted text-foreground': canUseAssistant && isHistoryOpen,
+                }"
+                title="项目会话历史"
+                :disabled="!canUseAssistant"
+                @click="toggleHistory"
+              >
+                <span class="i-material-symbols:history-rounded h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div v-if="isHistoryOpen" class="flex-1 min-h-0 bg-sidebar-background/60">

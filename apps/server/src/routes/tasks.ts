@@ -25,12 +25,12 @@ tasksRoutes.get('/', async (c) => {
 // POST /api/tasks
 tasksRoutes.post('/', async (c) => {
   const body = await c.req.json()
-  const { title, spec, status, priority, projectKey, conversationId } = body
+  const { title, spec, contextMarkdown, status, priority, projectKey, conversationId } = body
 
   if (!title || !projectKey)
     return c.json({ error: 'title and projectKey are required' }, 400)
 
-  const task = await createTask({ title, spec, status, priority, projectKey, conversationId })
+  const task = await createTask({ title, spec, contextMarkdown, status, priority, projectKey, conversationId })
   return c.json(task, 201)
 })
 

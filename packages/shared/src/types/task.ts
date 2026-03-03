@@ -11,6 +11,8 @@ export interface Task {
   title: string
   /** Markdown Spec 说明 */
   spec: string
+  /** 可复用编辑上下文 Markdown */
+  contextMarkdown: string
   status: TaskStatus
   priority: TaskPriority
   sortOrder: number
@@ -24,6 +26,7 @@ export interface Task {
 export interface CreateTaskInput {
   title: string
   spec?: string
+  contextMarkdown?: string
   status?: TaskStatus
   priority?: TaskPriority
   projectKey: string
@@ -33,6 +36,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   title?: string
   spec?: string
+  contextMarkdown?: string
   status?: TaskStatus
   priority?: TaskPriority
   sortOrder?: number

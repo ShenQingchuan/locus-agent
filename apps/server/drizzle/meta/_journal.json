@@ -22,6 +22,13 @@
       "when": 1772434083978,
       "tag": "0002_charming_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1772563130528,
+      "tag": "0003_fair_may_parker",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { readValidatedTextFile } from './file-utils.js'
+import { replaceUniqueString } from './string-replace.js'
 
 /**
  * 字符串替换工具定义
@@ -47,22 +48,6 @@ export interface StrReplaceResult {
 }
 
 /**
- * 统计 `needle` 在 `haystack` 中的非重叠出现次数。
- */
-function countOccurrences(haystack: string, needle: string): number {
-  let count = 0
-  let pos = 0
-  while (true) {
-    pos = haystack.indexOf(needle, pos)
-    if (pos === -1)
-      break
-    count++
-    pos += needle.length
-  }
-  return count
-}
-
-/**
  * 字符串替换工具执行函数
  */
 export async function executeStrReplace(args: {
@@ -78,31 +63,28 @@ export async function executeStrReplace(args: {
     binaryErrorMessage: `Binary file detected: ${file_path}. The str_replace tool only supports text files.`,
   })
 
-  // 唯一性校验
-  const occurrences = countOccurrences(content, old_string)
+  const replaced = replaceUniqueString(content, old_string, new_string)
 
-  if (occurrences === 0) {
-    return {
-      filePath: resolvedPath,
-      success: false,
-      message:
-        'old_string not found in file. '
-        + 'Use read_file to verify the exact current content, then provide the correct string to match.',
+  if (!replaced.ok) {
+    if (replaced.reason === 'not_found') {
+      return {
+        filePath: resolvedPath,
+        success: false,
+        message:
+          'old_string not found in file. '
+          + 'Use read_file to verify the exact current content, then provide the correct string to match.',
+      }
     }
-  }
-
-  if (occurrences > 1) {
     return {
       filePath: resolvedPath,
       success: false,
       message:
-        `old_string matched ${occurrences} locations (must be unique). `
+        `old_string matched ${replaced.occurrences} locations (must be unique). `
         + 'Include more surrounding context lines to narrow down to exactly one match.',
     }
   }
 
-  // 执行替换
-  const newContent = content.replace(old_string, new_string)
+  const newContent: string = replaced.value
   await writeFile(resolvedPath, newContent, 'utf-8')
 
   // 提取变更处附近的片段，便于 LLM 确认而不必再读文件
@@ -125,7 +107,7 @@ export async function executeStrReplace(args: {
   const centerLine = Math.floor((startLine + endLine) / 2)
   const from = Math.max(0, centerLine - SNIPPET_CONTEXT_LINES)
   const to = Math.min(lines.length, centerLine + SNIPPET_CONTEXT_LINES + 1)
-  const snippetLines = lines.slice(from, to)
+  const snippetLines: string[] = lines.slice(from, to)
   const numWidth = String(to).length
   const snippet = snippetLines
     .map((line, i) => `${String(from + i + 1).padStart(numWidth)}|${line}`)

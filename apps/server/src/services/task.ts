@@ -7,6 +7,7 @@ import { db, taskConversations, tasks } from '../db/index.js'
 export interface CreateTaskInput {
   title: string
   spec?: string
+  contextMarkdown?: string
   status?: 'backlog' | 'in_progress' | 'done'
   priority?: number
   projectKey: string
@@ -16,6 +17,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   title?: string
   spec?: string
+  contextMarkdown?: string
   status?: 'backlog' | 'in_progress' | 'done'
   priority?: number
   sortOrder?: number
@@ -42,6 +44,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     id,
     title: input.title,
     spec: input.spec ?? '',
+    contextMarkdown: input.contextMarkdown ?? '',
     status,
     priority: input.priority ?? 0,
     sortOrder: (maxRow?.max ?? -1) + 1,
@@ -95,6 +98,8 @@ export async function updateTask(
     updates.title = input.title
   if (input.spec !== undefined)
     updates.spec = input.spec
+  if (input.contextMarkdown !== undefined)
+    updates.contextMarkdown = input.contextMarkdown
   if (input.status !== undefined)
     updates.status = input.status
   if (input.priority !== undefined)
@@ -193,4 +198,26 @@ export async function getTaskConversationIds(taskId: string): Promise<string[]> 
     .where(eq(taskConversations.taskId, taskId))
 
   return result.map(r => r.conversationId)
+}
+
+export async function getLatestTaskByConversation(conversationId: string): Promise<Task | null> {
+  const [task] = await db
+    .select({ task: tasks })
+    .from(taskConversations)
+    .innerJoin(tasks, eq(taskConversations.taskId, tasks.id))
+    .where(eq(taskConversations.conversationId, conversationId))
+    .orderBy(sql`${tasks.updatedAt} DESC`)
+    .limit(1)
+
+  if (task?.task)
+    return task.task
+
+  const [primaryTask] = await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.conversationId, conversationId))
+    .orderBy(sql`${tasks.updatedAt} DESC`)
+    .limit(1)
+
+  return primaryTask ?? null
 }

@@ -215,6 +215,8 @@ export const tasks = sqliteTable('tasks', {
   title: text('title').notNull(),
   /** Markdown Spec 说明 */
   spec: text('spec').notNull().default(''),
+  /** 需求可复用编辑上下文（Markdown） */
+  contextMarkdown: text('context_markdown').notNull().default(''),
   /** 看板列状态 */
   status: text('status', { enum: ['backlog', 'in_progress', 'done'] }).notNull().default('backlog'),
   /** 优先级：0=无, 1=低, 2=中, 3=高 */
