@@ -7,7 +7,7 @@ interface StreamAssistantReplyOptions {
   conversationId: string
   assistantMessageId: string
   message: string
-  messages: CoreMessage[]
+  messages?: CoreMessage[]
   scope: ConversationScope
   confirmMode: boolean
   thinkingMode: boolean

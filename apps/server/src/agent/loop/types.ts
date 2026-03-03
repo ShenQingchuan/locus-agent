@@ -70,6 +70,8 @@ export interface ExecuteToolPipelineOptions {
 
 export interface ExecuteToolPipelineResult {
   result: unknown
+  /** 精简版结果，用于推入 LLM 上下文的 messages（不设置则使用 result 序列化） */
+  contextResult?: string
   isError: boolean
   isInterrupted: boolean
 }

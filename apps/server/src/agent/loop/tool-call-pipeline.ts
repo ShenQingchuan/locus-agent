@@ -2,7 +2,7 @@ import type { QuestionItem } from '../tools/ask_question.js'
 import type { DelegateArgs, DelegateResult } from '../tools/delegate.js'
 import type { ExecuteToolPipelineOptions, ExecuteToolPipelineResult } from './types.js'
 import { formatQuestionAnswers } from '../tools/ask_question.js'
-import { executeDelegate } from '../tools/delegate.js'
+import { executeDelegate, formatDelegateResult } from '../tools/delegate.js'
 import { executeToolCall, hasToolExecutor, interactiveTools, isTrustedBuiltinTool } from '../tools/registry.js'
 import { isWhitelisted } from '../whitelist.js'
 import { withTimeout } from './timeout.js'
@@ -94,10 +94,18 @@ export async function executePendingToolCall(
             : undefined,
         )
 
+        // 完整结果（含 deltas）发给前端 SSE 展示
         result = {
           ...delegateResult,
           deltas: delegateDeltas,
           isSubAgentResult: true,
+        }
+        // 精简结果推入 LLM messages，不含庞大的 deltas
+        return {
+          result,
+          contextResult: formatDelegateResult(delegateResult),
+          isError: false,
+          isInterrupted: false,
         }
       }
       else {

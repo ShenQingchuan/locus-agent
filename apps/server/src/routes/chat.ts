@@ -1,6 +1,5 @@
 import type {
   ChatRequest,
-  CoreMessage as SharedCoreMessage,
   SSEEvent,
   ToolApprovalRequest,
   ToolCall,
@@ -24,7 +23,7 @@ import {
 } from '../agent/whitelist.js'
 import { config } from '../config.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
-import { addMessage } from '../services/message.js'
+import { addMessage, getMessages } from '../services/message.js'
 
 export const chatRoutes = new Hono()
 
@@ -70,41 +69,63 @@ function createUserMessage(content: string): ModelMessage {
   }
 }
 
+
 /**
- * 将 shared 的 CoreMessage 转换为 AI SDK 的 ModelMessage
+ * 将数据库 Message 记录转换为 AI SDK 的 ModelMessage[]
  */
-function convertToModelMessage(msg: SharedCoreMessage): ModelMessage {
-  switch (msg.role) {
-    case 'user':
-      return { role: 'user', content: msg.content }
-    case 'assistant':
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        return {
-          role: 'assistant',
-          content: msg.toolCalls.map(tc => ({
-            type: 'tool-call' as const,
-            toolCallId: tc.toolCallId,
-            toolName: tc.toolName,
-            input: tc.args,
-          })),
+function dbMessagesToModelMessages(dbMsgs: Array<{
+  role: string
+  content: string
+  toolCalls?: unknown[] | null
+  toolResults?: unknown[] | null
+}>): ModelMessage[] {
+  const result: ModelMessage[] = []
+  for (const msg of dbMsgs) {
+    switch (msg.role) {
+      case 'user':
+        result.push({ role: 'user', content: msg.content })
+        break
+      case 'assistant': {
+        const tcs = msg.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
+        if (tcs && tcs.length > 0) {
+          result.push({
+            role: 'assistant',
+            content: tcs.map(tc => ({
+              type: 'tool-call' as const,
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              input: tc.args,
+            })),
+          })
         }
+        else {
+          result.push({ role: 'assistant', content: msg.content })
+        }
+        break
       }
-      return { role: 'assistant', content: msg.content }
-    case 'system':
-      return { role: 'system', content: msg.content }
-    case 'tool':
-      return {
-        role: 'tool',
-        content: msg.toolResults.map(tr => ({
-          type: 'tool-result' as const,
-          toolCallId: tr.toolCallId,
-          toolName: tr.toolName,
-          output: tr.isError
-            ? { type: 'error-text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) }
-            : { type: 'text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) },
-        })),
+      case 'tool': {
+        const trs = msg.toolResults as Array<{ toolCallId: string, toolName: string, result: unknown, isError?: boolean }> | null
+        if (trs && trs.length > 0) {
+          result.push({
+            role: 'tool',
+            content: trs.map(tr => ({
+              type: 'tool-result' as const,
+              toolCallId: tr.toolCallId,
+              toolName: tr.toolName,
+              output: tr.isError
+                ? { type: 'error-text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) }
+                : { type: 'text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) },
+            })),
+          })
+        }
+        break
       }
+      case 'system':
+        result.push({ role: 'system', content: msg.content })
+        break
+    }
   }
+  return result
 }
 
 // POST /api/chat - Stream chat response
@@ -113,7 +134,6 @@ chatRoutes.post('/', async (c) => {
   const {
     conversationId,
     message,
-    messages: historyMessages,
     confirmMode,
     thinkingMode,
     codingMode,
@@ -208,11 +228,9 @@ chatRoutes.post('/', async (c) => {
       const runtimeModelInfo = getCurrentModelInfo()
       const assistantModel = `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
-      // 构建消息历史
-      // 将 shared 类型转换为 AI SDK 类型
-      const convertedHistory: ModelMessage[] = historyMessages
-        ? historyMessages.map(m => convertToModelMessage(m))
-        : []
+      // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
+      const dbMessages = await getMessages(conversationId)
+      const convertedHistory = dbMessagesToModelMessages(dbMessages)
       const messages: ModelMessage[] = [...convertedHistory, createUserMessage(message)]
 
       const effectiveThinkingMode = thinkingMode ?? true

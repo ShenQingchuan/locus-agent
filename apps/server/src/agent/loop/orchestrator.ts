@@ -1,7 +1,10 @@
 import type { ModelMessage } from 'ai'
 import type { AgentLoopOptions, AgentLoopResult } from './types.js'
 import { streamText } from 'ai'
-import { getMergedTools } from '../tools/registry.js'
+import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
+import { compactToolResults } from '../context/tool-result-cache.js'
+import { getCurrentModelInfo } from '../providers/index.js'
+import { getMergedToolsForMode } from '../tools/registry.js'
 import { consumeResponseStream } from './stream-consumer.js'
 import { executePendingToolCall } from './tool-call-pipeline.js'
 
@@ -82,6 +85,17 @@ You're in **Plan Mode**. Focus on creating clear, actionable implementation plan
 - Outputting summaries/explanations after write_plan
 `
 
+const BUILD_WITH_PLAN_PROMPT = `
+## 执行计划模式
+
+你正在执行一个之前制定的实现计划。请遵循以下原则：
+1. 用 manage_todos 将计划步骤转为 todo 项目，完成后逐项标记
+2. 按计划指定的顺序实施，除非依赖关系要求调整
+3. 完成每个主要步骤后简要汇报
+4. 遇到计划未覆盖的问题时，灵活应对并记录偏差
+5. 实施变更后验证结果（运行测试、检查输出等）再进入下一步
+`
+
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
   const {
     messages: initialMessages,
@@ -113,9 +127,18 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   const toolContext = { conversationId, projectKey }
 
   // 根据 codingMode 扩展 system prompt
-  const effectiveSystemPrompt = codingMode === 'plan'
-    ? `${systemPrompt}\n\n${PLAN_MODE_PROMPT}`
-    : systemPrompt
+  let effectiveSystemPrompt = systemPrompt
+  if (codingMode === 'plan') {
+    effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
+  }
+  else if (codingMode === 'build') {
+    const hasPlan = messages.some(
+      m => m.role === 'user' && typeof m.content === 'string' && m.content.includes('<plan>'),
+    )
+    if (hasPlan) {
+      effectiveSystemPrompt += `\n\n${BUILD_WITH_PLAN_PROMPT}`
+    }
+  }
 
   let totalInputTokens = 0
   let totalOutputTokens = 0
@@ -131,6 +154,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       break
     }
 
+    // Microcompaction: 将旧的大型工具结果缓存到磁盘，只保留引用
+    compactToolResults(messages)
+
     let response
     let retryCount = 0
     const maxRetries = 2
@@ -141,7 +167,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           model,
           system: effectiveSystemPrompt,
           messages,
-          tools: getMergedTools(),
+          tools: getMergedToolsForMode(codingMode),
           abortSignal,
           timeout: {
             totalMs: 600_000,
@@ -194,6 +220,19 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     totalInputTokens += usage.inputTokens ?? 0
     totalOutputTokens += usage.outputTokens ?? 0
 
+    // Auto compaction: 上下文接近上限时自动压缩
+    const lastInputTokens = usage.inputTokens ?? 0
+    const contextWindow = getCurrentModelInfo().contextWindow
+    if (shouldCompact(lastInputTokens, contextWindow)) {
+      const compactionResult = await performCompaction(messages, model)
+      if (compactionResult.didCompact) {
+        console.warn(
+          `[agent-loop] Auto-compacted: removed ${compactionResult.messagesRemoved} old messages, `
+          + `input was ${lastInputTokens}/${contextWindow} tokens`,
+        )
+      }
+    }
+
     finalText += streamResult.iterationText
 
     const responseData = await response.response
@@ -229,9 +268,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           )
         }
 
-        const resultText = typeof pipelineResult.result === 'string'
-          ? pipelineResult.result
-          : JSON.stringify(pipelineResult.result)
+        const resultText = pipelineResult.contextResult
+          ?? (typeof pipelineResult.result === 'string'
+            ? pipelineResult.result
+            : JSON.stringify(pipelineResult.result))
 
         messages.push({
           role: 'tool',

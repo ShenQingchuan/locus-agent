@@ -139,7 +139,8 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         space,
         projectKey,
         message,
-        messages,
+        // 后端从 DB 加载历史，只在 edit/retry 有显式 messages 时发送
+        ...(messages && messages.length > 0 ? { messages } : {}),
         confirmMode,
         thinkingMode,
         codingMode,

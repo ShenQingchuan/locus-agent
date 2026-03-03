@@ -147,8 +147,8 @@ function goToNext() {
         <!-- No changes at all -->
         <div v-if="!isLoading && files.length === 0 && isGitRepo" class="h-full flex items-center justify-center">
           <div class="text-center">
-            <span class="i-mingcute:empty-box-fill h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
-            <span class="text-xs text-muted-foreground">工作区暂无未提交的变更</span>
+            <span class="i-material-symbols:person-play h-6 w-6 text-muted-foreground/40 mx-auto block mb-2" />
+            <span class="text-xs text-muted-foreground">现在就去开始编码吧！</span>
           </div>
         </div>
 

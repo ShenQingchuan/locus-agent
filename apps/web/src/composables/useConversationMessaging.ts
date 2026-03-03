@@ -94,7 +94,9 @@ export function createConversationMessagingActions(options: CreateConversationMe
 
     options.clearError(conversationId)
 
-    const historyToSend = historyMessages ?? options.messagesToCoreMessages(runtimeState.messages)
+    // 后端从 DB 加载历史，正常发送时不需要传 messages
+    // 仅 edit/retry 场景会传入 historyMessages（用于 truncate 后的状态同步）
+    const historyToSend = historyMessages
 
     options.addMessage({ role: 'user', content }, conversationId)
 

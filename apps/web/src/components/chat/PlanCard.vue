@@ -40,7 +40,14 @@ function handleViewPlan() {
 
 function handleStartExecution() {
   chatStore.setCodingMode('build')
-  chatStore.sendMessage('开始执行计划')
+  if (!props.content?.trim()) {
+    chatStore.sendMessage('开始执行计划')
+    return
+  }
+  chatStore.sendMessage(
+    `请执行以下计划：\n\n<plan>\n${props.content}\n</plan>\n\n`
+    + `首先用 manage_todos 将计划的关键步骤创建为 todo 项以便跟踪进度，然后按顺序执行每一步。`,
+  )
 }
 </script>
 

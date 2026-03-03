@@ -190,6 +190,19 @@ export async function truncateMessages(
 }
 
 /**
+ * 替换会话的全部消息（用于 auto-compaction 后持久化压缩结果）
+ */
+export async function replaceMessages(
+  conversationId: string,
+  newMessages: AddMessageInput[],
+): Promise<void> {
+  await db.delete(messages).where(eq(messages.conversationId, conversationId))
+  if (newMessages.length > 0) {
+    await addMessages(conversationId, newMessages)
+  }
+}
+
+/**
  * 获取会话的消息数量
  */
 export async function getMessageCount(conversationId: string): Promise<number> {
