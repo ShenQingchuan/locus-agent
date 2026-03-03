@@ -69,7 +69,6 @@ function createUserMessage(content: string): ModelMessage {
   }
 }
 
-
 /**
  * 将数据库 Message 记录转换为 AI SDK 的 ModelMessage[]
  */

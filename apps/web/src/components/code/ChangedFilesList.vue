@@ -25,6 +25,8 @@ const emit = defineEmits<{
 // --- Derived file lists from real git staging state ---
 const stagedFiles = computed(() => props.files.filter(f => f.staged))
 const unstagedFiles = computed(() => props.files.filter(f => !f.staged))
+const isStagedCollapsed = ref(false)
+const isUnstagedCollapsed = ref(false)
 
 // --- Multi-selection state (for Shift+click range) ---
 const selectedSet = ref(new Set<string>())
@@ -188,89 +190,119 @@ function fileName(filePath: string): string {
         <!-- Staged section -->
         <template v-if="stagedFiles.length > 0">
           <div class="px-2.5 py-1.5 flex items-center justify-between">
-            <span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              暂存的更改 ({{ stagedFiles.length }})
-            </span>
             <button
-              class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="全部取消暂存"
-              @click="unstageAll"
+              class="min-w-0 inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              :title="isStagedCollapsed ? '展开暂存的更改' : '收起暂存的更改'"
+              @click="isStagedCollapsed = !isStagedCollapsed"
             >
-              <span class="i-carbon-subtract h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div
-            v-for="file in stagedFiles"
-            :key="`staged-${file.filePath}`"
-            class="group/file flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-xs transition-colors cursor-pointer"
-            :class="[
-              isRowSelected(file.filePath, true) ? 'bg-accent' : isRowActive(file.filePath, true) ? 'bg-accent/70' : 'hover:bg-accent/60',
-            ]"
-            @click="handleRowClick(file.filePath, stagedFiles, true, $event)"
-          >
-            <span
-              class="flex-shrink-0 w-4 text-center font-mono font-semibold text-[10px] leading-4 rounded"
-              :class="statusColors[file.status]"
-            >{{ statusLabel(file.status) }}</span>
-            <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
-            <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-              <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
-                <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
-                <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+              <span
+                class="h-3.5 w-3.5"
+                :class="isStagedCollapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-down'"
+              />
+              <span class="text-xs font-semibold">暂存的更改</span>
+              <span class="text-[10px] text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                {{ stagedFiles.length }}
               </span>
+            </button>
+            <div class="flex items-center">
               <button
-                class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                :title="selectedSet.size > 1 && isRowSelected(file.filePath, true) ? `取消暂存 ${selectedSet.size} 个文件` : '取消暂存'"
-                @click.stop="unstage(file.filePath)"
+                class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="全部取消暂存"
+                @click="unstageAll"
               >
-                <span class="i-carbon-subtract text-sm" />
+                <span class="i-carbon-subtract h-3.5 w-3.5" />
               </button>
             </div>
           </div>
+          <template v-if="!isStagedCollapsed">
+            <div
+              v-for="file in stagedFiles"
+              :key="`staged-${file.filePath}`"
+              class="group/file flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-xs transition-colors cursor-pointer"
+              :class="[
+                isRowSelected(file.filePath, true) ? 'bg-accent' : isRowActive(file.filePath, true) ? 'bg-accent/70' : 'hover:bg-accent/60',
+              ]"
+              @click="handleRowClick(file.filePath, stagedFiles, true, $event)"
+            >
+              <span
+                class="flex-shrink-0 w-4 text-center font-mono font-semibold text-[10px] leading-4 rounded"
+                :class="statusColors[file.status]"
+              >{{ statusLabel(file.status) }}</span>
+              <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
+              <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
+                  <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
+                  <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+                </span>
+                <button
+                  class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  :title="selectedSet.size > 1 && isRowSelected(file.filePath, true) ? `取消暂存 ${selectedSet.size} 个文件` : '取消暂存'"
+                  @click.stop="unstage(file.filePath)"
+                >
+                  <span class="i-carbon-subtract text-sm" />
+                </button>
+              </div>
+            </div>
+          </template>
         </template>
 
         <!-- Unstaged section -->
         <template v-if="unstagedFiles.length > 0">
           <div class="px-2.5 py-1.5 flex items-center justify-between" :class="stagedFiles.length > 0 ? 'mt-1' : ''">
-            <span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              更改 ({{ unstagedFiles.length }})
-            </span>
             <button
-              class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="全部暂存"
-              @click="stageAll"
+              class="min-w-0 inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              :title="isUnstagedCollapsed ? '展开更改' : '收起更改'"
+              @click="isUnstagedCollapsed = !isUnstagedCollapsed"
             >
-              <span class="i-carbon-add text-sm" />
-            </button>
-          </div>
-          <div
-            v-for="file in unstagedFiles"
-            :key="`unstaged-${file.filePath}`"
-            class="group/file flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-xs transition-colors cursor-pointer"
-            :class="[
-              isRowSelected(file.filePath, false) ? 'bg-accent' : isRowActive(file.filePath, false) ? 'bg-accent/70' : 'hover:bg-accent/60',
-            ]"
-            @click="handleRowClick(file.filePath, unstagedFiles, false, $event)"
-          >
-            <span
-              class="flex-shrink-0 w-4 text-center font-mono font-semibold text-sm leading-4 rounded"
-              :class="statusColors[file.status]"
-            >{{ statusLabel(file.status) }}</span>
-            <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
-            <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-              <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
-                <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
-                <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+              <span
+                class="h-3.5 w-3.5"
+                :class="isUnstagedCollapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-down'"
+              />
+              <span class="text-xs font-semibold">更改</span>
+              <span class="text-[10px] text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                {{ unstagedFiles.length }}
               </span>
+            </button>
+            <div class="flex items-center">
               <button
-                class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                :title="selectedSet.size > 1 && isRowSelected(file.filePath, false) ? `暂存 ${selectedSet.size} 个文件` : '暂存'"
-                @click.stop="stage(file.filePath)"
+                class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="全部暂存"
+                @click="stageAll"
               >
                 <span class="i-carbon-add text-sm" />
               </button>
             </div>
           </div>
+          <template v-if="!isUnstagedCollapsed">
+            <div
+              v-for="file in unstagedFiles"
+              :key="`unstaged-${file.filePath}`"
+              class="group/file flex items-center gap-1 pl-2.5 pr-1.5 py-1 text-xs transition-colors cursor-pointer"
+              :class="[
+                isRowSelected(file.filePath, false) ? 'bg-accent' : isRowActive(file.filePath, false) ? 'bg-accent/70' : 'hover:bg-accent/60',
+              ]"
+              @click="handleRowClick(file.filePath, unstagedFiles, false, $event)"
+            >
+              <span
+                class="flex-shrink-0 w-4 text-center font-mono font-semibold text-sm leading-4 rounded"
+                :class="statusColors[file.status]"
+              >{{ statusLabel(file.status) }}</span>
+              <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
+              <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
+                  <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
+                  <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+                </span>
+                <button
+                  class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  :title="selectedSet.size > 1 && isRowSelected(file.filePath, false) ? `暂存 ${selectedSet.size} 个文件` : '暂存'"
+                  @click.stop="stage(file.filePath)"
+                >
+                  <span class="i-carbon-add text-sm" />
+                </button>
+              </div>
+            </div>
+          </template>
         </template>
       </div>
     </div>

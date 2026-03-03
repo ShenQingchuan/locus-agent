@@ -51,7 +51,8 @@ export function compactToolResults(
 
   // 2. 只处理 hot tail 之外的 cold 区域
   const coldCount = Math.max(0, toolIndices.length - hotTailCount)
-  if (coldCount === 0) return []
+  if (coldCount === 0)
+    return []
 
   const coldIndices = toolIndices.slice(0, coldCount)
   const entries: CacheEntry[] = []
@@ -60,16 +61,21 @@ export function compactToolResults(
   for (const idx of coldIndices) {
     const msg = messages[idx] as any
     const content = msg.content
-    if (!content || !Array.isArray(content)) continue
+    if (!content || !Array.isArray(content))
+      continue
 
     for (const part of content) {
-      if (part.type !== 'tool-result') continue
+      if (part.type !== 'tool-result')
+        continue
 
       const value = part.output?.value
-      if (!value || typeof value !== 'string') continue
-      if (value.length <= minSizeToCache) continue
+      if (!value || typeof value !== 'string')
+        continue
+      if (value.length <= minSizeToCache)
+        continue
       // 已缓存的跳过
-      if (value.startsWith(CACHED_MARKER)) continue
+      if (value.startsWith(CACHED_MARKER))
+        continue
 
       // 写入磁盘
       const filename = `${part.toolCallId}.txt`

@@ -39,7 +39,8 @@ export function shouldCompact(
   lastInputTokens: number,
   contextWindowSize: number,
 ): boolean {
-  if (contextWindowSize <= 0 || lastInputTokens <= 0) return false
+  if (contextWindowSize <= 0 || lastInputTokens <= 0)
+    return false
   return (lastInputTokens / contextWindowSize) >= COMPACTION_THRESHOLD
 }
 

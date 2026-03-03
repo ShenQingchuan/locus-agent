@@ -26,6 +26,7 @@ type CodingSection = 'planning' | 'workspace'
 
 const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')
 const currentProjectName = ref('未选择工作空间')
+const currentProjectPath = ref('')
 const isWorkspaceLoading = ref(false)
 const isWorkspacePickerOpen = ref(false)
 const isWorkspacePickerLoading = ref(false)
@@ -164,6 +165,7 @@ onMounted(async () => {
       const result = await workspaceApi.openWorkspace(savedPath)
       const projectKey = await createProjectKey(result.rootPath)
       currentProjectName.value = result.rootName
+      currentProjectPath.value = result.rootPath
       currentProjectKey.value = projectKey
       currentBrowsePath.value = result.rootPath
     })
@@ -312,6 +314,7 @@ async function openCurrentBrowsePathAsWorkspace() {
       const result = await workspaceApi.openWorkspace(currentBrowsePath.value)
       const projectKey = await createProjectKey(result.rootPath)
       currentProjectName.value = result.rootName
+      currentProjectPath.value = result.rootPath
       currentProjectKey.value = projectKey
       lastWorkspacePath.value = result.rootPath
       activeSection.value = 'workspace'
@@ -489,23 +492,6 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
         <!-- Section buttons -->
         <div :class="isLeftSidebarCollapsed ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5'">
           <button
-            class="flex items-center rounded transition-colors text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-            :class="[
-              isLeftSidebarCollapsed
-                ? 'h-8 w-8 inline-flex items-center justify-center'
-                : 'w-full text-left px-2.5 py-2 text-sm',
-            ]"
-            :title="isLeftSidebarCollapsed ? '工作目录' : undefined"
-            @click="openWorkspacePicker"
-          >
-            <div v-if="isLeftSidebarCollapsed" class="i-material-symbols:folder-managed h-4 w-4" />
-            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-material-symbols:folder-managed h-4 w-4" />
-              工作目录
-            </div>
-          </button>
-
-          <button
             class="flex items-center rounded transition-colors"
             :class="[
               isLeftSidebarCollapsed
@@ -587,9 +573,20 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
           <!-- Normal content -->
           <template v-else>
             <header class="h-11 border-b border-border px-4 flex items-center justify-between">
-              <h1 class="text-sm font-semibold">
-                {{ activeSection === 'planning' ? '任务编排' : '变更审阅' }}
-              </h1>
+              <button
+                class="min-w-0 inline-flex items-center gap-2 rounded px-2 py-1 transition-colors hover:bg-muted"
+                @click="openWorkspacePicker"
+              >
+                <span class="i-material-symbols:folder-managed h-4 w-4 flex-none text-muted-foreground" />
+                <span class="text-sm text-foreground/90">工作目录</span>
+                <span
+                  class="max-w-[28rem] truncate text-xs font-mono text-muted-foreground"
+                  :title="currentProjectPath || currentProjectName"
+                >
+                  {{ currentProjectPath || currentProjectName }}
+                </span>
+              </button>
+
               <button
                 v-if="activeSection === 'planning'"
                 class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded px-1.5 py-1 transition-colors"
@@ -671,9 +668,6 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
               <template v-else>
                 <p class="text-sm font-medium leading-tight">
                   研发助手
-                </p>
-                <p v-if="currentProjectKey" class="text-[11px] text-muted-foreground leading-tight truncate mt-0.5">
-                  当前项目：<span class="font-mono">{{ currentProjectName }}</span>
                 </p>
               </template>
             </div>

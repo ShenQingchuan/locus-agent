@@ -74,14 +74,27 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
 ])
 
 const MCP_WRITE_KEYWORDS = [
-  'write', 'create', 'delete', 'update', 'edit', 'modify', 'remove',
-  'insert', 'patch', 'put', 'execute', 'run', 'deploy', 'send',
+  'write',
+  'create',
+  'delete',
+  'update',
+  'edit',
+  'modify',
+  'remove',
+  'insert',
+  'patch',
+  'put',
+  'execute',
+  'run',
+  'deploy',
+  'send',
 ]
 
 function looksLikeWriteTool(name: string, t: Tool): boolean {
   const lowerName = name.toLowerCase()
   for (const kw of MCP_WRITE_KEYWORDS) {
-    if (lowerName.includes(kw)) return true
+    if (lowerName.includes(kw))
+      return true
   }
   const desc = ((t as any).description ?? '').toLowerCase()
   if (desc.includes('write') || desc.includes('modify') || desc.includes('delete') || desc.includes('create file')) {
@@ -96,7 +109,8 @@ function looksLikeWriteTool(name: string, t: Tool): boolean {
  * build / undefined：返回全部工具
  */
 export function getMergedToolsForMode(codingMode?: 'build' | 'plan'): Record<string, Tool> {
-  if (codingMode !== 'plan') return getMergedTools()
+  if (codingMode !== 'plan')
+    return getMergedTools()
 
   const filtered: Record<string, Tool> = {}
   for (const [name, t] of Object.entries(tools)) {
