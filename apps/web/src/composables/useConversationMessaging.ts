@@ -145,13 +145,11 @@ export function createConversationMessagingActions(options: CreateConversationMe
         options.appendReasoningToMessage(assistantMessageId, delta, conversationId)
       },
       onTextDelta: (delta) => {
-        if (isPlanningTurn) {
-          // Plan 模式：text delta 只写入计划预览面板，不写入消息气泡
-          options.onPlanPreviewDelta?.(conversationId, delta)
-        }
-        else {
+        if (!isPlanningTurn) {
           options.appendToMessage(assistantMessageId, delta, conversationId)
         }
+        // Plan 模式：丢弃 text delta（含 provider 会话废话），
+        // 计划内容统一由 onWritePlanDetected 从 write_plan tool args 获取
       },
       onToolCallStart: (toolCall) => {
         options.addToolCallToMessage(assistantMessageId, toolCall, conversationId)

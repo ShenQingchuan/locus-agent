@@ -147,17 +147,18 @@ defineExpose({ scrollToBottom })
     >
       <div class="max-w-3xl mx-auto">
         <!-- Empty state -->
-        <div
-          v-if="messages.length === 0"
-          class="flex-col-center h-full py-20 text-muted-foreground"
-        >
-          <div class="i-carbon-chat-bot h-10 w-10 mb-4 opacity-50" />
-          <p class="text-base font-medium">
-            开始对话
-          </p>
-          <p class="text-sm mt-1.5 opacity-70">
-            在下方输入消息开始聊天
-          </p>
+        <div v-if="messages.length === 0">
+          <slot name="empty">
+            <div class="flex-col-center h-full py-20 text-muted-foreground">
+              <div class="i-carbon-chat-bot h-10 w-10 mb-4 opacity-50" />
+              <p class="text-base font-medium">
+                开始对话
+              </p>
+              <p class="text-sm mt-1.5 opacity-70">
+                在下方输入消息开始聊天
+              </p>
+            </div>
+          </slot>
         </div>
 
         <!-- Messages -->

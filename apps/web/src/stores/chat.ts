@@ -201,18 +201,19 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  const planGeneratingPlaceholder = '计划生成中 ...'
   function onPlanPreviewStart(conversationId: string) {
     if (conversationId !== currentConversationId.value)
       return
-    openPlan('当前计划（生成中）', '')
+    openPlan(planGeneratingPlaceholder, '')
   }
 
   function onPlanPreviewDelta(conversationId: string, delta: string) {
     if (conversationId !== currentConversationId.value)
       return
     const existing = viewingPlan.value
-    if (!existing || existing.filename !== '当前计划（生成中）') {
-      openPlan('当前计划（生成中）', delta)
+    if (!existing || existing.filename !== planGeneratingPlaceholder) {
+      openPlan(planGeneratingPlaceholder, delta)
       return
     }
     viewingPlan.value = {

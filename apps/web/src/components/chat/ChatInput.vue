@@ -559,7 +559,7 @@ function handleKeydown(event: KeyboardEvent) {
                 class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
               >
                 <div class="i-icon-park-solid:guide-board h-3.5 w-3.5" />
-                <span>当前计划</span>
+                <span>关联计划</span>
                 <div
                   v-if="chatStore.isLoadingPlan"
                   class="i-carbon-circle-dash h-3 w-3 animate-spin opacity-60"

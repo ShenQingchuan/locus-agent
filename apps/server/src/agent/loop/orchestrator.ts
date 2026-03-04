@@ -120,7 +120,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onToolPendingApproval,
     onToolOutputDelta,
     onFinish,
-    maxIterations = 10,
+    maxIterations = 500,
     abortSignal,
     confirmMode: confirmModeOpt = false,
     thinkingMode = true,

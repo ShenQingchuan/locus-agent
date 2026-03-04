@@ -10,6 +10,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
+import ConversationListItem from '@/components/chat/ConversationListItem.vue'
 import MessageList from '@/components/chat/MessageList.vue'
 import PlanViewer from '@/components/code/PlanViewer.vue'
 import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
@@ -485,6 +486,14 @@ watch(() => chatStore.isStreaming, (cur, prev) => {
 
 const currentProjectConversations = computed<Conversation[]>(() => chatStore.conversations)
 
+const recentConversations = computed(() => {
+  if (!canUseAssistant.value)
+    return []
+  return [...currentProjectConversations.value]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 3)
+})
+
 const manageKanbanResultCount = computed(() => {
   return chatStore.messages.reduce((count, message) => {
     if (!message.toolCalls || message.toolCalls.length === 0)
@@ -747,7 +756,56 @@ watch(manageKanbanResultCount, (current, previous) => {
                 :is-loading="chatStore.isLoading"
                 :is-streaming="chatStore.isStreaming"
                 scroll-button-right="calc((100% - min(100%, 48rem)) / 2 + 2rem)"
-              />
+              >
+                <template #empty>
+                  <div class="flex-col-center h-full py-16 text-muted-foreground">
+                    <div class="i-carbon-chat-bot h-10 w-10 mb-4 opacity-50" />
+                    <p class="text-base font-medium">
+                      开始对话
+                    </p>
+                    <p class="text-sm mt-1.5 opacity-70">
+                      在下方输入消息开始聊天
+                    </p>
+
+                    <!-- Recent conversations -->
+                    <div v-if="recentConversations.length > 0" class="w-full max-w-xs mt-8">
+                      <div class="flex items-center gap-2 mb-2 px-1">
+                        <div class="h-px flex-1 bg-border" />
+                        <span class="text-xs text-muted-foreground/70">最近对话</span>
+                        <div class="h-px flex-1 bg-border" />
+                      </div>
+                      <div class="space-y-0.5">
+                        <button
+                          v-for="conv in recentConversations"
+                          :key="conv.id"
+                          class="w-full text-left rounded-md px-3 py-2 transition-colors hover:bg-muted"
+                          @click="handleSelectConversation(conv.id)"
+                        >
+                          <ConversationListItem :conversation="conv" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </MessageList>
+            </div>
+
+            <!-- Error display -->
+            <div
+              v-if="chatStore.hasError"
+              class="flex-shrink-0 border-t border-destructive/20 bg-destructive/5 px-3.5 py-2.5"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-destructive">
+                  {{ chatStore.error?.message }}
+                </span>
+                <button
+                  class="text-xs text-destructive/80 hover:text-destructive transition-colors duration-150"
+                  @click="chatStore.clearError()"
+                >
+                  关闭
+                </button>
+              </div>
             </div>
 
             <div class="px-0 pb-3">
