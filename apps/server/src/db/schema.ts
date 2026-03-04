@@ -68,6 +68,45 @@ export const whitelistRules = sqliteTable('whitelist_rules', {
   index('idx_whitelist_rules_scope').on(t.scope),
 ])
 
+/** 会话待办事项 */
+export const todoItems = sqliteTable('todo_items', {
+  id: text('id').primaryKey(),
+  conversationId: text('conversation_id')
+    .notNull()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  status: text('status', { enum: ['in_progress', 'completed'] }).notNull().default('in_progress'),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_todo_items_conversation_created').on(t.conversationId, t.createdAt),
+  index('idx_todo_items_conversation_status').on(t.conversationId, t.status),
+])
+
+/** delegate 子任务会话（用于 task_id 续跑） */
+export const delegateSessions = sqliteTable('delegate_sessions', {
+  taskId: text('task_id').primaryKey(),
+  conversationId: text('conversation_id')
+    .references(() => conversations.id, { onDelete: 'set null' }),
+  agentName: text('agent_name').notNull(),
+  agentType: text('agent_type').notNull(),
+  systemPrompt: text('system_prompt').notNull(),
+  messages: text('messages', { mode: 'json' }).$type<unknown[]>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_delegate_sessions_conversation').on(t.conversationId),
+  index('idx_delegate_sessions_updated').on(t.updatedAt),
+])
+
 /** CLI 配置存储 */
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
@@ -152,6 +191,22 @@ export const noteConversations = sqliteTable('note_conversations', {
 export const conversationsRelations = relations(conversations, ({ many }) => ({
   messages: many(messages),
   noteConversations: many(noteConversations),
+  todoItems: many(todoItems),
+  delegateSessions: many(delegateSessions),
+}))
+
+export const delegateSessionsRelations = relations(delegateSessions, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [delegateSessions.conversationId],
+    references: [conversations.id],
+  }),
+}))
+
+export const todoItemsRelations = relations(todoItems, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [todoItems.conversationId],
+    references: [conversations.id],
+  }),
 }))
 
 export const messagesRelations = relations(messages, ({ one }) => ({
@@ -278,6 +333,10 @@ export type Message = typeof messages.$inferSelect
 export type NewMessage = typeof messages.$inferInsert
 export type WhitelistRuleRow = typeof whitelistRules.$inferSelect
 export type NewWhitelistRuleRow = typeof whitelistRules.$inferInsert
+export type TodoItem = typeof todoItems.$inferSelect
+export type NewTodoItem = typeof todoItems.$inferInsert
+export type DelegateSession = typeof delegateSessions.$inferSelect
+export type NewDelegateSession = typeof delegateSessions.$inferInsert
 export type Folder = typeof folders.$inferSelect
 export type NewFolder = typeof folders.$inferInsert
 export type Note = typeof notes.$inferSelect

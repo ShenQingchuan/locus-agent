@@ -41,6 +41,19 @@ async function handleQuestionAnswer(toolCallId: string, answers: QuestionAnswer[
   await chatStore.submitQuestionAnswer(toolCallId, answers)
 }
 
+async function handleDelegateResume(payload: { taskId: string, agentType: string, agentName: string }) {
+  const prompt = [
+    `继续之前的子任务：${payload.agentName}（${payload.agentType}）`,
+    `task_id: ${payload.taskId}`,
+    '请基于现有上下文继续推进，并优先复用该 task_id。',
+  ].join('\n')
+
+  const conversationId = await chatStore.sendMessage(prompt)
+  if (conversationId) {
+    markDirty(conversationId)
+  }
+}
+
 function getQuestionData(toolCallId: string) {
   const pending = chatStore.pendingQuestions.get(toolCallId)
   if (pending) {
@@ -307,6 +320,7 @@ const { copy, copied } = useClipboard()
               @reject="handleReject"
               @whitelist="handleWhitelist"
               @question-answer="handleQuestionAnswer"
+              @delegate-resume="handleDelegateResume"
             />
           </template>
 

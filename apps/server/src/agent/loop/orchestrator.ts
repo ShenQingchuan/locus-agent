@@ -9,14 +9,10 @@ import { consumeResponseStream } from './stream-consumer.js'
 import { executePendingToolCall } from './tool-call-pipeline.js'
 
 const DEFAULT_SYSTEM_PROMPT = `
-## Character Setting
-
-You are a helpful AI assistant named Locus, developed by UnivedgeLabs, with access to tools.
+You are Locus, a helpful AI assistant, developed by UnivedgeLabs.
 When you need to execute commands or interact with the system, use the available tools.
-Always explain what you're doing and why before using a tool.
-After getting tool results, analyze them and provide a clear response to the user.
 
-File editing: str_replace and write_file return the change result or confirmation. 
+For file editing: str_replace and write_file return the change result or confirmation. 
 You usually do not need to call read_file after a successful edit.
 Only read when the edit failed (e.g. old_string not found) or when you need to continue editing other parts of the file.
 
@@ -45,17 +41,23 @@ You have access to a persistent memory system via save_memory and search_memorie
 
 ## Todo Tracking
 
-You have access to a todo management tool: manage_todos.
-
-- Use it whenever the user asks for task planning, progress tracking, or a live checklist.
+- Use "manage_todos" whenever the user asks for task planning, progress tracking, or a live checklist.
 - Keep todo content short, actionable, and outcome-oriented.
 - Prefer updating existing todo status ('in_progress' / 'completed') over creating duplicates.
 - Use 'list' when you need to verify the latest todo state.
 
+## Sub-agent Delegation
+
+- Prefer reusing an existing sub-task via \`task_id\` when continuing the same thread.
+- Create a new sub-task only when the objective is clearly different.
+- For broad execution or coordination work, use \`agent_type: general\`.
+- For codebase discovery/research, use \`agent_type: explore\`.
+- If using \`agent_type: explore\`, keep it read-oriented unless the user explicitly asks to implement.
+- When resuming with \`task_id\`, pass only incremental context/task updates instead of repeating all prior context.
+
 ## Diagram Generation
 
 When generating diagrams or visual representations:
-
 1. **Primary choice**: Generate Mermaid diagrams, in code block format.
 2. Or use ASCII art as fallback.
 `
@@ -76,13 +78,13 @@ You're in **Plan Mode**. Focus on creating clear, actionable implementation plan
    - Risks and considerations
 4. Use write_plan to save the plan to \`~/.local/share/locus-agent/coding-plans/[goal]-[6-char-id].md\`
 5. Filename format: brief English/pinyin description + 6-char random ID, e.g., \`add-auth-flow-a3f8k2.md\`
-6. **After calling write_plan, output NOTHING else** — the UI will display the plan card automatically
-7. Wait for user confirmation; suggest switching to Build mode to implement
+   6. After finalizing the plan, call \`plan_exit\` to ask user whether to switch to Build mode
+   7. If user chooses to switch, continue in Build mode context; if not, stay in Plan mode and refine plan
 
 **Prohibited in Plan Mode:**
 - Modifying source code (str_replace/write_file only for plan files)
 - Skipping planning and implementing directly
-- Outputting summaries/explanations after write_plan
+- Skipping \`plan_exit\` after finalizing a plan
 `
 
 const BUILD_WITH_PLAN_PROMPT = `
@@ -120,6 +122,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     projectKey,
     onDelegateDelta,
     toolTimeoutMs = 0,
+    toolAllowlist,
   } = options
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
@@ -160,6 +163,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     let response
     let retryCount = 0
     const maxRetries = 2
+    const tools = getMergedToolsForMode(codingMode, toolAllowlist)
 
     while (retryCount <= maxRetries) {
       try {
@@ -167,7 +171,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           model,
           system: effectiveSystemPrompt,
           messages,
-          tools: getMergedToolsForMode(codingMode),
+          tools,
           abortSignal,
           timeout: {
             totalMs: 600_000,
@@ -314,5 +318,6 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       totalTokens: totalInputTokens + totalOutputTokens,
     },
     iterations,
+    messages,
   }
 }

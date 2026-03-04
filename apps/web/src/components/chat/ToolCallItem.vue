@@ -29,6 +29,7 @@ const emit = defineEmits<{
   reject: [toolCallId: string]
   whitelist: [toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }]
   questionAnswer: [toolCallId: string, answers: QuestionAnswer[]]
+  delegateResume: [payload: { taskId: string, agentType: string, agentName: string }]
 }>()
 
 defineSlots<{
@@ -125,6 +126,7 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
 
     return '待办管理'
   },
+  plan_exit: () => '规划完成，等待模式切换',
 }
 
 /**
@@ -263,8 +265,16 @@ const delegateMeta = computed(() => {
 
   // 后端可能返回对象（包含 deltas）或字符串（旧格式）
   if (typeof raw === 'object' && raw !== null) {
-    const r = raw as { success?: boolean, agentName?: string, agentType?: string, iterations?: number, usage?: { inputTokens: number, outputTokens: number, totalTokens: number } }
+    const r = raw as {
+      success?: boolean
+      taskId?: string
+      agentName?: string
+      agentType?: string
+      iterations?: number
+      usage?: { inputTokens: number, outputTokens: number, totalTokens: number }
+    }
     return {
+      taskId: r.taskId ?? '',
       iterations: r.iterations ?? 0,
       inputTokens: r.usage?.inputTokens ?? 0,
       outputTokens: r.usage?.outputTokens ?? 0,
@@ -283,10 +293,14 @@ const delegateMeta = computed(() => {
     let outputTokens = 0
     let totalTokens = 0
     let success = false
+    let taskId = ''
     let agentName = ''
     let agentType = ''
 
     for (const line of lines.slice(0, 10)) {
+      if (line.startsWith('task_id:')) {
+        taskId = line.replace('task_id:', '').split(' ')[0]!.trim()
+      }
       if (line.startsWith('## Delegate Result:')) {
         agentName = line.replace('## Delegate Result:', '').trim()
       }
@@ -311,7 +325,7 @@ const delegateMeta = computed(() => {
       }
     }
 
-    return { iterations, inputTokens, outputTokens, totalTokens, success, agentName, agentType }
+    return { taskId, iterations, inputTokens, outputTokens, totalTokens, success, agentName, agentType }
   }
 
   return null
@@ -598,10 +612,12 @@ watch(bashExpanded, (expanded) => {
       :task="delegateArgs.task"
       :context="delegateArgs.context"
       :status="tool.status === 'error' || tool.status === 'interrupted' ? 'error' : tool.status === 'completed' ? 'completed' : 'pending'"
+      :task-id="delegateMeta?.taskId || undefined"
       :deltas="tool.delegateDeltas?.length ? tool.delegateDeltas : delegateDeltasFromResult"
       :iterations="delegateMeta?.iterations"
       :usage="delegateMeta ? { inputTokens: delegateMeta.inputTokens, outputTokens: delegateMeta.outputTokens, totalTokens: delegateMeta.totalTokens } : undefined"
       class="mt-1.5"
+      @resume="(payload) => emit('delegateResume', payload)"
     />
 
     <!-- Plan card for write_plan tool -->

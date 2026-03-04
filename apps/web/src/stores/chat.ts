@@ -401,6 +401,13 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /**
+   * 计划退出时切换到 Build 模式
+   */
+  const onPlanExitSwitchToBuild = () => {
+    setCodingMode('build')
+  }
+
   const messaging = createConversationMessagingActions({
     currentConversationId,
     conversationScope,
@@ -428,6 +435,7 @@ export const useChatStore = defineStore('chat', () => {
     appendToolCallOutput,
     appendDelegateDelta,
     generateTitle,
+    onPlanExitSwitchToBuild,
   })
 
   const {

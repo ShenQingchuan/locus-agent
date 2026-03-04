@@ -26,6 +26,7 @@ export interface AgentLoopOptions {
   projectKey?: string
   onDelegateDelta?: (toolCallId: string, delta: DelegateDelta) => void | Promise<void>
   toolTimeoutMs?: number
+  toolAllowlist?: string[]
 }
 
 export interface AgentLoopResult {
@@ -37,6 +38,7 @@ export interface AgentLoopResult {
     totalTokens: number
   }
   iterations: number
+  messages: ModelMessage[]
 }
 
 export interface PendingToolCall {

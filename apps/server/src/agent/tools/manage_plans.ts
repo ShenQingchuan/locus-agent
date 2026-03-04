@@ -66,6 +66,32 @@ Use action "read" to read a specific file, or "list" to list all available plan 
   }),
 })
 
+// ==================== plan_exit ====================
+
+export const planExitTool = tool({
+  description: `Exit Plan mode after plan is finalized.
+This tool asks user whether to switch to Build mode and start implementation.`,
+  inputSchema: z.object({}),
+})
+
+export interface PlanExitResult {
+  success: boolean
+  switchedToBuild: boolean
+  message: string
+}
+
+export async function executePlanExit(): Promise<PlanExitResult> {
+  return {
+    success: true,
+    switchedToBuild: false,
+    message: 'Plan mode exit requested.',
+  }
+}
+
+export function formatPlanExitResult(result: PlanExitResult): string {
+  return result.message
+}
+
 export interface ReadPlanResult {
   success: boolean
   content?: string

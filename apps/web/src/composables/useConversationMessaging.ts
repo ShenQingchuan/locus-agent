@@ -41,6 +41,7 @@ interface CreateConversationMessagingOptions {
   appendToolCallOutput: (toolCallId: string, delta: string, conversationId?: string | null) => void
   appendDelegateDelta: (toolCallId: string, delta: Parameters<Parameters<typeof streamAssistantReply>[0]['onDelegateDelta']>[0]['delta'], conversationId?: string | null) => void
   generateTitle: (conversationId: string) => Promise<void>
+  onPlanExitSwitchToBuild?: (conversationId: string) => void
 }
 
 function computeBackendKeepCount(history: Message[]): number {
@@ -133,6 +134,15 @@ export function createConversationMessagingActions(options: CreateConversationMe
       },
       onToolCallResult: (toolResult) => {
         options.updateToolCallResult(assistantMessageId, toolResult, conversationId)
+
+        if (toolResult.toolName === 'plan_exit' && !toolResult.isError && conversationId) {
+          const payload = typeof toolResult.result === 'object' && toolResult.result !== null
+            ? (toolResult.result as { switchedToBuild?: unknown })
+            : null
+          if (payload?.switchedToBuild === true) {
+            options.onPlanExitSwitchToBuild?.(conversationId)
+          }
+        }
       },
       onToolPendingApproval: (approval) => {
         options.addPendingApproval(approval, conversationId)

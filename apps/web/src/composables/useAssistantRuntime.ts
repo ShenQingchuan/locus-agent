@@ -80,6 +80,31 @@ export function createConversationRuntimeState(): ConversationRuntimeState {
 }
 
 export function parseManageTodosResult(result: unknown): TodoTask[] | null {
+  if (typeof result === 'object' && result !== null) {
+    const todos = (result as { todos?: unknown }).todos
+    if (!Array.isArray(todos))
+      return null
+
+    const parsed = todos
+      .map((item) => {
+        if (typeof item !== 'object' || item === null)
+          return null
+        const maybe = item as { id?: unknown, content?: unknown, status?: unknown }
+        if (typeof maybe.id !== 'string' || typeof maybe.content !== 'string')
+          return null
+        if (maybe.status !== 'in_progress' && maybe.status !== 'completed')
+          return null
+        return {
+          id: maybe.id,
+          content: maybe.content,
+          status: maybe.status,
+        } as TodoTask
+      })
+      .filter((item): item is TodoTask => !!item)
+
+    return parsed
+  }
+
   if (typeof result !== 'string')
     return null
 

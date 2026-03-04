@@ -3,7 +3,14 @@ import type { StreamingToolExecutor, ToolExecutor } from './tool-runtime-types.j
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
 import { executeManageKanban, formatManageKanbanResult } from './manage_kanban.js'
-import { executeReadPlan, executeWritePlan, formatReadPlanResult, formatWritePlanResult } from './manage_plans.js'
+import {
+  executePlanExit,
+  executeReadPlan,
+  executeWritePlan,
+  formatPlanExitResult,
+  formatReadPlanResult,
+  formatWritePlanResult,
+} from './manage_plans.js'
 import { executeManageTodos, formatManageTodosResult } from './manage_todos.js'
 import { executeReadFile, formatReadResult } from './read.js'
 import { executeSaveMemory, formatSaveMemoryResult } from './save_memory.js'
@@ -67,6 +74,10 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     const result = await executeReadPlan(args as Parameters<typeof executeReadPlan>[0])
     return formatReadPlanResult(result)
   },
+  plan_exit: async () => {
+    const result = await executePlanExit()
+    return formatPlanExitResult(result)
+  },
 }
 
 const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
@@ -81,6 +92,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   manage_kanban: executeManageKanban as ToolExecutor,
   write_plan: executeWritePlan as ToolExecutor,
   read_plan: executeReadPlan as ToolExecutor,
+  plan_exit: executePlanExit as ToolExecutor,
 }
 
 export function getBuiltinFormattedExecutor(toolName: string): StreamingToolExecutor | undefined {

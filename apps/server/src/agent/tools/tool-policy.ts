@@ -1,6 +1,7 @@
 export const interactiveTools = new Set<string>([
   'ask_question',
   'delegate',
+  'plan_exit',
 ])
 
 export const trustedBuiltinTools = new Set<string>([
@@ -10,6 +11,7 @@ export const trustedBuiltinTools = new Set<string>([
   'manage_kanban',
   'write_plan',
   'read_plan',
+  'plan_exit',
 ])
 
 export function isTrustedBuiltinTool(toolName: string): boolean {

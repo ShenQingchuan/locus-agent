@@ -1,32 +1,22 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import {
+  addTodoItem,
+  clearTodoItems,
+  deleteTodoItem,
+  listTodoItems,
+  updateTodoItem,
+} from '../../services/todo.js'
 
 type TodoStatus = 'in_progress' | 'completed'
 
 export interface TodoItem {
   id: string
+  conversationId?: string
   content: string
   status: TodoStatus
   createdAt: string
   updatedAt: string
-}
-
-interface TodoStore {
-  items: TodoItem[]
-}
-
-const todoStoreByConversation = new Map<string, TodoStore>()
-const draftTodoStore: TodoStore = { items: [] }
-
-function getTodoStore(conversationId?: string): TodoStore {
-  if (!conversationId)
-    return draftTodoStore
-  const existing = todoStoreByConversation.get(conversationId)
-  if (existing)
-    return existing
-  const created: TodoStore = { items: [] }
-  todoStoreByConversation.set(conversationId, created)
-  return created
 }
 
 export const manageTodosTool = tool({
@@ -57,15 +47,22 @@ export async function executeManageTodos(
   },
   conversationId?: string,
 ): Promise<ManageTodosResult> {
-  const store = getTodoStore(conversationId)
-  const now = new Date().toISOString()
+  if (!conversationId) {
+    return {
+      action: args.action,
+      changed: false,
+      todos: [],
+      message: 'Todo operation skipped: missing conversation context.',
+    }
+  }
 
   if (args.action === 'list') {
+    const todos = await listTodoItems(conversationId)
     return {
       action: 'list',
       changed: false,
-      todos: [...store.items],
-      message: `Listed ${store.items.length} todo item(s).`,
+      todos,
+      message: `Listed ${todos.length} todo item(s).`,
     }
   }
 
@@ -75,23 +72,17 @@ export async function executeManageTodos(
       return {
         action: 'add',
         changed: false,
-        todos: [...store.items],
+        todos: await listTodoItems(conversationId),
         message: 'Add skipped: content is required.',
       }
     }
 
-    const item: TodoItem = {
-      id: `todo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      content,
-      status: args.status ?? 'in_progress',
-      createdAt: now,
-      updatedAt: now,
-    }
-    store.items.unshift(item)
+    await addTodoItem(conversationId, content, args.status ?? 'in_progress')
+    const todos = await listTodoItems(conversationId)
     return {
       action: 'add',
       changed: true,
-      todos: [...store.items],
+      todos,
       message: 'Added 1 todo item.',
     }
   }
@@ -102,22 +93,22 @@ export async function executeManageTodos(
       return {
         action: 'update',
         changed: false,
-        todos: [...store.items],
+        todos: await listTodoItems(conversationId),
         message: 'Update skipped: taskId is required.',
       }
     }
 
-    const index = store.items.findIndex(t => t.id === taskId)
-    if (index === -1) {
+    const currentTodos = await listTodoItems(conversationId)
+    const target = currentTodos.find(t => t.id === taskId)
+    if (!target) {
       return {
         action: 'update',
         changed: false,
-        todos: [...store.items],
+        todos: currentTodos,
         message: `Update skipped: task ${taskId} not found.`,
       }
     }
 
-    const target = store.items[index]!
     const nextContent = args.content?.trim()
     const hasContentUpdate = typeof nextContent === 'string' && nextContent.length > 0
     const hasStatusUpdate = !!args.status
@@ -126,21 +117,20 @@ export async function executeManageTodos(
       return {
         action: 'update',
         changed: false,
-        todos: [...store.items],
+        todos: currentTodos,
         message: 'Update skipped: no fields to update.',
       }
     }
 
-    store.items[index] = {
-      ...target,
-      content: hasContentUpdate ? nextContent! : target.content,
-      status: hasStatusUpdate ? args.status! : target.status,
-      updatedAt: now,
-    }
+    await updateTodoItem(conversationId, taskId, {
+      content: hasContentUpdate ? nextContent! : undefined,
+      status: hasStatusUpdate ? args.status! : undefined,
+    })
+
     return {
       action: 'update',
       changed: true,
-      todos: [...store.items],
+      todos: await listTodoItems(conversationId),
       message: `Updated task ${taskId}.`,
     }
   }
@@ -151,41 +141,38 @@ export async function executeManageTodos(
       return {
         action: 'delete',
         changed: false,
-        todos: [...store.items],
+        todos: await listTodoItems(conversationId),
         message: 'Delete skipped: taskId is required.',
       }
     }
 
-    const before = store.items.length
-    store.items = store.items.filter(t => t.id !== taskId)
-    const changed = store.items.length !== before
+    const changed = await deleteTodoItem(conversationId, taskId)
+    const todos = await listTodoItems(conversationId)
     return {
       action: 'delete',
       changed,
-      todos: [...store.items],
+      todos,
       message: changed ? `Deleted task ${taskId}.` : `Delete skipped: task ${taskId} not found.`,
     }
   }
 
   const clearTarget = args.clearTarget ?? 'completed'
   if (clearTarget === 'all') {
-    const changed = store.items.length > 0
-    store.items = []
+    const removed = await clearTodoItems(conversationId, 'all')
     return {
       action: 'clear',
-      changed,
+      changed: removed > 0,
       todos: [],
-      message: changed ? 'Cleared all todo items.' : 'Todo list is already empty.',
+      message: removed > 0 ? 'Cleared all todo items.' : 'Todo list is already empty.',
     }
   }
 
-  const before = store.items.length
-  store.items = store.items.filter(t => t.status !== 'completed')
-  const removed = before - store.items.length
+  const removed = await clearTodoItems(conversationId, 'completed')
+  const todos = await listTodoItems(conversationId)
   return {
     action: 'clear',
     changed: removed > 0,
-    todos: [...store.items],
+    todos,
     message: removed > 0 ? `Cleared ${removed} completed todo item(s).` : 'No completed todo items to clear.',
   }
 }

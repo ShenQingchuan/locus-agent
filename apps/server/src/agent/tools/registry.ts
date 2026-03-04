@@ -69,6 +69,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   'search_memories',
   'write_plan',
   'read_plan',
+  'plan_exit',
   'ask_question',
   'manage_todos',
 ])
@@ -108,9 +109,21 @@ function looksLikeWriteTool(name: string, t: Tool): boolean {
  * plan 模式：只返回只读工具 + 计划管理工具
  * build / undefined：返回全部工具
  */
-export function getMergedToolsForMode(codingMode?: 'build' | 'plan'): Record<string, Tool> {
+export function getMergedToolsForMode(codingMode?: 'build' | 'plan', allowlist?: string[]): Record<string, Tool> {
+  const applyAllowlist = (input: Record<string, Tool>): Record<string, Tool> => {
+    if (!allowlist || allowlist.length === 0)
+      return input
+    const set = new Set(allowlist)
+    const filtered: Record<string, Tool> = {}
+    for (const [name, tool] of Object.entries(input)) {
+      if (set.has(name))
+        filtered[name] = tool
+    }
+    return filtered
+  }
+
   if (codingMode !== 'plan')
-    return getMergedTools()
+    return applyAllowlist(getMergedTools())
 
   const filtered: Record<string, Tool> = {}
   for (const [name, t] of Object.entries(tools)) {
@@ -123,7 +136,7 @@ export function getMergedToolsForMode(codingMode?: 'build' | 'plan'): Record<str
       filtered[name] = t
     }
   }
-  return filtered
+  return applyAllowlist(filtered)
 }
 
 export function getAvailableTools(): string[] {

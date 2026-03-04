@@ -11,6 +11,7 @@ const props = defineProps<{
   task: string
   context?: string
   status: 'pending' | 'completed' | 'error'
+  taskId?: string
   deltas: DelegateDelta[]
   iterations?: number
   usage?: {
@@ -23,6 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   expand: []
   collapse: []
+  resume: [payload: { taskId: string, agentType: string, agentName: string }]
 }>()
 
 const isExpanded = ref(false)
@@ -171,6 +173,16 @@ function toggleExpand() {
   }
 }
 
+function handleResumeClick() {
+  if (!props.taskId)
+    return
+  emit('resume', {
+    taskId: props.taskId,
+    agentType: props.agentType,
+    agentName: props.agentName,
+  })
+}
+
 // 用户是否正在手动滚动
 const isUserScrolling = ref(false)
 let scrollTimeout: ReturnType<typeof setTimeout> | null = null
@@ -209,6 +221,7 @@ watch(() => props.deltas.length, () => {
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-foreground">{{ agentName }}</span>
+          <code v-if="taskId" class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{{ taskId }}</code>
           <span
             class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
             :class="statusConfig.badgeClass"
@@ -305,6 +318,14 @@ watch(() => props.deltas.length, () => {
       <!-- Stats Footer (Sticky at bottom) -->
       <div v-if="status !== 'pending' && usage" class="px-3 py-2 border-t border-border/50 bg-muted/20 flex items-center justify-between text-[10px] text-muted-foreground flex-shrink-0">
         <div class="flex items-center gap-2">
+          <button
+            v-if="taskId"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            @click.stop="handleResumeClick"
+          >
+            <div class="i-carbon-play-filled-alt h-3 w-3" />
+            <span>继续此任务</span>
+          </button>
           <span v-if="hasToolCalls" class="flex items-center gap-1">
             <div class="i-carbon-tool-box h-3 w-3" />
             <span>{{ toolCallCount }} 个工具调用</span>
