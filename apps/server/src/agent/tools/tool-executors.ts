@@ -66,12 +66,18 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     )
     return formatManageKanbanResult(result)
   },
-  write_plan: async (args) => {
-    const result = await executeWritePlan(args as Parameters<typeof executeWritePlan>[0])
+  write_plan: async (args, _callbacks, context) => {
+    const result = await executeWritePlan(
+      args as Parameters<typeof executeWritePlan>[0],
+      { projectKey: context?.projectKey },
+    )
     return formatWritePlanResult(result)
   },
-  read_plan: async (args) => {
-    const result = await executeReadPlan(args as Parameters<typeof executeReadPlan>[0])
+  read_plan: async (args, _callbacks, context) => {
+    const result = await executeReadPlan(
+      args as Parameters<typeof executeReadPlan>[0],
+      { projectKey: context?.projectKey },
+    )
     return formatReadPlanResult(result)
   },
   plan_exit: async () => {

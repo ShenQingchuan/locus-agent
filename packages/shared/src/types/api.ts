@@ -2,6 +2,11 @@ import type { Conversation } from './conversation.js'
 import type { CoreMessage, Message } from './message.js'
 import type { AddToWhitelistPayload } from './whitelist.js'
 
+export interface PlanBinding {
+  mode: 'auto' | 'specific' | 'none'
+  filename?: string
+}
+
 /**
  * 聊天请求
  */
@@ -22,6 +27,8 @@ export interface ChatRequest {
   confirmMode?: boolean
   /** Coding 空间模式：build（直接编码）/ plan（先规划再编码） */
   codingMode?: 'build' | 'plan'
+  /** Build 模式计划绑定策略：自动/latest、指定文件、或禁用 */
+  planBinding?: PlanBinding
 }
 
 /**

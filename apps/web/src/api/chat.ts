@@ -8,6 +8,7 @@ import type {
   MCPServersConfig,
   MCPServerStatus,
   Message,
+  PlanBinding,
   RiskLevel,
   SSEEvent,
   ToolCall,
@@ -58,6 +59,7 @@ export interface ChatStreamOptions {
   confirmMode?: boolean
   thinkingMode?: boolean
   codingMode?: 'build' | 'plan'
+  planBinding?: PlanBinding
   onReasoningDelta?: (delta: string) => void
   onTextDelta?: (delta: string) => void
   onToolCallStart?: (toolCall: ToolCall) => void
@@ -106,6 +108,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     confirmMode = true,
     thinkingMode,
     codingMode,
+    planBinding,
     onReasoningDelta,
     onTextDelta,
     onToolCallStart,
@@ -144,6 +147,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         confirmMode,
         thinkingMode,
         codingMode,
+        planBinding,
       }),
       signal: controller.signal,
     })
@@ -295,6 +299,29 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
   }
   finally {
     abortControllers.delete(conversationId)
+  }
+}
+
+export interface ConversationPlansResponse {
+  files: string[]
+  latestFilename: string | null
+}
+
+export async function fetchConversationPlans(conversationId: string): Promise<ConversationPlansResponse | null> {
+  try {
+    const response = await fetch(`/api/chat/plans/${conversationId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!response.ok)
+      return null
+    return await response.json() as ConversationPlansResponse
+  }
+  catch (error) {
+    console.error('Failed to fetch conversation plans:', error)
+    return null
   }
 }
 

@@ -98,6 +98,46 @@ const modeItems = computed<DropdownItem[]>(() => [
   },
 ])
 
+const planBindingItems = computed<DropdownItem[]>(() => {
+  const latest = chatStore.latestPlanFilename || '无可用计划'
+  const files = chatStore.availablePlanFiles
+
+  const items: DropdownItem[] = [
+    {
+      key: 'plan:auto',
+      label: `自动（${latest}）`,
+      icon: 'i-carbon:link',
+      active: chatStore.currentPlanBinding.mode === 'auto',
+    },
+  ]
+
+  if (files.length > 0) {
+    for (const filename of files) {
+      items.push({
+        key: `plan:file:${filename}`,
+        label: filename,
+        icon: 'i-carbon:document',
+        active: chatStore.currentPlanBinding.mode === 'specific' && chatStore.currentPlanBinding.filename === filename,
+      })
+    }
+  }
+
+  items.push(
+    { key: 'plan:none', label: '解绑计划', icon: 'i-carbon:unlink', separator: true, active: chatStore.currentPlanBinding.mode === 'none' },
+    { key: 'plan:refresh', label: '刷新计划列表', icon: 'i-carbon:renew' },
+  )
+
+  return items
+})
+
+const boundPlanLabel = computed(() => {
+  if (chatStore.currentPlanBinding.mode === 'none')
+    return '未绑定'
+  if (chatStore.currentPlanBinding.mode === 'specific')
+    return chatStore.currentPlanBinding.filename || '指定计划'
+  return chatStore.activeBoundPlanFilename || '自动（无）'
+})
+
 function handleModeSelect(key: string) {
   if (key === 'think')
     chatStore.toggleThinkMode()
@@ -105,6 +145,26 @@ function handleModeSelect(key: string) {
     chatStore.toggleYoloMode()
   else if (key === 'whitelist')
     whitelistOpen.value = !whitelistOpen.value
+}
+
+function handlePlanBindingSelect(key: string) {
+  if (key === 'plan:auto') {
+    chatStore.useAutoPlanBinding()
+    return
+  }
+  if (key === 'plan:none') {
+    chatStore.unbindPlan()
+    return
+  }
+  if (key === 'plan:refresh') {
+    void chatStore.refreshConversationPlans(chatStore.currentConversationId)
+    return
+  }
+  if (key.startsWith('plan:file:')) {
+    const filename = key.slice('plan:file:'.length)
+    if (filename)
+      chatStore.bindPlanFile(filename)
+  }
 }
 
 const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
@@ -217,6 +277,15 @@ watch(() => chatStore.focusInputTrigger, async () => {
   await nextTick()
   textarea.value?.focus()
 })
+
+watch(
+  () => [chatStore.currentConversationId, props.showCodingMode] as const,
+  ([conversationId, showCoding]) => {
+    if (showCoding && conversationId)
+      void chatStore.refreshConversationPlans(conversationId)
+  },
+  { immediate: true },
+)
 
 async function handleSubmit() {
   if (!input.value.trim())
@@ -382,26 +451,51 @@ function handleKeydown(event: KeyboardEvent) {
       />
 
       <!-- Build/Plan mode toggle row (Coding 空间独有) -->
-      <div v-if="showCodingMode" class="flex items-center justify-between px-3 pt-1.5">
-        <div class="flex items-center bg-muted rounded-md p-0.5">
-          <button
-            class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
-            :class="chatStore.codingMode === 'build'
-              ? 'bg-background text-foreground shadow-sm font-medium'
-              : 'text-muted-foreground hover:text-foreground'"
-            @click="chatStore.setCodingMode('build')"
+      <div v-if="showCodingMode" class="flex items-center justify-between px-3 pt-1.5 gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center bg-muted rounded-md p-0.5">
+            <button
+              class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
+              :class="chatStore.codingMode === 'build'
+                ? 'bg-background text-foreground shadow-sm font-medium'
+                : 'text-muted-foreground hover:text-foreground'"
+              @click="chatStore.setCodingMode('build')"
+            >
+              Build
+            </button>
+            <button
+              class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
+              :class="chatStore.codingMode === 'plan'
+                ? 'bg-background text-foreground shadow-sm font-medium'
+                : 'text-muted-foreground hover:text-foreground'"
+              @click="chatStore.setCodingMode('plan')"
+            >
+              Plan
+            </button>
+          </div>
+
+          <Dropdown
+            v-if="chatStore.codingMode === 'build'"
+            :items="planBindingItems"
+            placement="top-start"
+            persistent
+            @select="handlePlanBindingSelect"
           >
-            Build
-          </button>
-          <button
-            class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
-            :class="chatStore.codingMode === 'plan'
-              ? 'bg-background text-foreground shadow-sm font-medium'
-              : 'text-muted-foreground hover:text-foreground'"
-            @click="chatStore.setCodingMode('plan')"
-          >
-            Plan
-          </button>
+            <template #trigger>
+              <button
+                class="max-w-[300px] flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
+                :title="`当前计划：${boundPlanLabel}`"
+              >
+                <div class="i-carbon-document h-3.5 w-3.5" />
+                <span class="truncate">{{ boundPlanLabel }}</span>
+                <div
+                  v-if="chatStore.isLoadingPlanFiles"
+                  class="i-carbon-circle-dash h-3 w-3 animate-spin opacity-60"
+                />
+                <div v-else class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+              </button>
+            </template>
+          </Dropdown>
         </div>
         <Dropdown :items="modeItems" placement="top-end" persistent @select="handleModeSelect">
           <template #trigger>

@@ -8,6 +8,9 @@ import type {
 } from '@locus-agent/shared'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
@@ -15,6 +18,7 @@ import { getPendingApproval, requestApproval, resolveApproval } from '../agent/a
 import { runAgentLoop } from '../agent/loop.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
+import { executeReadPlan } from '../agent/tools/manage_plans.js'
 import {
   addGlobalRule,
   addSessionRule,
@@ -127,6 +131,117 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
   return result
 }
 
+interface PlanSnapshot {
+  filename: string
+  filePath: string
+}
+
+type PlanBindingPayload = ChatRequest['planBinding']
+
+const PLANS_BASE_DIR = join(homedir(), '.local', 'share', 'locus-agent', 'coding-plans')
+
+function normalizeProjectKey(projectKey?: string): string | null {
+  const key = projectKey?.trim()
+  if (!key)
+    return null
+  const safe = key.replace(/[^\w-]/g, '_')
+  return safe.length > 0 ? safe : null
+}
+
+function getPlansDir(projectKey?: string): string {
+  const normalized = normalizeProjectKey(projectKey)
+  if (!normalized)
+    return join(PLANS_BASE_DIR, 'global')
+  return join(PLANS_BASE_DIR, normalized)
+}
+
+function extractLatestPlanFromDbMessages(
+  dbMsgs: Array<{ toolCalls?: unknown[] | null }>,
+  projectKey?: string,
+): PlanSnapshot | null {
+  for (let i = dbMsgs.length - 1; i >= 0; i--) {
+    const toolCalls = dbMsgs[i]?.toolCalls
+    if (!toolCalls || toolCalls.length === 0)
+      continue
+
+    for (let j = toolCalls.length - 1; j >= 0; j--) {
+      const item = toolCalls[j] as { toolName?: unknown, args?: unknown }
+      if (item?.toolName !== 'write_plan')
+        continue
+      const args = item.args as { filename?: unknown }
+      const filename = typeof args?.filename === 'string' ? args.filename.trim() : ''
+      if (!filename)
+        continue
+      return {
+        filename,
+        filePath: join(getPlansDir(projectKey), filename),
+      }
+    }
+  }
+  return null
+}
+
+function isSafePlanFilename(filename: string): boolean {
+  return filename.endsWith('.md') && !filename.includes('/') && !filename.includes('\\') && !filename.includes('..')
+}
+
+function resolvePlanSnapshot(
+  binding: PlanBindingPayload | undefined,
+  dbMsgs: Array<{ toolCalls?: unknown[] | null }>,
+  projectKey?: string,
+): PlanSnapshot | null {
+  if (binding?.mode === 'none')
+    return null
+
+  if (binding?.mode === 'specific') {
+    const filename = typeof binding.filename === 'string' ? binding.filename.trim() : ''
+    if (!isSafePlanFilename(filename))
+      return null
+    const filePath = join(getPlansDir(projectKey), filename)
+    if (!existsSync(filePath))
+      return null
+    return { filename, filePath }
+  }
+
+  return extractLatestPlanFromDbMessages(dbMsgs, projectKey)
+}
+
+function buildPlanInjectedMessage(message: string, plan: PlanSnapshot): string {
+  const stripped = message
+    .replace(/<plan\b[^>]*>[\s\S]*?<\/plan>/gi, '')
+    .replace(/<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi, '')
+    .trim()
+  return `${stripped}\n\n<plan_ref>\nfilename: ${plan.filename}\npath: ${plan.filePath}\nread_with: read_plan(action=\"read\", filename=\"${plan.filename}\")\n</plan_ref>`
+}
+
+chatRoutes.get('/plans/:conversationId', async (c) => {
+  const conversationId = c.req.param('conversationId')
+  if (!conversationId) {
+    return c.json({ message: 'conversationId is required' }, 400)
+  }
+
+  const conversation = await getConversation(conversationId)
+  if (!conversation) {
+    return c.json({ message: 'Conversation not found' }, 404)
+  }
+
+  if (conversation.space !== 'coding') {
+    return c.json({ files: [], latestFilename: null })
+  }
+
+  const readResult = await executeReadPlan(
+    { action: 'list' },
+    { projectKey: conversation.projectKey ?? undefined },
+  )
+  const dbMessages = await getMessages(conversationId)
+  const latestPlan = extractLatestPlanFromDbMessages(dbMessages, conversation.projectKey ?? undefined)
+
+  return c.json({
+    files: readResult.success ? (readResult.files ?? []) : [],
+    latestFilename: latestPlan?.filename ?? null,
+  })
+})
+
 // POST /api/chat - Stream chat response
 chatRoutes.post('/', async (c) => {
   const body = await c.req.json<ChatRequest>()
@@ -136,6 +251,7 @@ chatRoutes.post('/', async (c) => {
     confirmMode,
     thinkingMode,
     codingMode,
+    planBinding,
     space,
     projectKey,
   } = body
@@ -230,7 +346,18 @@ chatRoutes.post('/', async (c) => {
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
       const dbMessages = await getMessages(conversationId)
       const convertedHistory = dbMessagesToModelMessages(dbMessages)
-      const messages: ModelMessage[] = [...convertedHistory, createUserMessage(message)]
+      let effectiveUserMessage = message
+      if (
+        conversationSpace === 'coding'
+        && codingMode === 'build'
+      ) {
+        const boundPlan = resolvePlanSnapshot(planBinding, dbMessages, conversationProjectKey)
+        if (boundPlan) {
+          effectiveUserMessage = buildPlanInjectedMessage(message, boundPlan)
+        }
+      }
+
+      const messages: ModelMessage[] = [...convertedHistory, createUserMessage(effectiveUserMessage)]
 
       const effectiveThinkingMode = thinkingMode ?? true
       const result = await runAgentLoop({

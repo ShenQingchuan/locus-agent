@@ -1,4 +1,4 @@
-import type { Conversation, CoreMessage, LLMProviderType } from '@locus-agent/shared'
+import type { Conversation, CoreMessage, LLMProviderType, PlanBinding } from '@locus-agent/shared'
 import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
@@ -42,6 +42,7 @@ interface CreateConversationMessagingOptions {
   appendDelegateDelta: (toolCallId: string, delta: Parameters<Parameters<typeof streamAssistantReply>[0]['onDelegateDelta']>[0]['delta'], conversationId?: string | null) => void
   generateTitle: (conversationId: string) => Promise<void>
   onPlanExitSwitchToBuild?: (conversationId: string) => void
+  getPlanBinding?: (conversationId: string) => PlanBinding | undefined
 }
 
 function computeBackendKeepCount(history: Message[]): number {
@@ -123,6 +124,9 @@ export function createConversationMessagingActions(options: CreateConversationMe
       confirmMode: !options.yoloMode.value,
       thinkingMode: options.thinkMode.value,
       codingMode: options.conversationScope.value.space === 'coding' ? options.codingMode.value : undefined,
+      planBinding: options.conversationScope.value.space === 'coding' && options.codingMode.value === 'build'
+        ? options.getPlanBinding?.(conversationId)
+        : undefined,
       onReasoningDelta: (delta) => {
         options.appendReasoningToMessage(assistantMessageId, delta, conversationId)
       },

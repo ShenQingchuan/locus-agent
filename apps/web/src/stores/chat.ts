@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, PlanBinding, WhitelistRule } from '@locus-agent/shared'
 import type { QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -9,6 +9,7 @@ import {
   approveToolCall,
   deleteConversation,
   deleteWhitelistRule,
+  fetchConversationPlans,
   fetchSettingsConfig,
   fetchWhitelistRules,
   generateConversationTitle,
@@ -117,6 +118,85 @@ export const useChatStore = defineStore('chat', () => {
 
   // Coding mode: build (直接编码) / plan (先规划再编码) — 仅 Coding 空间可用
   const codingMode = ref<'build' | 'plan'>('build')
+  const availablePlanFiles = ref<string[]>([])
+  const latestPlanFilename = ref<string | null>(null)
+  const isLoadingPlanFiles = ref(false)
+  const planBindings = ref<Record<string, { mode: 'auto' | 'specific' | 'none', filename?: string }>>({})
+
+  function getPlanBindingForConversation(conversationId?: string | null): { mode: 'auto' | 'specific' | 'none', filename?: string } {
+    if (!conversationId)
+      return { mode: 'auto' }
+    return planBindings.value[conversationId] ?? { mode: 'auto' }
+  }
+
+  function setPlanBinding(mode: 'auto' | 'specific' | 'none', filename?: string) {
+    const conversationId = currentConversationId.value
+    if (!conversationId)
+      return
+    planBindings.value[conversationId] = mode === 'specific'
+      ? { mode, filename }
+      : { mode }
+  }
+
+  function bindPlanFile(filename: string) {
+    setPlanBinding('specific', filename)
+  }
+
+  function unbindPlan() {
+    setPlanBinding('none')
+  }
+
+  function useAutoPlanBinding() {
+    setPlanBinding('auto')
+  }
+
+  async function refreshConversationPlans(conversationId?: string | null) {
+    const targetConversationId = conversationId ?? currentConversationId.value
+    if (!targetConversationId) {
+      availablePlanFiles.value = []
+      latestPlanFilename.value = null
+      return
+    }
+
+    isLoadingPlanFiles.value = true
+    try {
+      const payload = await fetchConversationPlans(targetConversationId)
+      if (!payload) {
+        availablePlanFiles.value = []
+        latestPlanFilename.value = null
+        return
+      }
+      availablePlanFiles.value = payload.files
+      latestPlanFilename.value = payload.latestFilename
+
+      const binding = getPlanBindingForConversation(targetConversationId)
+      if (binding.mode === 'specific' && binding.filename && !payload.files.includes(binding.filename)) {
+        planBindings.value[targetConversationId] = { mode: 'auto' }
+      }
+    }
+    finally {
+      isLoadingPlanFiles.value = false
+    }
+  }
+
+  const currentPlanBinding = computed(() => getPlanBindingForConversation(currentConversationId.value))
+  const activeBoundPlanFilename = computed(() => {
+    if (currentPlanBinding.value.mode === 'specific')
+      return currentPlanBinding.value.filename ?? null
+    if (currentPlanBinding.value.mode === 'auto')
+      return latestPlanFilename.value
+    return null
+  })
+
+  function getPlanBindingPayload(conversationId: string): PlanBinding | undefined {
+    const state = getPlanBindingForConversation(conversationId)
+    if (state.mode === 'none')
+      return { mode: 'none' }
+    if (state.mode === 'specific' && state.filename)
+      return { mode: 'specific', filename: state.filename }
+    return { mode: 'auto' }
+  }
+
   function toggleCodingMode() {
     codingMode.value = codingMode.value === 'build' ? 'plan' : 'build'
   }
@@ -299,6 +379,7 @@ export const useChatStore = defineStore('chat', () => {
     getConversationRuntimeState(id)
     clearError(id)
     loadWhitelistRules(id)
+    void refreshConversationPlans(id)
   }
 
   async function removeConversation(id: string) {
@@ -350,6 +431,8 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId.value = null
     yoloMode.value = false
     clearConversationRuntimeState(null)
+    availablePlanFiles.value = []
+    latestPlanFilename.value = null
     focusInputTrigger.value++
   }
 
@@ -405,6 +488,8 @@ export const useChatStore = defineStore('chat', () => {
    * 计划退出时切换到 Build 模式
    */
   const onPlanExitSwitchToBuild = () => {
+    useAutoPlanBinding()
+    refreshConversationPlans(currentConversationId.value)
     setCodingMode('build')
   }
 
@@ -436,6 +521,7 @@ export const useChatStore = defineStore('chat', () => {
     appendDelegateDelta,
     generateTitle,
     onPlanExitSwitchToBuild,
+    getPlanBinding: getPlanBindingPayload,
   })
 
   const {
@@ -575,6 +661,11 @@ export const useChatStore = defineStore('chat', () => {
     yoloMode,
     thinkMode,
     codingMode,
+    availablePlanFiles,
+    latestPlanFilename,
+    isLoadingPlanFiles,
+    currentPlanBinding,
+    activeBoundPlanFilename,
     viewingPlan,
     provider,
     modelName,
@@ -627,6 +718,11 @@ export const useChatStore = defineStore('chat', () => {
     toggleThinkMode,
     toggleCodingMode,
     setCodingMode,
+    setPlanBinding,
+    bindPlanFile,
+    unbindPlan,
+    useAutoPlanBinding,
+    refreshConversationPlans,
     openPlan,
     closePlan,
 

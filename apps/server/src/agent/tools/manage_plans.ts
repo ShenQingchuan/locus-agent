@@ -4,19 +4,36 @@ import { join } from 'node:path'
 import { tool } from 'ai'
 import { z } from 'zod'
 
-const PLANS_DIR = join(homedir(), '.local', 'share', 'locus-agent', 'coding-plans')
+const PLANS_BASE_DIR = join(homedir(), '.local', 'share', 'locus-agent', 'coding-plans')
 
-function ensurePlansDir(): void {
-  if (!existsSync(PLANS_DIR)) {
-    mkdirSync(PLANS_DIR, { recursive: true })
+function normalizeProjectKey(projectKey?: string): string | null {
+  const key = projectKey?.trim()
+  if (!key)
+    return null
+  const safe = key.replace(/[^\w-]/g, '_')
+  return safe.length > 0 ? safe : null
+}
+
+function getPlansDir(projectKey?: string): string {
+  const normalized = normalizeProjectKey(projectKey)
+  if (!normalized)
+    return join(PLANS_BASE_DIR, 'global')
+  return join(PLANS_BASE_DIR, normalized)
+}
+
+function ensurePlansDir(projectKey?: string): string {
+  const plansDir = getPlansDir(projectKey)
+  if (!existsSync(plansDir)) {
+    mkdirSync(plansDir, { recursive: true })
   }
+  return plansDir
 }
 
 // ==================== write_plan ====================
 
 export const writePlanTool = tool({
   description: `Write a coding plan to a Markdown file. Used in Plan mode to persist implementation plans.
-File is saved to ~/.local/share/locus-agent/coding-plans/[filename].md
+File is saved to ~/.local/share/locus-agent/coding-plans/[project-key-or-global]/[filename].md
 Filename should be descriptive: [plan-goal]-[6-char-id].md (e.g. "add-auth-flow-a3f8k2.md")`,
   inputSchema: z.object({
     filename: z.string()
@@ -34,6 +51,7 @@ export interface WritePlanResult {
 
 export async function executeWritePlan(
   args: { filename: string, content: string },
+  context?: { projectKey?: string },
 ): Promise<WritePlanResult> {
   const filename = args.filename.trim()
   if (!filename || !filename.endsWith('.md')) {
@@ -44,8 +62,8 @@ export async function executeWritePlan(
     return { success: false, filePath: '', message: 'Filename must not contain path separators' }
   }
 
-  ensurePlansDir()
-  const filePath = join(PLANS_DIR, filename)
+  const plansDir = ensurePlansDir(context?.projectKey)
+  const filePath = join(plansDir, filename)
   writeFileSync(filePath, args.content, 'utf-8')
   return { success: true, filePath, message: `Plan saved: ${filePath}` }
 }
@@ -57,7 +75,7 @@ export function formatWritePlanResult(result: WritePlanResult): string {
 // ==================== read_plan ====================
 
 export const readPlanTool = tool({
-  description: `Read a coding plan file from ~/.local/share/locus-agent/coding-plans/.
+  description: `Read a coding plan file from ~/.local/share/locus-agent/coding-plans/[project-key-or-global]/.
 Use action "read" to read a specific file, or "list" to list all available plan files.`,
   inputSchema: z.object({
     action: z.enum(['read', 'list'])
@@ -101,11 +119,12 @@ export interface ReadPlanResult {
 
 export async function executeReadPlan(
   args: { action: 'read' | 'list', filename?: string },
+  context?: { projectKey?: string },
 ): Promise<ReadPlanResult> {
-  ensurePlansDir()
+  const plansDir = ensurePlansDir(context?.projectKey)
 
   if (args.action === 'list') {
-    const files = readdirSync(PLANS_DIR)
+    const files = readdirSync(plansDir)
       .filter(f => f.endsWith('.md'))
       .sort()
     return { success: true, files, message: `Found ${files.length} plan file(s).` }
@@ -119,7 +138,7 @@ export async function executeReadPlan(
     if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) {
       return { success: false, message: 'Invalid filename.' }
     }
-    const filePath = join(PLANS_DIR, filename)
+    const filePath = join(plansDir, filename)
     if (!existsSync(filePath)) {
       return { success: false, message: `Plan file not found: ${filename}` }
     }

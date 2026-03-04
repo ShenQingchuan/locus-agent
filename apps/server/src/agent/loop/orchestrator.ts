@@ -76,10 +76,9 @@ You're in **Plan Mode**. Focus on creating clear, actionable implementation plan
    - Specific changes per file
    - Implementation steps
    - Risks and considerations
-4. Use write_plan to save the plan to \`~/.local/share/locus-agent/coding-plans/[goal]-[6-char-id].md\`
-5. Filename format: brief English/pinyin description + 6-char random ID, e.g., \`add-auth-flow-a3f8k2.md\`
-   6. After finalizing the plan, call \`plan_exit\` to ask user whether to switch to Build mode
-   7. If user chooses to switch, continue in Build mode context; if not, stay in Plan mode and refine plan
+4. Use write_plan to save the plan to \`~/.local/share/locus-agent/coding-plans/[project-key-or-global]/[goal]-[6-char-id].md\`
+5. After finalizing the plan, call \`plan_exit\` to ask user whether to switch to Build mode
+6. If user chooses to switch, continue in Build mode context; if not, stay in Plan mode and refine plan
 
 **Prohibited in Plan Mode:**
 - Modifying source code (str_replace/write_file only for plan files)
@@ -91,11 +90,12 @@ const BUILD_WITH_PLAN_PROMPT = `
 ## 执行计划模式
 
 你正在执行一个之前制定的实现计划。请遵循以下原则：
-1. 用 manage_todos 将计划步骤转为 todo 项目，完成后逐项标记
-2. 按计划指定的顺序实施，除非依赖关系要求调整
-3. 完成每个主要步骤后简要汇报
-4. 遇到计划未覆盖的问题时，灵活应对并记录偏差
-5. 实施变更后验证结果（运行测试、检查输出等）再进入下一步
+1. 若用户消息包含 <plan_ref>，先用 read_plan 读取对应计划文件，再开始实施
+2. 用 manage_todos 将计划步骤转为 todo 项目，完成后逐项标记
+3. 按计划指定的顺序实施，除非依赖关系要求调整
+4. 完成每个主要步骤后简要汇报
+5. 遇到计划未覆盖的问题时，灵活应对并记录偏差
+6. 实施变更后验证结果（运行测试、检查输出等）再进入下一步
 `
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
@@ -136,7 +136,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   }
   else if (codingMode === 'build') {
     const hasPlan = messages.some(
-      m => m.role === 'user' && typeof m.content === 'string' && m.content.includes('<plan>'),
+      m => m.role === 'user' && typeof m.content === 'string' && (m.content.includes('<plan>') || m.content.includes('<plan_ref>')),
     )
     if (hasPlan) {
       effectiveSystemPrompt += `\n\n${BUILD_WITH_PLAN_PROMPT}`
