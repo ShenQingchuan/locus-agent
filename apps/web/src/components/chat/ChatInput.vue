@@ -98,44 +98,15 @@ const modeItems = computed<DropdownItem[]>(() => [
   },
 ])
 
-const planBindingItems = computed<DropdownItem[]>(() => {
-  const latest = chatStore.latestPlanFilename || '无可用计划'
-  const files = chatStore.availablePlanFiles
-
-  const items: DropdownItem[] = [
-    {
-      key: 'plan:auto',
-      label: `自动（${latest}）`,
-      icon: 'i-carbon:link',
-      active: chatStore.currentPlanBinding.mode === 'auto',
-    },
-  ]
-
-  if (files.length > 0) {
-    for (const filename of files) {
-      items.push({
-        key: `plan:file:${filename}`,
-        label: filename,
-        icon: 'i-carbon:document',
-        active: chatStore.currentPlanBinding.mode === 'specific' && chatStore.currentPlanBinding.filename === filename,
-      })
-    }
+const currentPlanItems = computed<DropdownItem[]>(() => {
+  if (!chatStore.activeBoundPlanFilename) {
+    return [{ key: 'plan:empty', label: '当前暂无计划', disabled: true }]
   }
 
-  items.push(
-    { key: 'plan:none', label: '解绑计划', icon: 'i-carbon:unlink', separator: true, active: chatStore.currentPlanBinding.mode === 'none' },
-    { key: 'plan:refresh', label: '刷新计划列表', icon: 'i-carbon:renew' },
-  )
-
-  return items
-})
-
-const boundPlanLabel = computed(() => {
-  if (chatStore.currentPlanBinding.mode === 'none')
-    return '未绑定'
-  if (chatStore.currentPlanBinding.mode === 'specific')
-    return chatStore.currentPlanBinding.filename || '指定计划'
-  return chatStore.activeBoundPlanFilename || '自动（无）'
+  return [
+    { key: 'plan:open', label: '打开当前计划', icon: 'i-lucide:notebook-pen' },
+    { key: 'plan:unbind', label: '解绑计划', icon: 'i-carbon:unlink', separator: true },
+  ]
 })
 
 function handleModeSelect(key: string) {
@@ -147,23 +118,18 @@ function handleModeSelect(key: string) {
     whitelistOpen.value = !whitelistOpen.value
 }
 
-function handlePlanBindingSelect(key: string) {
-  if (key === 'plan:auto') {
-    chatStore.useAutoPlanBinding()
+function handleCurrentPlanSelect(key: string) {
+  if (key === 'plan:empty')
     return
-  }
-  if (key === 'plan:none') {
+  if (key === 'plan:unbind') {
     chatStore.unbindPlan()
     return
   }
-  if (key === 'plan:refresh') {
-    void chatStore.refreshConversationPlans(chatStore.currentConversationId)
-    return
-  }
-  if (key.startsWith('plan:file:')) {
-    const filename = key.slice('plan:file:'.length)
-    if (filename)
-      chatStore.bindPlanFile(filename)
+  if (key === 'plan:open') {
+    const opened = chatStore.openCurrentPlan()
+    if (!opened) {
+      toast.info('当前会话暂无可打开的计划')
+    }
   }
 }
 
@@ -476,20 +442,19 @@ function handleKeydown(event: KeyboardEvent) {
 
           <Dropdown
             v-if="chatStore.codingMode === 'build'"
-            :items="planBindingItems"
+            :items="currentPlanItems"
             placement="top-start"
             persistent
-            @select="handlePlanBindingSelect"
+            @select="handleCurrentPlanSelect"
           >
             <template #trigger>
               <button
-                class="max-w-[300px] flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
-                :title="`当前计划：${boundPlanLabel}`"
+                class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
               >
-                <div class="i-carbon-document h-3.5 w-3.5" />
-                <span class="truncate">{{ boundPlanLabel }}</span>
+                <div class="i-icon-park-solid:guide-board h-3.5 w-3.5" />
+                <span>当前计划</span>
                 <div
-                  v-if="chatStore.isLoadingPlanFiles"
+                  v-if="chatStore.isLoadingPlan"
                   class="i-carbon-circle-dash h-3 w-3 animate-spin opacity-60"
                 />
                 <div v-else class="i-carbon-chevron-up h-3 w-3 opacity-50" />

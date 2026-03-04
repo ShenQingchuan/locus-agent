@@ -303,8 +303,10 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
 }
 
 export interface ConversationPlansResponse {
-  files: string[]
-  latestFilename: string | null
+  currentPlan: {
+    filename: string
+    content: string
+  } | null
 }
 
 export async function fetchConversationPlans(conversationId: string): Promise<ConversationPlansResponse | null> {

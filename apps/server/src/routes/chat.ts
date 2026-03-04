@@ -8,7 +8,6 @@ import type {
 } from '@locus-agent/shared'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
-import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
@@ -181,10 +180,6 @@ function extractLatestPlanFromDbMessages(
   return null
 }
 
-function isSafePlanFilename(filename: string): boolean {
-  return filename.endsWith('.md') && !filename.includes('/') && !filename.includes('\\') && !filename.includes('..')
-}
-
 function resolvePlanSnapshot(
   binding: PlanBindingPayload | undefined,
   dbMsgs: Array<{ toolCalls?: unknown[] | null }>,
@@ -192,16 +187,6 @@ function resolvePlanSnapshot(
 ): PlanSnapshot | null {
   if (binding?.mode === 'none')
     return null
-
-  if (binding?.mode === 'specific') {
-    const filename = typeof binding.filename === 'string' ? binding.filename.trim() : ''
-    if (!isSafePlanFilename(filename))
-      return null
-    const filePath = join(getPlansDir(projectKey), filename)
-    if (!existsSync(filePath))
-      return null
-    return { filename, filePath }
-  }
 
   return extractLatestPlanFromDbMessages(dbMsgs, projectKey)
 }
@@ -226,19 +211,28 @@ chatRoutes.get('/plans/:conversationId', async (c) => {
   }
 
   if (conversation.space !== 'coding') {
-    return c.json({ files: [], latestFilename: null })
+    return c.json({ currentPlan: null })
+  }
+
+  const dbMessages = await getMessages(conversationId)
+  const latestPlan = extractLatestPlanFromDbMessages(dbMessages, conversation.projectKey ?? undefined)
+  if (!latestPlan) {
+    return c.json({ currentPlan: null })
   }
 
   const readResult = await executeReadPlan(
-    { action: 'list' },
+    { action: 'read', filename: latestPlan.filename },
     { projectKey: conversation.projectKey ?? undefined },
   )
-  const dbMessages = await getMessages(conversationId)
-  const latestPlan = extractLatestPlanFromDbMessages(dbMessages, conversation.projectKey ?? undefined)
+  if (!readResult.success || !readResult.content) {
+    return c.json({ currentPlan: null })
+  }
 
   return c.json({
-    files: readResult.success ? (readResult.files ?? []) : [],
-    latestFilename: latestPlan?.filename ?? null,
+    currentPlan: {
+      filename: latestPlan.filename,
+      content: readResult.content,
+    },
   })
 })
 

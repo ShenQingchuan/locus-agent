@@ -3,8 +3,7 @@ import type { CoreMessage, Message } from './message.js'
 import type { AddToWhitelistPayload } from './whitelist.js'
 
 export interface PlanBinding {
-  mode: 'auto' | 'specific' | 'none'
-  filename?: string
+  mode: 'auto' | 'none'
 }
 
 /**

@@ -13,6 +13,8 @@ export interface DropdownItem {
   separator?: boolean
   /** Whether this item is currently active/checked */
   active?: boolean
+  /** Whether this item is disabled (non-interactive) */
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<{
@@ -102,9 +104,26 @@ function handleMouseLeave() {
 }
 
 function handleSelect(key: string) {
+  const item = props.items.find(i => i.key === key)
+  if (item?.disabled)
+    return
   emit('select', key)
   if (!props.persistent)
     close()
+}
+
+function moveFocus(step: 1 | -1) {
+  if (props.items.length === 0)
+    return
+
+  let nextIndex = focusedIndex.value
+  for (let i = 0; i < props.items.length; i++) {
+    nextIndex = (nextIndex + step + props.items.length) % props.items.length
+    if (!props.items[nextIndex]?.disabled) {
+      focusedIndex.value = nextIndex
+      return
+    }
+  }
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -114,12 +133,12 @@ function handleKeydown(e: KeyboardEvent) {
   switch (e.key) {
     case 'ArrowDown': {
       e.preventDefault()
-      focusedIndex.value = (focusedIndex.value + 1) % props.items.length
+      moveFocus(1)
       break
     }
     case 'ArrowUp': {
       e.preventDefault()
-      focusedIndex.value = focusedIndex.value <= 0 ? props.items.length - 1 : focusedIndex.value - 1
+      moveFocus(-1)
       break
     }
     case 'Enter':
@@ -190,9 +209,11 @@ onBeforeUnmount(() => {
             :class="[
               focusedIndex === index ? 'bg-accent text-accent-foreground' : '',
               item.active ? 'text-accent-foreground' : '',
+              item.disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-popover-foreground' : '',
             ]"
+            :disabled="item.disabled"
             @click="handleSelect(item.key)"
-            @mouseenter="focusedIndex = index"
+            @mouseenter="!item.disabled && (focusedIndex = index)"
           >
             <div v-if="item.icon" :class="item.icon" class="h-3.5 w-3.5 flex-shrink-0 opacity-70" />
             <span class="flex-1 text-left whitespace-nowrap">{{ item.label }}</span>
