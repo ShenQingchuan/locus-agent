@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun && cp -r ../web/dist dist/web && cp -r ../server/drizzle dist/drizzle",
+    "build": "bun run scripts/build.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 {
-  "name": "locus-agent",
+  "name": "locus-agent-monorepo",
   "type": "module",
   "version": "0.1.0",
   "private": true,

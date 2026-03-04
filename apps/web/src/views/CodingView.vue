@@ -47,7 +47,7 @@ const dirtyConversations = new Set<string>()
 const toast = useToast()
 const chatStore = useChatStore()
 const queryCache = useQueryCache()
-const gitStatus = useGitStatus(currentBrowsePath)
+const gitStatus = useGitStatus(currentProjectPath)
 
 const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
 const STORAGE_KEY_ASSISTANT_WIDTH = 'locus-agent:coding-assistant-width'
