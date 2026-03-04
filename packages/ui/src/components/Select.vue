@@ -21,11 +21,14 @@ const props = withDefaults(defineProps<{
   size?: 'sm' | 'md'
   /** Init arrow direction */
   arrowDirection?: 'up' | 'down'
+  /** Trigger behavior: hover by default, or click */
+  trigger?: 'click' | 'hover'
 }>(), {
   placeholder: '请选择…',
   placement: 'bottom-start',
   size: 'sm',
   arrowDirection: 'down',
+  trigger: 'hover',
 })
 
 const emit = defineEmits<{
@@ -36,6 +39,7 @@ const isOpen = ref(false)
 const triggerRef = ref<HTMLElement | null>(null)
 const menuRef = ref<HTMLElement | null>(null)
 const focusedIndex = ref(-1)
+let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedOption = computed(() =>
   props.options.find(o => o.value === props.modelValue),
@@ -66,9 +70,42 @@ function toggle() {
   }
 }
 
+function open() {
+  if (hoverCloseTimer) {
+    clearTimeout(hoverCloseTimer)
+    hoverCloseTimer = null
+  }
+  if (isOpen.value)
+    return
+  isOpen.value = true
+  focusedIndex.value = props.options.findIndex(o => o.value === props.modelValue)
+  nextTick(() => {
+    menuRef.value?.focus()
+  })
+}
+
 function close() {
   isOpen.value = false
   focusedIndex.value = -1
+}
+
+function scheduleClose() {
+  hoverCloseTimer = setTimeout(close, 150)
+}
+
+function handleTriggerClick() {
+  if (props.trigger === 'click')
+    toggle()
+}
+
+function handleMouseEnter() {
+  if (props.trigger === 'hover')
+    open()
+}
+
+function handleMouseLeave() {
+  if (props.trigger === 'hover')
+    scheduleClose()
 }
 
 function handleSelect(value: string) {
@@ -122,11 +159,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onClickOutside)
+  if (hoverCloseTimer) {
+    clearTimeout(hoverCloseTimer)
+    hoverCloseTimer = null
+  }
 })
 </script>
 
 <template>
-  <div class="relative inline-flex">
+  <div class="relative inline-flex" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
     <!-- Trigger -->
     <button
       ref="triggerRef"
@@ -137,7 +178,7 @@ onBeforeUnmount(() => {
       ]"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
-      @click="toggle"
+      @click="handleTriggerClick"
       @keydown="handleKeydown"
     >
       <div v-if="selectedOption?.icon" :class="selectedOption.icon" class="h-3 w-3 flex-shrink-0 opacity-70" />

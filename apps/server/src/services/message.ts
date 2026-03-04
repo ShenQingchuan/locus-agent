@@ -21,6 +21,8 @@ export interface AddMessageInput {
     completionTokens: number
     totalTokens: number
   }
+  /** 消息元数据（trigger 等标记） */
+  metadata?: { trigger?: string }
 }
 
 /**
@@ -43,6 +45,7 @@ export async function addMessage(
     toolCalls: message.toolCalls ?? null,
     toolResults: message.toolResults ?? null,
     usage: message.usage ?? null,
+    metadata: message.metadata ?? null,
     createdAt: now,
   }
 
@@ -78,6 +81,7 @@ export async function addMessages(
     toolCalls: message.toolCalls ?? null,
     toolResults: message.toolResults ?? null,
     usage: message.usage ?? null,
+    metadata: message.metadata ?? null,
     createdAt: now,
   }))
 

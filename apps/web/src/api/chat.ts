@@ -8,6 +8,7 @@ import type {
   MCPServersConfig,
   MCPServerStatus,
   Message,
+  MessageMetadata,
   PlanBinding,
   RiskLevel,
   SSEEvent,
@@ -60,6 +61,7 @@ export interface ChatStreamOptions {
   thinkingMode?: boolean
   codingMode?: 'build' | 'plan'
   planBinding?: PlanBinding
+  messageMetadata?: MessageMetadata
   onReasoningDelta?: (delta: string) => void
   onTextDelta?: (delta: string) => void
   onToolCallStart?: (toolCall: ToolCall) => void
@@ -109,6 +111,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     thinkingMode,
     codingMode,
     planBinding,
+    messageMetadata,
     onReasoningDelta,
     onTextDelta,
     onToolCallStart,
@@ -148,6 +151,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         thinkingMode,
         codingMode,
         planBinding,
+        messageMetadata,
       }),
       signal: controller.signal,
     })

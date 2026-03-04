@@ -41,6 +41,8 @@ export const messages = sqliteTable('messages', {
     completionTokens: number
     totalTokens: number
   } | null>(),
+  /** 消息元数据（JSON，用于标记触发类型等） */
+  metadata: text('metadata', { mode: 'json' }).$type<{ trigger?: string } | null>(),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),

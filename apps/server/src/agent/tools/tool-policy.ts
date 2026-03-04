@@ -1,7 +1,6 @@
 export const interactiveTools = new Set<string>([
   'ask_question',
   'delegate',
-  'plan_exit',
 ])
 
 export const trustedBuiltinTools = new Set<string>([

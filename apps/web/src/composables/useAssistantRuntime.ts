@@ -43,6 +43,8 @@ export interface Message {
     completionTokens: number
     totalTokens: number
   }
+  /** 消息元数据 — 携带 trigger 的消息不在 UI 渲染 */
+  metadata?: { trigger?: string }
 }
 
 export interface TodoTask {
@@ -332,6 +334,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
         content: m.content,
         model: m.role === 'assistant' ? (m.model ?? undefined) : undefined,
         reasoning: m.reasoning || undefined,
+        metadata: m.metadata ?? undefined,
         usage: m.role === 'assistant' && m.usage
           ? {
               promptTokens: m.usage.promptTokens,

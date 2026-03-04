@@ -16,12 +16,16 @@ import { executeReadFile, formatReadResult } from './read.js'
 import { executeSaveMemory, formatSaveMemoryResult } from './save_memory.js'
 import { executeSearchMemories, formatSearchMemoriesResult } from './search_memories.js'
 import { executeStrReplace, formatStrReplaceResult } from './str-replace.js'
+import { executeTree, formatTreeResult } from './tree.js'
 import { executeWriteFile, formatWriteResult } from './write.js'
 
 const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = {
-  bash: async (args, callbacks) => {
+  bash: async (args, callbacks, context) => {
     const result = await executeBash(
-      args as { command: string, timeout?: number },
+      {
+        ...(args as { command: string, timeout?: number, cwd?: string }),
+        cwd: (args as { cwd?: string }).cwd ?? context?.workspaceRoot,
+      },
       callbacks?.onOutputDelta
         ? {
             onStdout: chunk => callbacks.onOutputDelta!('stdout', chunk),
@@ -35,9 +39,17 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
     return formatReadResult(result)
   },
-  glob: async (args) => {
-    const result = await executeGlob(args as Parameters<typeof executeGlob>[0])
+  glob: async (args, _callbacks, context) => {
+    const normalizedArgs = args as Parameters<typeof executeGlob>[0]
+    const result = await executeGlob({
+      ...normalizedArgs,
+      cwd: normalizedArgs.cwd ?? context?.workspaceRoot,
+    })
     return formatGlobResult(result)
+  },
+  tree: async (args) => {
+    const result = await executeTree(args as Parameters<typeof executeTree>[0])
+    return formatTreeResult(result)
   },
   str_replace: async (args) => {
     const result = await executeStrReplace(args as Parameters<typeof executeStrReplace>[0])
@@ -90,6 +102,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   bash: executeBash as ToolExecutor,
   read_file: executeReadFile as ToolExecutor,
   glob: executeGlob as ToolExecutor,
+  tree: executeTree as ToolExecutor,
   str_replace: executeStrReplace as ToolExecutor,
   write_file: executeWriteFile as ToolExecutor,
   save_memory: executeSaveMemory as ToolExecutor,

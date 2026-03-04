@@ -702,7 +702,7 @@ watch(manageKanbanResultCount, (current, previous) => {
             </div>
             <div class="flex items-center gap-1">
               <button
-                class="h-7 inline-flex items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 :class="{
                   'opacity-40 cursor-not-allowed': !canUseAssistant,
                 }"
@@ -710,8 +710,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 :disabled="!canUseAssistant"
                 @click="handleNewConversation"
               >
-                <span class="i-carbon-add h-3.5 w-3.5" />
-                <span>新建会话</span>
+                <span class="i-ic:baseline-add h-4 w-4" />
               </button>
               <button
                 class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -744,7 +743,7 @@ watch(manageKanbanResultCount, (current, previous) => {
           <template v-else>
             <div class="flex-1 min-h-0">
               <MessageList
-                :messages="chatStore.messages"
+                :messages="chatStore.visibleMessages"
                 :is-loading="chatStore.isLoading"
                 :is-streaming="chatStore.isStreaming"
                 scroll-button-right="calc((100% - min(100%, 48rem)) / 2 + 2rem)"

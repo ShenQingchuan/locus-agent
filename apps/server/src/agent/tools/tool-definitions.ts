@@ -9,12 +9,14 @@ import { readFileTool } from './read.js'
 import { saveMemoryTool } from './save_memory.js'
 import { searchMemoriesTool } from './search_memories.js'
 import { strReplaceTool } from './str-replace.js'
+import { treeTool } from './tree.js'
 import { writeFileTool } from './write.js'
 
 export const tools = {
   bash: bashTool,
   read_file: readFileTool,
   glob: globTool,
+  tree: treeTool,
   str_replace: strReplaceTool,
   write_file: writeFileTool,
   ask_question: askQuestionTool,

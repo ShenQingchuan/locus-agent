@@ -24,6 +24,7 @@ export interface AgentLoopOptions {
   getQuestionAnswer?: (toolCallId: string, questions: QuestionItem[]) => Promise<QuestionAnswer[]>
   conversationId?: string
   projectKey?: string
+  workspaceRoot?: string
   onDelegateDelta?: (toolCallId: string, delta: DelegateDelta) => void | Promise<void>
   toolTimeoutMs?: number
   toolAllowlist?: string[]

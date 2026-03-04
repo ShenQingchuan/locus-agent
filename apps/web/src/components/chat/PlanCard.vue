@@ -32,6 +32,12 @@ const planSummary = computed(() => {
   return '点击查看完整计划'
 })
 
+const canStartExecution = computed(() => {
+  if (props.status !== 'completed')
+    return false
+  return !(chatStore.codingMode === 'build' && chatStore.activeBoundPlanFilename === props.filename)
+})
+
 function handleViewPlan() {
   if (props.status === 'completed') {
     chatStore.openPlan(props.filename, props.content)
@@ -39,15 +45,18 @@ function handleViewPlan() {
 }
 
 function handleStartExecution() {
-  chatStore.setCodingMode('build')
-  if (!props.content?.trim()) {
-    chatStore.sendMessage('开始执行计划')
+  const startPlanExecution = (chatStore as { startPlanExecution?: (filename: string, content: string) => void }).startPlanExecution
+  if (typeof startPlanExecution === 'function') {
+    startPlanExecution(props.filename, props.content)
     return
   }
-  chatStore.sendMessage(
-    `请执行以下计划：\n\n<plan>\n${props.content}\n</plan>\n\n`
-    + `首先用 manage_todos 将计划的关键步骤创建为 todo 项以便跟踪进度，然后按顺序执行每一步。`,
-  )
+
+  // Fallback for stale runtime/HMR states: no extra message bubble.
+  chatStore.useAutoPlanBinding()
+  chatStore.setCodingMode('build')
+  chatStore.openPlan(props.filename, props.content)
+  if (chatStore.currentConversationId)
+    void chatStore.refreshConversationPlans(chatStore.currentConversationId)
 }
 </script>
 
@@ -100,7 +109,7 @@ function handleStartExecution() {
 
     <!-- Action bar -->
     <div
-      v-if="status === 'completed'"
+      v-if="canStartExecution"
       class="flex items-center gap-2 px-3.5 py-2 border-t border-border bg-muted/20"
     >
       <button

@@ -1,5 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import { resolveToolPath } from './resolve-path.js'
+import { getWorkspaceRoot } from './workspace-root.js'
 
 /**
  * Bash 工具定义
@@ -9,6 +11,7 @@ export const bashTool = tool({
   inputSchema: z.object({
     command: z.string().describe('The bash command to execute'),
     timeout: z.number().optional().describe('Timeout in milliseconds (default: 30000)'),
+    cwd: z.string().optional().describe('Working directory to run command in (default: workspace root)'),
   }),
 })
 
@@ -75,16 +78,18 @@ async function consumeStream(
  * Bash 工具执行函数
  */
 export async function executeBash(
-  args: { command: string, timeout?: number },
+  args: { command: string, timeout?: number, cwd?: string },
   streamCallbacks?: BashStreamCallbacks,
 ): Promise<BashResult> {
-  const { command, timeout = 30000 } = args
+  const { command, timeout = 30000, cwd } = args
+  const resolvedCwd = cwd ? resolveToolPath(cwd) : getWorkspaceRoot()
 
   try {
     const proc = Bun.spawn(['bash', '-c', command], {
       stdout: 'pipe',
       stderr: 'pipe',
       env: { ...Bun.env },
+      cwd: resolvedCwd,
     })
 
     // 设置超时

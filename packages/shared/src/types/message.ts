@@ -7,6 +7,14 @@ import type { ToolCall, ToolResult } from './tool.js'
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 
 /**
+ * 消息元数据（用于标记自动触发等非用户手动输入的消息）
+ */
+export interface MessageMetadata {
+  /** 触发类型标识 — 携带此字段的消息不在 UI 中渲染气泡 */
+  trigger?: string
+}
+
+/**
  * 消息类型定义
  * 符合 Vercel AI SDK 的消息格式
  */
@@ -33,6 +41,8 @@ export interface Message {
     completionTokens: number
     totalTokens: number
   } | null
+  /** 消息元数据 */
+  metadata?: MessageMetadata | null
   /** 创建时间 */
   createdAt: Date
 }

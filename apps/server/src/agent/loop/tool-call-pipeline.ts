@@ -53,30 +53,6 @@ export async function executePendingToolCall(
         const answers = await getQuestionAnswer(tc.toolCallId, questions)
         result = formatQuestionAnswers(answers)
       }
-      else if (tc.toolName === 'plan_exit' && getQuestionAnswer) {
-        const question = '计划已完成，是否切换到 Build 模式并开始执行？'
-        const questions: QuestionItem[] = [{
-          question,
-          options: ['切换到 Build', '继续完善 Plan'],
-        }]
-
-        if (onQuestionPending) {
-          await onQuestionPending(tc.toolCallId, questions)
-        }
-
-        const answers = await getQuestionAnswer(tc.toolCallId, questions)
-        const answerText = answers[0]?.answer?.trim() ?? ''
-        const switchedToBuild = /切换|build|yes|start|执行/i.test(answerText)
-          && !/继续|保持|no|否/i.test(answerText)
-
-        result = {
-          success: true,
-          switchedToBuild,
-          message: switchedToBuild
-            ? '已确认切换到 Build 模式。'
-            : '保持在 Plan 模式。',
-        }
-      }
       else if (tc.toolName === 'delegate') {
         const args = tc.args as DelegateArgs
         const delegateDeltas: Array<{ type: string, content: string, toolName?: string, isError?: boolean }> = []

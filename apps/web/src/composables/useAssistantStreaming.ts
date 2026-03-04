@@ -1,4 +1,4 @@
-import type { CoreMessage, PlanBinding } from '@locus-agent/shared'
+import type { CoreMessage, MessageMetadata, PlanBinding } from '@locus-agent/shared'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
 import { streamChat } from '@/api/chat'
@@ -13,6 +13,7 @@ interface StreamAssistantReplyOptions {
   thinkingMode: boolean
   codingMode?: 'build' | 'plan'
   planBinding?: PlanBinding
+  messageMetadata?: MessageMetadata
   onReasoningDelta: (delta: string) => void
   onTextDelta: (delta: string) => void
   onToolCallStart: (toolCall: Parameters<NonNullable<Parameters<typeof streamChat>[0]['onToolCallStart']>>[0]) => void
@@ -39,6 +40,7 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
       thinkingMode: options.thinkingMode,
       codingMode: options.codingMode,
       planBinding: options.planBinding,
+      messageMetadata: options.messageMetadata,
       onReasoningDelta: options.onReasoningDelta,
       onTextDelta: options.onTextDelta,
       onToolCallStart: (toolCall) => {

@@ -121,6 +121,15 @@ export const useChatStore = defineStore('chat', () => {
   const currentPlan = ref<{ filename: string, content: string } | null>(null)
   const isLoadingPlan = ref(false)
   const planBindings = ref<Record<string, { mode: 'auto' | 'none' }>>({})
+  const latestPlanByConversation = ref<Record<string, { filename: string, content: string }>>({})
+  // Plan viewer state — Coding 页面中间面板展示实现计划
+  const viewingPlan = ref<{ filename: string, content: string } | null>(null)
+  function openPlan(filename: string, content: string) {
+    viewingPlan.value = { filename, content }
+  }
+  function closePlan() {
+    viewingPlan.value = null
+  }
 
   function getPlanBindingForConversation(conversationId?: string | null): { mode: 'auto' | 'none' } {
     if (!conversationId)
@@ -183,20 +192,45 @@ export const useChatStore = defineStore('chat', () => {
     return true
   }
 
+  function onWritePlanDetected(conversationId: string, filename: string, content: string) {
+    const snapshot = { filename, content }
+    latestPlanByConversation.value[conversationId] = snapshot
+    if (conversationId === currentConversationId.value) {
+      currentPlan.value = snapshot
+      openPlan(filename, content)
+    }
+  }
+
+  function onPlanPreviewStart(conversationId: string) {
+    if (conversationId !== currentConversationId.value)
+      return
+    openPlan('当前计划（生成中）', '')
+  }
+
+  function onPlanPreviewDelta(conversationId: string, delta: string) {
+    if (conversationId !== currentConversationId.value)
+      return
+    const existing = viewingPlan.value
+    if (!existing || existing.filename !== '当前计划（生成中）') {
+      openPlan('当前计划（生成中）', delta)
+      return
+    }
+    viewingPlan.value = {
+      ...existing,
+      content: `${existing.content}${delta}`,
+    }
+  }
+
+  function onPlanPreviewDone(_conversationId: string) {
+    // Keep preview open. If write_plan succeeds, onWritePlanDetected will replace it
+    // with the persisted plan filename/content.
+  }
+
   function toggleCodingMode() {
     codingMode.value = codingMode.value === 'build' ? 'plan' : 'build'
   }
   function setCodingMode(mode: 'build' | 'plan') {
     codingMode.value = mode
-  }
-
-  // Plan viewer state — Coding 页面中间面板展示实现计划
-  const viewingPlan = ref<{ filename: string, content: string } | null>(null)
-  function openPlan(filename: string, content: string) {
-    viewingPlan.value = { filename, content }
-  }
-  function closePlan() {
-    viewingPlan.value = null
   }
 
   // Model provider & model name (synced with server settings)
@@ -208,6 +242,11 @@ export const useChatStore = defineStore('chat', () => {
   // Edit message state
   const editingMessageId = ref<string | null>(null)
   const editingContent = ref<string>('')
+
+  /** 过滤掉 trigger 消息后的可见消息列表（用于 UI 渲染） */
+  const visibleMessages = computed(() =>
+    messages.value.filter(m => !m.metadata?.trigger),
+  )
 
   const hasError = computed(() => error.value !== null)
   const isStreaming = computed(() => currentStreamingMessageId.value !== null)
@@ -472,12 +511,6 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 计划退出时切换到 Build 模式
    */
-  const onPlanExitSwitchToBuild = () => {
-    useAutoPlanBinding()
-    refreshConversationPlans(currentConversationId.value)
-    setCodingMode('build')
-  }
-
   const messaging = createConversationMessagingActions({
     currentConversationId,
     conversationScope,
@@ -505,7 +538,10 @@ export const useChatStore = defineStore('chat', () => {
     appendToolCallOutput,
     appendDelegateDelta,
     generateTitle,
-    onPlanExitSwitchToBuild,
+    onWritePlanDetected,
+    onPlanPreviewStart,
+    onPlanPreviewDelta,
+    onPlanPreviewDone,
     getPlanBinding: getPlanBindingPayload,
   })
 
@@ -517,6 +553,26 @@ export const useChatStore = defineStore('chat', () => {
     saveEditMessage: saveEditedMessage,
     retryFromMessage,
   } = messaging
+
+  function startPlanExecution(filename: string, content: string) {
+    const conversationId = currentConversationId.value
+    if (!conversationId)
+      return
+
+    const snapshot = { filename, content }
+    latestPlanByConversation.value[conversationId] = snapshot
+    currentPlan.value = snapshot
+
+    useAutoPlanBinding()
+    setCodingMode('build')
+
+    void sendMessage(
+      '开始执行当前已绑定计划。请先 read_plan，再按计划顺序实施，并使用 manage_todos 跟踪进度。',
+      undefined,
+      conversationId,
+      { metadata: { trigger: 'start_plan_execution' } },
+    )
+  }
 
   async function handleToolApproval(toolCallId: string, approved: boolean) {
     const conversationId = currentConversationId.value
@@ -658,6 +714,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // Current conversation state
     messages,
+    visibleMessages,
     todoTasks,
     isLoading,
     error,
@@ -705,6 +762,7 @@ export const useChatStore = defineStore('chat', () => {
     setPlanBinding,
     unbindPlan,
     useAutoPlanBinding,
+    startPlanExecution,
     openCurrentPlan,
     refreshConversationPlans,
     openPlan,

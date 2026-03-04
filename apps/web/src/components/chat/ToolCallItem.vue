@@ -54,7 +54,7 @@ onClickOutside(whitelistPopoverRef, () => {
 
 const statusIcon = computed(() => {
   switch (props.tool.status) {
-    case 'pending': return 'i-carbon-hourglass'
+    case 'pending': return 'i-svg-spinners:90-ring-with-bg'
     case 'awaiting-approval': return 'i-carbon-warning-alt'
     case 'awaiting-question': return 'i-carbon-help'
     case 'completed': return 'i-carbon-checkmark'
@@ -66,7 +66,7 @@ const statusIcon = computed(() => {
 
 const statusIconClass = computed(() => {
   switch (props.tool.status) {
-    case 'pending': return 'text-muted-foreground animate-spin'
+    case 'pending': return 'text-muted-foreground'
     case 'error': return 'text-destructive'
     case 'interrupted': return 'text-warning'
     default: return 'text-muted-foreground'
@@ -82,6 +82,11 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
   bash: args => String(args.command ?? ''),
   read_file: args => String(args.file_path ?? ''),
   glob: args => String(args.pattern ?? ''),
+  tree: (args) => {
+    const path = String(args.path ?? '')
+    const depth = args.max_depth != null ? ` depth=${String(args.max_depth)}` : ''
+    return `${path || '.'}${depth}`
+  },
   str_replace: args => String(args.file_path ?? ''),
   write_file: args => String(args.file_path ?? ''),
   ask_question: (args) => {
@@ -126,7 +131,6 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
 
     return '待办管理'
   },
-  plan_exit: () => '规划完成，等待模式切换',
 }
 
 /**
@@ -138,7 +142,7 @@ const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => st
  * To add a new tool with custom output, just add its name to this set.
  */
 const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
-const toolsHideSummaryRow = new Set<string>(['manage_todos', 'write_plan'])
+const toolsHideSummaryRow = new Set<string>(['manage_todos', 'write_plan', 'plan_exit'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -231,6 +235,7 @@ const writePlanStatus = computed<'pending' | 'completed' | 'error'>(() => {
 
 /** Whether this is a bash tool */
 const isBash = computed(() => props.tool.toolCall.toolName === 'bash')
+const isSilentTool = computed(() => props.tool.toolCall.toolName === 'plan_exit')
 
 const bashExpanded = ref(props.tool.status === 'pending')
 
@@ -424,7 +429,7 @@ watch(bashExpanded, (expanded) => {
 </script>
 
 <template>
-  <div class="my-2 text-sm">
+  <div v-if="!isSilentTool" class="my-2 text-sm">
     <!-- Awaiting approval: card style with inline buttons -->
     <div
       v-if="tool.status === 'awaiting-approval'"
@@ -538,7 +543,7 @@ watch(bashExpanded, (expanded) => {
           v-if="isToolRunning"
           class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#a08060] dark:text-[#888]"
         >
-          <div class="i-svg-spinners:bars-fade h-3 w-3" />
+          <div class="i-svg-spinners:90-ring-with-bg h-3 w-3" />
           <span>执行中...</span>
         </div>
       </template>
@@ -577,7 +582,7 @@ watch(bashExpanded, (expanded) => {
         v-if="isToolRunning"
         class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#a08060] dark:text-[#888]"
       >
-        <div class="i-svg-spinners:bars-fade h-3 w-3" />
+        <div class="i-svg-spinners:90-ring-with-bg h-3 w-3" />
         <span>执行中...</span>
       </div>
     </div>

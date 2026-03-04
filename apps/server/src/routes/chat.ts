@@ -18,6 +18,7 @@ import { runAgentLoop } from '../agent/loop.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
+import { getWorkspaceRoot } from '../agent/tools/workspace-root.js'
 import {
   addGlobalRule,
   addSessionRule,
@@ -246,6 +247,7 @@ chatRoutes.post('/', async (c) => {
     thinkingMode,
     codingMode,
     planBinding,
+    messageMetadata,
     space,
     projectKey,
   } = body
@@ -302,10 +304,11 @@ chatRoutes.post('/', async (c) => {
     }
   }
 
-  // 保存用户消息到数据库
+  // 保存用户消息到数据库（始终持久化，metadata 标记的消息由前端过滤）
   await addMessage(conversationId, {
     role: 'user',
     content: message,
+    metadata: messageMetadata,
   })
 
   // 取消之前的请求（如果存在）
@@ -354,6 +357,7 @@ chatRoutes.post('/', async (c) => {
       const messages: ModelMessage[] = [...convertedHistory, createUserMessage(effectiveUserMessage)]
 
       const effectiveThinkingMode = thinkingMode ?? true
+      const workspaceRoot = getWorkspaceRoot()
       const result = await runAgentLoop({
         model: createLLMModel(runtimeModelInfo.model, effectiveThinkingMode),
         messages,
@@ -363,6 +367,7 @@ chatRoutes.post('/', async (c) => {
         codingMode: conversationSpace === 'coding' ? codingMode : undefined,
         conversationId,
         projectKey: conversationProjectKey,
+        workspaceRoot,
 
         // 思考过程增量回调
         onReasoningDelta: async (delta) => {

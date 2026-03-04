@@ -5,6 +5,7 @@ import type { ReadFileResult } from './read.js'
 import type { StrReplaceResult } from './str-replace.js'
 import type { ToolName } from './tool-definitions.js'
 import type { ToolExecutionContext, ToolOutputCallbacks } from './tool-runtime-types.js'
+import type { TreeResult } from './tree.js'
 import type { WriteFileResult } from './write.js'
 import { mcpManager } from '../mcp/manager.js'
 import { tools } from './tool-definitions.js'
@@ -66,10 +67,10 @@ export function getMergedTools(): Record<string, Tool> {
 const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   'read_file',
   'glob',
+  'tree',
   'search_memories',
   'write_plan',
   'read_plan',
-  'plan_exit',
   'ask_question',
   'manage_todos',
 ])
@@ -143,7 +144,7 @@ export function getAvailableTools(): string[] {
   return Object.keys(getMergedTools())
 }
 
-export type { BashResult, GlobResult, ReadFileResult, StrReplaceResult, WriteFileResult }
+export type { BashResult, GlobResult, ReadFileResult, StrReplaceResult, TreeResult, WriteFileResult }
 
 export { delegateTool, executeDelegate, formatDelegateResult } from './delegate.js'
 export type { DelegateArgs, DelegateResult, SubAgentConfig } from './delegate.js'

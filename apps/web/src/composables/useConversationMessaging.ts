@@ -1,4 +1,4 @@
-import type { Conversation, CoreMessage, LLMProviderType, PlanBinding } from '@locus-agent/shared'
+import type { Conversation, CoreMessage, LLMProviderType, MessageMetadata, PlanBinding } from '@locus-agent/shared'
 import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
@@ -12,6 +12,11 @@ interface RuntimeState {
   currentStreamingMessageId: string | null
   messageQueue: Array<{ id: string, content: string }>
   isProcessingQueue: boolean
+}
+
+export interface SendMessageOptions {
+  /** 附加到用户消息的元数据 — 含 trigger 字段时消息不在 UI 渲染 */
+  metadata?: MessageMetadata
 }
 
 interface CreateConversationMessagingOptions {
@@ -41,8 +46,11 @@ interface CreateConversationMessagingOptions {
   appendToolCallOutput: (toolCallId: string, delta: string, conversationId?: string | null) => void
   appendDelegateDelta: (toolCallId: string, delta: Parameters<Parameters<typeof streamAssistantReply>[0]['onDelegateDelta']>[0]['delta'], conversationId?: string | null) => void
   generateTitle: (conversationId: string) => Promise<void>
-  onPlanExitSwitchToBuild?: (conversationId: string) => void
+  onWritePlanDetected?: (conversationId: string, filename: string, content: string) => void
   getPlanBinding?: (conversationId: string) => PlanBinding | undefined
+  onPlanPreviewStart?: (conversationId: string) => void
+  onPlanPreviewDelta?: (conversationId: string, delta: string) => void
+  onPlanPreviewDone?: (conversationId: string) => void
 }
 
 function computeBackendKeepCount(history: Message[]): number {
@@ -61,6 +69,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
     content: string,
     historyMessages?: CoreMessage[],
     targetConversationId?: string,
+    optionsOverride?: SendMessageOptions,
   ): Promise<string | null> {
     if (!content.trim())
       return null
@@ -100,10 +109,14 @@ export function createConversationMessagingActions(options: CreateConversationMe
     // 仅 edit/retry 场景会传入 historyMessages（用于 truncate 后的状态同步）
     const historyToSend = historyMessages
 
-    options.addMessage({ role: 'user', content }, conversationId)
+    options.addMessage({ role: 'user', content, metadata: optionsOverride?.metadata }, conversationId)
 
     const selectedModel = (options.modelName.value || DEFAULT_MODELS[options.provider.value] || 'unknown').trim()
     const assistantModel = `${options.provider.value}/${selectedModel}`
+    const isPlanningTurn = options.conversationScope.value.space === 'coding' && options.codingMode.value === 'plan'
+
+    if (isPlanningTurn)
+      options.onPlanPreviewStart?.(conversationId)
 
     const assistantMessageId = options.addMessage({
       role: 'assistant',
@@ -127,26 +140,32 @@ export function createConversationMessagingActions(options: CreateConversationMe
       planBinding: options.conversationScope.value.space === 'coding' && options.codingMode.value === 'build'
         ? options.getPlanBinding?.(conversationId)
         : undefined,
+      messageMetadata: optionsOverride?.metadata,
       onReasoningDelta: (delta) => {
         options.appendReasoningToMessage(assistantMessageId, delta, conversationId)
       },
       onTextDelta: (delta) => {
-        options.appendToMessage(assistantMessageId, delta, conversationId)
+        if (isPlanningTurn) {
+          // Plan 模式：text delta 只写入计划预览面板，不写入消息气泡
+          options.onPlanPreviewDelta?.(conversationId, delta)
+        }
+        else {
+          options.appendToMessage(assistantMessageId, delta, conversationId)
+        }
       },
       onToolCallStart: (toolCall) => {
         options.addToolCallToMessage(assistantMessageId, toolCall, conversationId)
+
+        if (conversationId && toolCall.toolName === 'write_plan') {
+          const filename = typeof toolCall.args?.filename === 'string' ? toolCall.args.filename.trim() : ''
+          const content = typeof toolCall.args?.content === 'string' ? toolCall.args.content : ''
+          if (filename && content) {
+            options.onWritePlanDetected?.(conversationId, filename, content)
+          }
+        }
       },
       onToolCallResult: (toolResult) => {
         options.updateToolCallResult(assistantMessageId, toolResult, conversationId)
-
-        if (toolResult.toolName === 'plan_exit' && !toolResult.isError && conversationId) {
-          const payload = typeof toolResult.result === 'object' && toolResult.result !== null
-            ? (toolResult.result as { switchedToBuild?: unknown })
-            : null
-          if (payload?.switchedToBuild === true) {
-            options.onPlanExitSwitchToBuild?.(conversationId)
-          }
-        }
       },
       onToolPendingApproval: (approval) => {
         options.addPendingApproval(approval, conversationId)
@@ -177,6 +196,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
 
         if (isNewConversation && conversationId)
           void options.generateTitle(conversationId)
+        if (isPlanningTurn)
+          options.onPlanPreviewDone?.(conversationId)
       },
       onError: (code, message) => {
         options.setError({ code, message }, conversationId)
@@ -187,6 +208,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
         }, conversationId)
         errorState.currentStreamingMessageId = null
         errorState.isLoading = false
+        if (isPlanningTurn)
+          options.onPlanPreviewDone?.(conversationId)
       },
       isStillStreaming: () => options.getConversationRuntimeState(conversationId).currentStreamingMessageId === assistantMessageId,
       onMissingTerminalEvent: () => {
@@ -194,6 +217,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
         const fallbackState = options.getConversationRuntimeState(conversationId)
         fallbackState.currentStreamingMessageId = null
         fallbackState.isLoading = false
+        if (isPlanningTurn)
+          options.onPlanPreviewDone?.(conversationId)
       },
     })
 

@@ -5,7 +5,7 @@ import type { QueuedMessage } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
@@ -31,6 +31,10 @@ const markDirty = useMarkConversationDirty()
 
 const { textarea, input } = useTextareaAutosize()
 const whitelistOpen = ref(false)
+const ESC_CONFIRM_WINDOW_MS = 3000
+const escConfirmActive = ref(false)
+const escRemainingMs = ref(0)
+const escIntervalId = ref<number | null>(null)
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
 
@@ -109,6 +113,72 @@ const currentPlanItems = computed<DropdownItem[]>(() => {
   ]
 })
 
+const codingModeItems = computed<DropdownItem[]>(() => [
+  {
+    key: 'coding:build',
+    label: 'Build',
+    icon: 'i-streamline-sharp:loop-1-solid',
+  },
+  {
+    key: 'coding:plan',
+    label: 'Plan',
+    icon: 'i-icon-park-solid:guide-board',
+  },
+  {
+    key: 'coding:hint',
+    label: 'Shift + Tab 切换模式',
+    icon: 'i-carbon-keyboard',
+    separator: true,
+    disabled: true,
+  },
+])
+
+const codingModeButtonClass = computed(() => {
+  if (chatStore.codingMode === 'build') {
+    return 'border border-blue-300/70 bg-blue-500/10 text-blue-700 hover:bg-blue-500/15 dark:text-blue-300 dark:border-blue-400/35'
+  }
+  return 'border border-amber-300/70 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/35'
+})
+
+const currentCodingModeItem = computed(() => {
+  const key = chatStore.codingMode === 'build' ? 'coding:build' : 'coding:plan'
+  return codingModeItems.value.find(item => item.key === key)
+})
+
+const codingModeButtonIcon = computed(() => currentCodingModeItem.value?.icon ?? 'i-carbon:code')
+const codingModeButtonLabel = computed(() => currentCodingModeItem.value?.label ?? (chatStore.codingMode === 'build' ? 'Build' : 'Plan'))
+
+const escProgressWidth = computed(() => {
+  if (!escConfirmActive.value)
+    return '0%'
+  const ratio = Math.max(0, Math.min(1, escRemainingMs.value / ESC_CONFIRM_WINDOW_MS))
+  return `${Math.round(ratio * 100)}%`
+})
+
+function clearEscConfirm() {
+  escConfirmActive.value = false
+  escRemainingMs.value = 0
+  if (escIntervalId.value !== null) {
+    window.clearInterval(escIntervalId.value)
+    escIntervalId.value = null
+  }
+}
+
+function startEscConfirm() {
+  clearEscConfirm()
+  escConfirmActive.value = true
+  const deadline = Date.now() + ESC_CONFIRM_WINDOW_MS
+  escRemainingMs.value = ESC_CONFIRM_WINDOW_MS
+  escIntervalId.value = window.setInterval(() => {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) {
+      clearEscConfirm()
+      return
+    }
+    escRemainingMs.value = remaining
+  }, 50)
+}
+
 function handleModeSelect(key: string) {
   if (key === 'think')
     chatStore.toggleThinkMode()
@@ -131,6 +201,13 @@ function handleCurrentPlanSelect(key: string) {
       toast.info('当前会话暂无可打开的计划')
     }
   }
+}
+
+function handleCodingModeSelect(key: string) {
+  if (key === 'coding:build')
+    chatStore.setCodingMode('build')
+  else if (key === 'coding:plan')
+    chatStore.setCodingMode('plan')
 }
 
 const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
@@ -253,6 +330,15 @@ watch(
   { immediate: true },
 )
 
+watch(() => props.isStreaming, (streaming) => {
+  if (!streaming)
+    clearEscConfirm()
+})
+
+onUnmounted(() => {
+  clearEscConfirm()
+})
+
 async function handleSubmit() {
   if (!input.value.trim())
     return
@@ -279,6 +365,7 @@ function handleCancelEdit() {
 }
 
 function handleStop() {
+  clearEscConfirm()
   emit('stop')
 }
 
@@ -289,6 +376,16 @@ function handleKeydown(event: KeyboardEvent) {
 
   if (event.key === 'Escape' && isEditing.value) {
     handleCancelEdit()
+    return
+  }
+
+  if (event.key === 'Escape' && props.isStreaming) {
+    event.preventDefault()
+    if (escConfirmActive.value) {
+      handleStop()
+      return
+    }
+    startEscConfirm()
     return
   }
 
@@ -332,10 +429,10 @@ function handleKeydown(event: KeyboardEvent) {
         <div
           v-for="task in chatStore.todoTasks"
           :key="task.id"
-          class="mb-0.5 flex items-start gap-1.5 rounded px-1.5 py-1 last:mb-0 hover:bg-muted/50"
+          class="mb-0.5 flex items-center gap-1.5 rounded px-1.5 py-1 last:mb-0 hover:bg-muted/50"
         >
           <div
-            class="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
+            class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
             :class="task.status === 'completed' ? 'i-lets-icons:done-ring-round' : 'i-icon-park-outline:hourglass-full'"
           />
           <span
@@ -400,6 +497,22 @@ function handleKeydown(event: KeyboardEvent) {
       </div>
 
       <!-- Textarea -->
+      <div
+        v-if="escConfirmActive && isStreaming"
+        class="mx-3 mt-2 mb-1 rounded-full border border-amber-300/50 bg-amber-500/10 px-3 py-1"
+      >
+        <div class="flex items-center justify-between gap-3 text-[11px] text-amber-800 dark:text-amber-200">
+          <span>3秒内再次点击 ESC 中断对话</span>
+          <span class="font-mono">{{ Math.ceil(escRemainingMs / 1000) }}s</span>
+        </div>
+        <div class="mt-1 h-1.5 rounded-full bg-amber-400/20 overflow-hidden">
+          <div
+            class="h-full bg-amber-500/70 transition-[width] duration-75"
+            :style="{ width: escProgressWidth }"
+          />
+        </div>
+      </div>
+
       <textarea
         ref="textarea"
         v-model="input"
@@ -419,32 +532,26 @@ function handleKeydown(event: KeyboardEvent) {
       <!-- Build/Plan mode toggle row (Coding 空间独有) -->
       <div v-if="showCodingMode" class="flex items-center justify-between px-3 pt-1.5 gap-2">
         <div class="flex items-center gap-2 min-w-0">
-          <div class="flex items-center bg-muted rounded-md p-0.5">
-            <button
-              class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
-              :class="chatStore.codingMode === 'build'
-                ? 'bg-background text-foreground shadow-sm font-medium'
-                : 'text-muted-foreground hover:text-foreground'"
-              @click="chatStore.setCodingMode('build')"
-            >
-              Build
-            </button>
-            <button
-              class="px-2.5 py-0.5 text-[11px] rounded transition-all duration-150"
-              :class="chatStore.codingMode === 'plan'
-                ? 'bg-background text-foreground shadow-sm font-medium'
-                : 'text-muted-foreground hover:text-foreground'"
-              @click="chatStore.setCodingMode('plan')"
-            >
-              Plan
-            </button>
-          </div>
+          <Dropdown :items="codingModeItems" placement="top-start" persistent trigger="hover" @select="handleCodingModeSelect">
+            <template #trigger>
+              <button
+                class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors duration-150"
+                :class="codingModeButtonClass"
+                aria-label="选择编码模式"
+              >
+                <div class="h-3.5 w-3.5" :class="codingModeButtonIcon" />
+                <span class="font-medium">{{ codingModeButtonLabel }}</span>
+                <div class="i-carbon-chevron-up h-3 w-3 opacity-70" />
+              </button>
+            </template>
+          </Dropdown>
 
           <Dropdown
             v-if="chatStore.codingMode === 'build'"
             :items="currentPlanItems"
             placement="top-start"
             persistent
+            trigger="hover"
             @select="handleCurrentPlanSelect"
           >
             <template #trigger>

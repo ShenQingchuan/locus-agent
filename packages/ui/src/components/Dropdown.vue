@@ -23,12 +23,12 @@ const props = withDefaults(defineProps<{
   placement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end'
   /** Keep menu open after selecting (useful for toggles) */
   persistent?: boolean
-  /** How the dropdown is triggered: click or hover */
+  /** How the dropdown is triggered: hover by default, or click */
   trigger?: 'click' | 'hover'
 }>(), {
   placement: 'top-end',
   persistent: false,
-  trigger: 'click',
+  trigger: 'hover',
 })
 
 const emit = defineEmits<{
@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
             :class="[
               focusedIndex === index ? 'bg-accent text-accent-foreground' : '',
               item.active ? 'text-accent-foreground' : '',
-              item.disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-popover-foreground' : '',
+              item.disabled ? 'opacity-70 cursor-not-allowed bg-muted/40 text-muted-foreground hover:bg-muted/40 hover:text-muted-foreground' : '',
             ]"
             :disabled="item.disabled"
             @click="handleSelect(item.key)"

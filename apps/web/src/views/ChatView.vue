@@ -312,7 +312,7 @@ async function handleGenerateTitle() {
       <!-- Messages area -->
       <main class="flex-1 overflow-hidden">
         <MessageList
-          :messages="chatStore.messages"
+          :messages="chatStore.visibleMessages"
           :is-loading="chatStore.isLoading"
           :is-streaming="chatStore.isStreaming"
         />

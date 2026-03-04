@@ -1,10 +1,12 @@
 import type { ModelMessage } from 'ai'
 import type { AgentLoopOptions, AgentLoopResult } from './types.js'
+import process from 'node:process'
 import { streamText } from 'ai'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
 import { getCurrentModelInfo } from '../providers/index.js'
 import { getMergedToolsForMode } from '../tools/registry.js'
+import { getWorkspaceRoot } from '../tools/workspace-root.js'
 import { consumeResponseStream } from './stream-consumer.js'
 import { executePendingToolCall } from './tool-call-pipeline.js'
 
@@ -77,13 +79,12 @@ You're in **Plan Mode**. Focus on creating clear, actionable implementation plan
    - Implementation steps
    - Risks and considerations
 4. Use write_plan to save the plan to \`~/.local/share/locus-agent/coding-plans/[project-key-or-global]/[goal]-[6-char-id].md\`
-5. After finalizing the plan, call \`plan_exit\` to ask user whether to switch to Build mode
-6. If user chooses to switch, continue in Build mode context; if not, stay in Plan mode and refine plan
+5. After saving the plan, stop and wait for user action (do not start implementation in this turn)
 
 **Prohibited in Plan Mode:**
 - Modifying source code (str_replace/write_file only for plan files)
 - Skipping planning and implementing directly
-- Skipping \`plan_exit\` after finalizing a plan
+- Continuing execution after write_plan in the same turn
 `
 
 const BUILD_WITH_PLAN_PROMPT = `
@@ -97,6 +98,15 @@ const BUILD_WITH_PLAN_PROMPT = `
 5. 遇到计划未覆盖的问题时，灵活应对并记录偏差
 6. 实施变更后验证结果（运行测试、检查输出等）再进入下一步
 `
+
+function buildRuntimeContextPrompt(workspaceRoot: string): string {
+  return `## Runtime Context
+
+- workspace_root: ${workspaceRoot}
+- server_cwd: ${process.cwd()}
+- Prefer resolving relative paths from workspace_root.
+- Before broad discovery, use tree with limited depth to inspect structure.`
+}
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
   const {
@@ -120,6 +130,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     getQuestionAnswer,
     conversationId,
     projectKey,
+    workspaceRoot: workspaceRootOption,
     onDelegateDelta,
     toolTimeoutMs = 0,
     toolAllowlist,
@@ -127,10 +138,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
   const messages: ModelMessage[] = [...initialMessages]
-  const toolContext = { conversationId, projectKey }
+  const workspaceRoot = workspaceRootOption || getWorkspaceRoot()
+  const toolContext = { conversationId, projectKey, workspaceRoot }
 
   // 根据 codingMode 扩展 system prompt
-  let effectiveSystemPrompt = systemPrompt
+  let effectiveSystemPrompt = `${systemPrompt}\n\n${buildRuntimeContextPrompt(workspaceRoot)}`
   if (codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
   }
@@ -288,7 +300,19 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
               : { type: 'text', value: resultText },
           }],
         })
+
+        if (tc.toolName === 'plan_exit' && !pipelineResult.isError) {
+          finishReason = 'end_turn'
+          break
+        }
+
+        if (codingMode === 'plan' && tc.toolName === 'write_plan' && !pipelineResult.isError) {
+          finishReason = 'end_turn'
+          break
+        }
       }
+      if (finishReason === 'end_turn')
+        break
       continue
     }
 

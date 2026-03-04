@@ -1,10 +1,11 @@
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { cwd } from 'node:process'
 import { tool } from 'ai'
 import { Glob } from 'bun'
 import { z } from 'zod'
+import { getGitignoreFilter } from './gitignore-filter.js'
 import { resolveToolPath } from './resolve-path.js'
+import { getWorkspaceRoot } from './workspace-root.js'
 
 /**
  * Maximum number of matching paths returned by default.
@@ -18,25 +19,6 @@ const DEFAULT_LIMIT = 200
 const HARD_MAX_LIMIT = 5000
 
 /**
- * Directories always excluded from scanning.
- * These are universally noisy and almost never what the user wants.
- */
-const ALWAYS_IGNORE_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  '.output',
-  '.nuxt',
-  '.next',
-  '.cache',
-  '.turbo',
-  'coverage',
-  '__pycache__',
-  '.venv',
-  'venv',
-])
-
-/**
  * Glob tool definition (Vercel AI SDK format).
  *
  * Design notes:
@@ -44,8 +26,6 @@ const ALWAYS_IGNORE_DIRS = new Set([
  *   It never modifies the filesystem.
  * - Returns matching file paths sorted by modification time (newest first),
  *   so the LLM can quickly focus on recently changed files.
- * - Common noise directories (node_modules, .git, dist, etc.) are
- *   automatically excluded to keep results relevant.
  * - Supports standard glob syntax: `*`, `**`, `?`, `[abc]`, `{a,b}`.
  *
  * Typical use cases:
@@ -58,7 +38,7 @@ export const globTool = tool({
   description:
     'Find files matching a glob pattern. '
     + 'Returns file paths sorted by modification time (newest first). '
-    + 'Common noise directories (node_modules, .git, dist, etc.) are excluded automatically. '
+    + 'Respects .gitignore rules in the workspace root. '
     + 'Use `**/*.ext` for recursive search. Supports `*`, `**`, `?`, `[abc]`, `{a,b}` syntax.',
   inputSchema: z.object({
     pattern: z
@@ -94,30 +74,11 @@ export interface GlobResult {
 }
 
 /**
- * Check whether a relative path contains any segment that should be ignored.
- *
- * For a path like "node_modules/foo/bar.js", splitting on "/" yields
- * ["node_modules", "foo", "bar.js"] – we check each directory segment
- * against the ignore set.
- */
-function shouldIgnore(relativePath: string): boolean {
-  const segments = relativePath.split('/')
-  // Check all segments except the last one (filename)
-  // But also check the last in case it is a directory entry
-  for (const segment of segments) {
-    if (ALWAYS_IGNORE_DIRS.has(segment)) {
-      return true
-    }
-  }
-  return false
-}
-
-/**
  * Execute the glob tool.
  *
  * 1. Resolve the search root directory
  * 2. Create a Bun.Glob instance and scan the directory
- * 3. Filter out ignored directories
+ * 3. Filter with .gitignore matcher
  * 4. Stat each file for mtime, sort by newest first
  * 5. Apply the result limit
  */
@@ -129,7 +90,9 @@ export async function executeGlob(args: {
   const { pattern, cwd: cwdArg, limit } = args
 
   // --- Resolve search root ---
-  const resolvedCwd = cwdArg ? resolveToolPath(cwdArg) : cwd()
+  const resolvedCwd = cwdArg ? resolveToolPath(cwdArg) : getWorkspaceRoot()
+  const workspaceRoot = getWorkspaceRoot()
+  const isIgnored = await getGitignoreFilter(workspaceRoot)
 
   // Validate the directory exists
   let cwdStat
@@ -153,7 +116,8 @@ export async function executeGlob(args: {
     onlyFiles: true,
     followSymlinks: false,
   })) {
-    if (!shouldIgnore(filePath)) {
+    const absPath = resolve(resolvedCwd, filePath)
+    if (!isIgnored(absPath, false)) {
       allMatches.push(filePath)
     }
   }

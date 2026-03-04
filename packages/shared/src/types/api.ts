@@ -1,5 +1,5 @@
 import type { Conversation } from './conversation.js'
-import type { CoreMessage, Message } from './message.js'
+import type { CoreMessage, Message, MessageMetadata } from './message.js'
 import type { AddToWhitelistPayload } from './whitelist.js'
 
 export interface PlanBinding {
@@ -28,6 +28,8 @@ export interface ChatRequest {
   codingMode?: 'build' | 'plan'
   /** Build 模式计划绑定策略：自动/latest、指定文件、或禁用 */
   planBinding?: PlanBinding
+  /** 用户消息元数据（携带 trigger 时该消息不在 UI 渲染） */
+  messageMetadata?: MessageMetadata
 }
 
 /**

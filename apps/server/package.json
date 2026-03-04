@@ -51,6 +51,7 @@
     "consola": "catalog:cli-tools",
     "drizzle-orm": "catalog:database",
     "hono": "catalog:hono-family",
+    "ignore": "catalog:fs-utils",
     "sqlite-vec": "catalog:embedding",
     "zhipu-ai-provider": "catalog:ai-sdk",
     "zod": "catalog:ai-sdk"
