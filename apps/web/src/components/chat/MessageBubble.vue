@@ -5,7 +5,7 @@ import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
@@ -17,6 +17,29 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+
+// 思考过程展开/折叠状态控制
+// - 流式过程中保持展开
+// - 流式结束时自动折叠（除非用户已手动展开）
+const isReasoningExpanded = ref(props.message.isStreaming)
+const hasUserManuallyToggled = ref(false)
+
+watch(() => props.message.isStreaming, (newVal, oldVal) => {
+  // 流式结束（从 true 变为 false）且用户未手动操作时，自动折叠
+  if (oldVal && !newVal && !hasUserManuallyToggled.value) {
+    isReasoningExpanded.value = false
+  }
+  // 流式开始时（从 false 变为 true），自动展开
+  else if (!oldVal && newVal) {
+    isReasoningExpanded.value = true
+    hasUserManuallyToggled.value = false
+  }
+})
+
+function handleReasoningToggle() {
+  hasUserManuallyToggled.value = true
+  isReasoningExpanded.value = !isReasoningExpanded.value
+}
 const markDirty = useMarkConversationDirty()
 
 const isUser = computed(() => props.message.role === 'user')
@@ -295,12 +318,18 @@ const { copy, copied } = useClipboard()
           <details
             v-if="part.type === 'reasoning' && part.content"
             class="my-2 group/reasoning"
-            :open="message.isStreaming"
+            :open="isReasoningExpanded"
           >
-            <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1">
+            <summary
+              class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1"
+              @click.prevent="handleReasoningToggle"
+            >
               <div class="i-carbon-idea h-3 w-3" />
               <span>{{ message.isStreaming ? '思考过程' : '思考结束' }}</span>
-              <span v-if="!message.isStreaming" class="reasoning-hint opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开思考过程</span>
+              <span v-if="!message.isStreaming && !isReasoningExpanded" class="reasoning-hint opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开</span>
+              <span v-if="message.isStreaming" class="reasoning-hint text-muted-foreground/40">
+                <div class="i-carbon-circle-dash animate-spin h-3 w-3" />
+              </span>
             </summary>
             <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
               {{ part.content }}
