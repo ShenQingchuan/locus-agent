@@ -403,7 +403,7 @@ async function handleCommit() {
   const message = await toast.prompt({
     title: '提交变更',
     message: `将提交 ${stagedCount} 个暂存文件`,
-    placeholder: 'feat: ...',
+    placeholder: '建议遵照提交信息书写规范：<type>(scope): <subject>',
     confirmText: '提交',
     cancelText: '取消',
     multiline: true,
@@ -800,7 +800,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                   {{ chatStore.error?.message }}
                 </span>
                 <button
-                  class="text-xs text-destructive/80 hover:text-destructive transition-colors duration-150"
+                  class="text-xs text-destructive/80 hover:text-destructive transition-colors duration-150 whitespace-nowrap"
                   @click="chatStore.clearError()"
                 >
                   关闭

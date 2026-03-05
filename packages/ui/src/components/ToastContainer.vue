@@ -187,7 +187,7 @@ function getToastClass(type: string): string {
             :ref="setPromptInputRef"
             v-model="promptState.inputValue"
             rows="4"
-            class="mt-3 w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-ring resize-y min-h-20"
+            class="mt-3 w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground font-sans outline-none focus:ring-1 focus:ring-ring resize-y min-h-20"
             :placeholder="promptState.options.placeholder"
             @keydown.enter.meta.prevent="handlePromptConfirm"
             @keydown.enter.ctrl.prevent="handlePromptConfirm"
@@ -199,17 +199,13 @@ function getToastClass(type: string): string {
             :ref="setPromptInputRef"
             v-model="promptState.inputValue"
             type="text"
-            class="mt-3 w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+            class="mt-3 w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground font-sans outline-none focus:ring-1 focus:ring-ring"
             :placeholder="promptState.options.placeholder"
             @keydown.enter.prevent="handlePromptConfirm"
           >
 
-          <div class="mt-4 flex items-center justify-between">
-            <span v-if="promptState.options.multiline" class="text-[10px] text-muted-foreground">
-              ⌘ Enter 提交
-            </span>
-            <span v-else />
-            <div class="flex gap-2">
+          <div class="mt-4 flex items-center">
+            <div class="flex gap-2 ml-auto">
               <button
                 class="px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted transition-colors"
                 @click="resolvePrompt(null)"

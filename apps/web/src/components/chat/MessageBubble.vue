@@ -5,7 +5,7 @@ import { DEFAULT_MODELS } from '@locus-agent/shared'
 import { Tooltip } from '@locus-agent/ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
@@ -18,27 +18,51 @@ const props = defineProps<{
 
 const chatStore = useChatStore()
 
-// 思考过程展开/折叠状态控制
-// - 流式过程中保持展开
-// - 流式结束时自动折叠（除非用户已手动展开）
-const isReasoningExpanded = ref(props.message.isStreaming)
-const hasUserManuallyToggled = ref(false)
+// 每个 reasoning 块独立的展开/折叠状态
+// - 思考中自动展开，思考一结束（后续出现非 reasoning 的 part）立即自动折叠
+// - 用户手动操作后该块不再自动折叠
+const expandedBlocks = reactive(new Set<number>())
+const userToggledBlocks = reactive(new Set<number>())
 
-watch(() => props.message.isStreaming, (newVal, oldVal) => {
-  // 流式结束（从 true 变为 false）且用户未手动操作时，自动折叠
-  if (oldVal && !newVal && !hasUserManuallyToggled.value) {
-    isReasoningExpanded.value = false
-  }
-  // 流式开始时（从 false 变为 true），自动展开
-  else if (!oldVal && newVal) {
-    isReasoningExpanded.value = true
-    hasUserManuallyToggled.value = false
-  }
+// 当前仍在生成中的 reasoning 块索引（parts 末尾的 reasoning）
+const activeReasoningIdx = computed<number | null>(() => {
+  if (!props.message.isStreaming)
+    return null
+  const parts = props.message.parts
+  if (!parts || parts.length === 0)
+    return null
+  const lastIdx = parts.length - 1
+  return parts[lastIdx]?.type === 'reasoning' ? lastIdx : null
 })
 
-function handleReasoningToggle() {
-  hasUserManuallyToggled.value = true
-  isReasoningExpanded.value = !isReasoningExpanded.value
+watch(activeReasoningIdx, (newIdx, oldIdx) => {
+  if (oldIdx != null && oldIdx !== newIdx && !userToggledBlocks.has(oldIdx))
+    expandedBlocks.delete(oldIdx)
+  if (newIdx != null && newIdx !== oldIdx) {
+    expandedBlocks.add(newIdx)
+    userToggledBlocks.delete(newIdx)
+  }
+}, { immediate: true })
+
+function isBlockDone(partIdx: number): boolean {
+  if (!props.message.isStreaming)
+    return true
+  const parts = props.message.parts
+  return !parts || partIdx + 1 < parts.length
+}
+
+function isBlockExpanded(partIdx: number): boolean {
+  return expandedBlocks.has(partIdx)
+}
+
+function handleReasoningToggle(partIdx: number) {
+  userToggledBlocks.add(partIdx)
+  if (expandedBlocks.has(partIdx)) {
+    expandedBlocks.delete(partIdx)
+  }
+  else {
+    expandedBlocks.add(partIdx)
+  }
 }
 const markDirty = useMarkConversationDirty()
 
@@ -315,26 +339,28 @@ const { copy, copied } = useClipboard()
         <!-- Ordered parts: reasoning, text and tool calls interleaved -->
         <template v-for="(part, partIdx) in displayParts" :key="partIdx">
           <!-- Reasoning/Thinking part -->
-          <details
+          <div
             v-if="part.type === 'reasoning' && part.content"
             class="my-2 group/reasoning"
-            :open="isReasoningExpanded"
           >
-            <summary
+            <div
               class="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground/70 select-none py-1"
-              @click.prevent="handleReasoningToggle"
+              @click="handleReasoningToggle(partIdx)"
             >
               <div class="i-carbon-idea h-3 w-3" />
-              <span>{{ message.isStreaming ? '思考过程' : '思考结束' }}</span>
-              <span v-if="!message.isStreaming && !isReasoningExpanded" class="reasoning-hint opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开</span>
-              <span v-if="message.isStreaming" class="reasoning-hint text-muted-foreground/40">
+              <span>{{ isBlockDone(partIdx) ? '思考结束' : '思考过程' }}</span>
+              <span v-if="isBlockDone(partIdx) && !isBlockExpanded(partIdx)" class="opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开</span>
+              <span v-if="!isBlockDone(partIdx)" class="text-muted-foreground/40">
                 <div class="i-carbon-circle-dash animate-spin h-3 w-3" />
               </span>
-            </summary>
-            <div class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+            </div>
+            <div
+              v-show="isBlockExpanded(partIdx)"
+              class="ml-1.25 mt-1 pl-4 border-l border-border/90 text-sm text-muted-foreground/70 leading-relaxed whitespace-pre-wrap"
+            >
               {{ part.content }}
             </div>
-          </details>
+          </div>
 
           <!-- Tool call part -->
           <template v-else-if="part.type === 'tool-call'">
@@ -378,9 +404,3 @@ const { copy, copied } = useClipboard()
     </template>
   </article>
 </template>
-
-<style scoped>
-details[open] .reasoning-hint {
-  display: none;
-}
-</style>

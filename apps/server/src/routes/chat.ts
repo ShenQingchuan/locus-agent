@@ -82,6 +82,17 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
   toolCalls?: unknown[] | null
   toolResults?: unknown[] | null
 }>): ModelMessage[] {
+  // Pre-collect all tool-result IDs to filter orphan tool-calls
+  const availableResultIds = new Set<string>()
+  for (const msg of dbMsgs) {
+    if (msg.role === 'tool' && msg.toolResults) {
+      for (const tr of msg.toolResults as Array<{ toolCallId: string }>) {
+        if (tr.toolCallId)
+          availableResultIds.add(tr.toolCallId)
+      }
+    }
+  }
+
   const result: ModelMessage[] = []
   for (const msg of dbMsgs) {
     switch (msg.role) {
@@ -91,15 +102,21 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
       case 'assistant': {
         const tcs = msg.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
         if (tcs && tcs.length > 0) {
-          result.push({
-            role: 'assistant',
-            content: tcs.map(tc => ({
-              type: 'tool-call' as const,
-              toolCallId: tc.toolCallId,
-              toolName: tc.toolName,
-              input: tc.args,
-            })),
-          })
+          const validCalls = tcs.filter(tc => availableResultIds.has(tc.toolCallId))
+          if (validCalls.length > 0) {
+            result.push({
+              role: 'assistant',
+              content: validCalls.map(tc => ({
+                type: 'tool-call' as const,
+                toolCallId: tc.toolCallId,
+                toolName: tc.toolName,
+                input: tc.args,
+              })),
+            })
+          }
+          else {
+            result.push({ role: 'assistant', content: msg.content || '' })
+          }
         }
         else {
           result.push({ role: 'assistant', content: msg.content })

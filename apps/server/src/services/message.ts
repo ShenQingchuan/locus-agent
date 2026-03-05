@@ -1,6 +1,6 @@
 import type { ToolCall, ToolResult } from '@locus-agent/shared'
 import type { Message, NewMessage } from '../db/schema.js'
-import { asc, desc, eq } from 'drizzle-orm'
+import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db, messages } from '../db/index.js'
 import { touchConversation } from './conversation.js'
 
@@ -96,7 +96,7 @@ export async function addMessages(
     .select()
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt))
+    .orderBy(asc(sql`rowid`))
 
   // 只返回刚插入的消息
   return savedMessages.filter(m => ids.includes(m.id))
@@ -110,7 +110,7 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
     .select()
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt))
+    .orderBy(asc(sql`rowid`))
 
   return result
 }
@@ -126,7 +126,7 @@ export async function getLastNMessages(
     .select()
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(desc(messages.createdAt))
+    .orderBy(desc(sql`rowid`))
     .limit(n)
 
   // 反转为升序（最旧的在前）
@@ -176,7 +176,7 @@ export async function truncateMessages(
     .select({ id: messages.id })
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt))
+    .orderBy(asc(sql`rowid`))
 
   // 需要删除的消息
   const toDelete = allMessages.slice(keepCount)

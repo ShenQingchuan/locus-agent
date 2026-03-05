@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TaskStatus } from '@locus-agent/shared'
 import { useQueryCache } from '@pinia/colada'
+import { useElementSize } from '@vueuse/core'
 import { computed, ref } from 'vue'
 import * as api from '@/api/tasks'
 import { getTasksListQueryKey, useTasksListQuery } from '@/composables/taskQueries'
@@ -18,6 +19,10 @@ const emit = defineEmits<{
 
 const queryCache = useQueryCache()
 const { data: tasks, isPending: isLoading } = useTasksListQuery(() => props.projectKey)
+
+const containerRef = ref<HTMLElement | null>(null)
+const { width: containerWidth } = useElementSize(containerRef)
+const useVerticalLayout = computed(() => containerWidth.value < 680)
 
 const columns = [
   { status: 'backlog' as const, title: '待跟进' },
@@ -96,7 +101,11 @@ defineExpose({ openCreate })
 </script>
 
 <template>
-  <section class="h-full min-h-0 grid grid-cols-1 md:grid-cols-3 md:divide-x divide-border">
+  <section
+    ref="containerRef"
+    class="h-full min-h-0 grid divide-border"
+    :class="useVerticalLayout ? 'grid-cols-1 grid-rows-3 divide-y' : 'grid-cols-3 divide-x'"
+  >
     <KanbanColumn
       v-for="col in columns"
       :key="col.status"
