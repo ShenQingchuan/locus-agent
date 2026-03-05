@@ -26,7 +26,7 @@ watch(conversationsData, (data) => {
   if (data) {
     chatStore.conversations = data
   }
-})
+}, { immediate: true })
 
 /** Navigate back to chat page if currently on a different route */
 function ensureChatRoute() {

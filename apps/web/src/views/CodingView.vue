@@ -72,9 +72,9 @@ function getStoredPanelWidth(storageKey: string, fallback: number, min: number, 
 }
 
 const leftPanel = useResizePanel({
-  initialWidth: getStoredPanelWidth(STORAGE_KEY_LEFT_PANEL_WIDTH, 224, 200, 380),
-  minWidth: 200,
-  maxWidth: 380,
+  initialWidth: getStoredPanelWidth(STORAGE_KEY_LEFT_PANEL_WIDTH, 180, 160, 300),
+  minWidth: 160,
+  maxWidth: 300,
   onWidthChange: (width) => {
     localStorage.setItem(STORAGE_KEY_LEFT_PANEL_WIDTH, String(width))
   },
@@ -126,7 +126,7 @@ watch(conversationsData, (data) => {
   if (data) {
     chatStore.conversations = data
   }
-})
+}, { immediate: true })
 
 watch(conversationData, (data) => {
   const activeConversationId = chatStore.currentConversationId
@@ -616,7 +616,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 @click="openWorkspacePicker"
               >
                 <span class="i-material-symbols:folder-managed h-4 w-4 flex-none text-muted-foreground" />
-                <span class="text-sm text-foreground/90">工作目录</span>
+                <span class="text-sm text-foreground/90 whitespace-nowrap">工作目录</span>
                 <span
                   class="max-w-[28rem] truncate text-xs font-mono text-muted-foreground"
                   :title="currentProjectPath || currentProjectName"
@@ -631,7 +631,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 @click="kanbanBoardRef?.openCreate()"
               >
                 <div class="i-carbon-add h-4 w-4" />
-                <span>新建任务</span>
+                <span class="whitespace-nowrap">新建任务</span>
               </button>
             </header>
 
