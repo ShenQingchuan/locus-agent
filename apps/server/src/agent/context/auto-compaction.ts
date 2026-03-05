@@ -2,7 +2,7 @@ import type { LanguageModel, ModelMessage } from 'ai'
 import { generateText } from 'ai'
 
 /** 上下文使用率超过此比例时触发压缩 */
-const COMPACTION_THRESHOLD = 0.80
+const COMPACTION_THRESHOLD = 0.65
 
 /** 压缩时保留最近 N 轮对话（user+assistant 算一轮） */
 const RECENT_TURNS_TO_KEEP = 4

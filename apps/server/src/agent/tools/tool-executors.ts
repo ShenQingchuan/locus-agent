@@ -2,6 +2,7 @@ import type { ToolName } from './tool-definitions.js'
 import type { StreamingToolExecutor, ToolExecutor } from './tool-runtime-types.js'
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
+import { executeGrep, formatGrepResult } from './grep.js'
 import { executeManageKanban, formatManageKanbanResult } from './manage_kanban.js'
 import {
   executePlanExit,
@@ -46,6 +47,14 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
       cwd: normalizedArgs.cwd ?? context?.workspaceRoot,
     })
     return formatGlobResult(result)
+  },
+  grep: async (args, _callbacks, context) => {
+    const normalizedArgs = args as Parameters<typeof executeGrep>[0]
+    const result = await executeGrep({
+      ...normalizedArgs,
+      path: normalizedArgs.path ?? context?.workspaceRoot,
+    })
+    return formatGrepResult(result)
   },
   tree: async (args) => {
     const result = await executeTree(args as Parameters<typeof executeTree>[0])
@@ -102,6 +111,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   bash: executeBash as ToolExecutor,
   read_file: executeReadFile as ToolExecutor,
   glob: executeGlob as ToolExecutor,
+  grep: executeGrep as ToolExecutor,
   tree: executeTree as ToolExecutor,
   str_replace: executeStrReplace as ToolExecutor,
   write_file: executeWriteFile as ToolExecutor,

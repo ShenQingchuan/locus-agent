@@ -67,6 +67,7 @@ export function getMergedTools(): Record<string, Tool> {
 const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   'read_file',
   'glob',
+  'grep',
   'tree',
   'search_memories',
   'write_plan',

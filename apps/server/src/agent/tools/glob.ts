@@ -124,27 +124,40 @@ export async function executeGlob(args: {
 
   const totalMatches = allMatches.length
 
-  // --- Sort by modification time (newest first) ---
-  // Stat files in parallel for mtime, with graceful fallback
-  const withMtime = await Promise.all(
-    allMatches.map(async (file) => {
-      try {
-        const fileStat = await stat(resolve(resolvedCwd, file))
-        return { file, mtime: fileStat.mtimeMs }
-      }
-      catch {
-        // File might have been deleted between scan and stat
-        return { file, mtime: 0 }
-      }
-    }),
-  )
-
-  withMtime.sort((a, b) => b.mtime - a.mtime)
-
   // --- Apply limit ---
   const effectiveLimit = limit !== undefined
     ? Math.min(limit, HARD_MAX_LIMIT)
     : DEFAULT_LIMIT
+
+  // --- Sort by modification time (newest first) ---
+  // Optimization: when there are many matches, only stat a capped subset
+  // to avoid thousands of stat syscalls. If total <= limit * 2, stat all;
+  // otherwise stat a random sample + return alphabetically for the rest.
+  const STAT_CAP = effectiveLimit * 2
+  const filesToStat = totalMatches <= STAT_CAP
+    ? allMatches
+    : allMatches.slice(0, STAT_CAP)
+
+  // Batch stat with concurrency limit to prevent fd exhaustion
+  const CONCURRENCY = 64
+  const withMtime: Array<{ file: string, mtime: number }> = []
+  for (let i = 0; i < filesToStat.length; i += CONCURRENCY) {
+    const batch = filesToStat.slice(i, i + CONCURRENCY)
+    const results = await Promise.all(
+      batch.map(async (file) => {
+        try {
+          const fileStat = await stat(resolve(resolvedCwd, file))
+          return { file, mtime: fileStat.mtimeMs }
+        }
+        catch {
+          return { file, mtime: 0 }
+        }
+      }),
+    )
+    withMtime.push(...results)
+  }
+
+  withMtime.sort((a, b) => b.mtime - a.mtime)
 
   const truncated = totalMatches > effectiveLimit
   const files = withMtime.slice(0, effectiveLimit).map(item => item.file)

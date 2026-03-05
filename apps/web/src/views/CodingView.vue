@@ -542,9 +542,9 @@ watch(manageKanbanResultCount, (current, previous) => {
             :title="isLeftSidebarCollapsed ? '编码工作台' : undefined"
             @click="activeSection = 'workspace'; chatStore.closePlan()"
           >
-            <div v-if="isLeftSidebarCollapsed" class="i-charm:git-request-cross h-4 w-4" />
+            <div v-if="isLeftSidebarCollapsed" class="i-lucide:git-pull-request-arrow h-4 w-4" />
             <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-charm:git-request-cross h-4 w-4" />
+              <span class="i-lucide:git-pull-request-arrow h-4 w-4" />
               变更审阅
             </div>
           </button>

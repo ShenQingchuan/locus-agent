@@ -6,10 +6,10 @@ import { getDataDir } from '../../settings/paths.js'
 const CACHE_SUBDIR = 'tmp/tools-result'
 
 /** 低于此字符数的工具结果永远不会被缓存（保持 inline） */
-const MIN_SIZE_TO_CACHE = 2000
+const MIN_SIZE_TO_CACHE = 800
 
 /** 最近 N 次 tool result 保持完整 inline（hot tail） */
-const DEFAULT_HOT_TAIL_COUNT = 3
+const DEFAULT_HOT_TAIL_COUNT = 2
 
 /** 已缓存的标记前缀 */
 const CACHED_MARKER = '[CACHED:'

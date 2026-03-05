@@ -2,6 +2,7 @@ import { askQuestionTool } from './ask_question.js'
 import { bashTool } from './bash.js'
 import { delegateTool } from './delegate.js'
 import { globTool } from './glob.js'
+import { grepTool } from './grep.js'
 import { manageKanbanTool } from './manage_kanban.js'
 import { planExitTool, readPlanTool, writePlanTool } from './manage_plans.js'
 import { manageTodosTool } from './manage_todos.js'
@@ -16,6 +17,7 @@ export const tools = {
   bash: bashTool,
   read_file: readFileTool,
   glob: globTool,
+  grep: grepTool,
   tree: treeTool,
   str_replace: strReplaceTool,
   write_file: writeFileTool,

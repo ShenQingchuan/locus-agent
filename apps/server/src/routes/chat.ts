@@ -27,7 +27,7 @@ import {
 } from '../agent/whitelist.js'
 import { config } from '../config.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
-import { addMessage, getMessages } from '../services/message.js'
+import { addMessage, getLastNMessages, getMessages } from '../services/message.js'
 
 export const chatRoutes = new Hono()
 
@@ -341,7 +341,10 @@ chatRoutes.post('/', async (c) => {
       const assistantModel = `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
-      const dbMessages = await getMessages(conversationId)
+      // 限制加载最近 100 条消息，避免长对话的 DB 查询和序列化开销
+      // agent loop 内部的 auto-compaction 会进一步压缩上下文
+      const MAX_DB_MESSAGES = 100
+      const dbMessages = await getLastNMessages(conversationId, MAX_DB_MESSAGES)
       const convertedHistory = dbMessagesToModelMessages(dbMessages)
       let effectiveUserMessage = message
       if (
