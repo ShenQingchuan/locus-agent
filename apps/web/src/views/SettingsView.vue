@@ -5,7 +5,7 @@ import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/s
 import { useToast } from '@locus-agent/ui'
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchSettingsConfig, updateSettingsConfig } from '@/api/chat'
+import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import SettingsEmbeddingCard from '@/components/settings/SettingsEmbeddingCard.vue'
 import SettingsLLMCard from '@/components/settings/SettingsLLMCard.vue'

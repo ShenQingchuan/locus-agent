@@ -4,18 +4,10 @@ import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import {
-  answerQuestion,
-  approveToolCall,
-  deleteConversation,
-  deleteWhitelistRule,
-  fetchConversationPlans,
-  fetchSettingsConfig,
-  fetchWhitelistRules,
-  generateConversationTitle,
-  updateConversation,
-  updateSettingsConfig,
-} from '@/api/chat'
+import { answerQuestion, approveToolCall, fetchConversationPlans } from '@/api/chat'
+import { deleteConversation, generateConversationTitle, updateConversation } from '@/api/conversations'
+import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
+import { deleteWhitelistRule, fetchWhitelistRules } from '@/api/whitelist'
 import { createAssistantRuntimeManager } from '@/composables/useAssistantRuntime'
 import { createConversationMessagingActions } from '@/composables/useConversationMessaging'
 import { createConversationScopeState } from '@/composables/useConversationScopeState'

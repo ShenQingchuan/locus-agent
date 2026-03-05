@@ -1,5 +1,5 @@
 import { useQuery } from '@pinia/colada'
-import { fetchConversation, fetchConversations } from '@/api/chat'
+import { fetchConversation, fetchConversations } from '@/api/conversations'
 
 export interface ConversationScopeInput {
   space?: 'chat' | 'coding'

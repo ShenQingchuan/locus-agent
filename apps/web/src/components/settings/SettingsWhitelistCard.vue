@@ -3,7 +3,7 @@ import type { WhitelistRule } from '@locus-agent/shared'
 import { getRiskLevel } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
 import { onMounted, ref } from 'vue'
-import { deleteWhitelistRule, fetchWhitelistRules } from '@/api/chat'
+import { deleteWhitelistRule, fetchWhitelistRules } from '@/api/whitelist'
 
 const toast = useToast()
 

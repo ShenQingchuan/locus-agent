@@ -3,7 +3,7 @@ import type { CommandItem } from '@locus-agent/ui'
 import { useDebounceFn } from '@vueuse/core'
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchConversations } from '@/api/chat'
+import { fetchConversations } from '@/api/conversations'
 import * as api from '@/api/knowledge'
 
 export interface SearchCommandItemData {

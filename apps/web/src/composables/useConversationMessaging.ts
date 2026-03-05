@@ -3,7 +3,8 @@ import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
 import { DEFAULT_MODELS } from '@locus-agent/shared'
-import { abortChat, truncateMessages } from '@/api/chat'
+import { abortChat } from '@/api/chat'
+import { truncateMessages } from '@/api/conversations'
 import { streamAssistantReply } from '@/composables/useAssistantStreaming'
 
 interface RuntimeState {

@@ -1,85 +1,10 @@
-import type {
-  AddToWhitelistPayload,
-  Conversation,
-  CoreMessage,
-  CustomProviderMode,
-  ListConversationsResponse,
-  LLMProviderType,
-  MCPServersConfig,
-  MCPServerStatus,
-  Message,
-  MessageMetadata,
-  PlanBinding,
-  RiskLevel,
-  SSEEvent,
-  ToolCall,
-  ToolResult,
-  WhitelistRule,
-} from '@locus-agent/shared'
+import type { AddToWhitelistPayload } from '@locus-agent/shared'
+import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer, SSEEvent } from './chat-types.js'
 
-export interface PendingApproval {
-  toolCallId: string
-  toolName: string
-  args: Record<string, unknown>
-  /** 服务端预计算的建议匹配前缀 */
-  suggestedPattern?: string
-  /** 服务端预计算的风险等级 */
-  riskLevel?: RiskLevel
-}
+export type { ChatStreamOptions, ConversationPlansResponse, DelegateDeltaEvent, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
 
-export interface QuestionAnswer {
-  question: string
-  answer: string
-}
-
-export interface PendingQuestion {
-  toolCallId: string
-  questions: Array<{
-    question: string
-    options: string[]
-    multiple?: boolean
-  }>
-}
-
-export interface DelegateDeltaEvent {
-  toolCallId: string
-  delta: {
-    type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
-    content: string
-    toolName?: string
-    isError?: boolean
-  }
-}
-
-export interface ChatStreamOptions {
-  conversationId: string
-  space?: 'chat' | 'coding'
-  projectKey?: string
-  message: string
-  messages?: CoreMessage[]
-  confirmMode?: boolean
-  thinkingMode?: boolean
-  codingMode?: 'build' | 'plan'
-  planBinding?: PlanBinding
-  messageMetadata?: MessageMetadata
-  onReasoningDelta?: (delta: string) => void
-  onTextDelta?: (delta: string) => void
-  onToolCallStart?: (toolCall: ToolCall) => void
-  onToolCallResult?: (toolResult: ToolResult) => void
-  onToolPendingApproval?: (approval: PendingApproval) => void
-  onQuestionPending?: (question: PendingQuestion) => void
-  onToolOutputDelta?: (toolCallId: string, stream: 'stdout' | 'stderr', delta: string) => void
-  onDelegateDelta?: (event: DelegateDeltaEvent) => void
-  onDone?: (messageId: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }, model?: string) => void
-  onError?: (code: string, message: string) => void
-}
-
-// Store AbortControllers for each conversation
 const abortControllers = new Map<string, AbortController>()
 
-/**
- * Parse SSE data from a line
- */
 function parseSSELine(line: string): SSEEvent | null {
   if (!line.startsWith('data: '))
     return null
@@ -97,9 +22,64 @@ function parseSSELine(line: string): SSEEvent | null {
   }
 }
 
-/**
- * Stream chat with SSE
- */
+function dispatchEvent(
+  event: SSEEvent,
+  handlers: {
+    onReasoningDelta?: (delta: string) => void
+    onTextDelta?: (delta: string) => void
+    onToolCallStart?: (c: import('@locus-agent/shared').ToolCall) => void
+    onToolCallResult?: (r: import('@locus-agent/shared').ToolResult) => void
+    onToolPendingApproval?: (a: import('./chat-types.js').PendingApproval) => void
+    onQuestionPending?: (q: import('./chat-types.js').PendingQuestion) => void
+    onToolOutputDelta?: (id: string, stream: 'stdout' | 'stderr', delta: string) => void
+    onDelegateDelta?: (e: import('./chat-types.js').DelegateDeltaEvent) => void
+    onDone?: (id: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }, model?: string) => void
+    onError?: (code: string, message: string) => void
+  },
+): void {
+  switch (event.type) {
+    case 'reasoning-delta':
+      handlers.onReasoningDelta?.(event.reasoningDelta)
+      break
+    case 'text-delta':
+      handlers.onTextDelta?.(event.textDelta)
+      break
+    case 'tool-call-start':
+      handlers.onToolCallStart?.(event.toolCall)
+      break
+    case 'tool-call-result':
+      handlers.onToolCallResult?.(event.toolResult)
+      break
+    case 'tool-pending-approval':
+      handlers.onToolPendingApproval?.({
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        args: event.args,
+        suggestedPattern: event.suggestedPattern,
+        riskLevel: event.riskLevel,
+      })
+      break
+    case 'question-pending':
+      handlers.onQuestionPending?.({
+        toolCallId: event.toolCallId,
+        questions: event.questions,
+      })
+      break
+    case 'tool-output-delta':
+      handlers.onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
+      break
+    case 'delegate-delta':
+      handlers.onDelegateDelta?.({ toolCallId: event.toolCallId, delta: event.delta })
+      break
+    case 'done':
+      handlers.onDone?.(event.messageId, event.usage, event.model)
+      break
+    case 'error':
+      handlers.onError?.(event.code, event.message)
+      break
+  }
+}
+
 export async function streamChat(options: ChatStreamOptions): Promise<void> {
   const {
     conversationId,
@@ -124,28 +104,36 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     onError,
   } = options
 
-  // Abort any existing stream for this conversation
   const existingController = abortControllers.get(conversationId)
   if (existingController) {
     existingController.abort()
   }
 
-  // Create new AbortController
   const controller = new AbortController()
   abortControllers.set(conversationId, controller)
+
+  const handlers = {
+    onReasoningDelta,
+    onTextDelta,
+    onToolCallStart,
+    onToolCallResult,
+    onToolPendingApproval,
+    onQuestionPending,
+    onToolOutputDelta,
+    onDelegateDelta,
+    onDone,
+    onError,
+  }
 
   try {
     const response = await fetch(`/api/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId,
         space,
         projectKey,
         message,
-        // 后端从 DB 加载历史，只在 edit/retry 有显式 messages 时发送
         ...(messages && messages.length > 0 ? { messages } : {}),
         confirmMode,
         thinkingMode,
@@ -182,9 +170,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
 
       buffer += decoder.decode(value, { stream: true })
 
-      // Process complete lines
       const lines = buffer.split('\n')
-      // Keep the last incomplete line in buffer
       buffer = lines.pop() || ''
 
       for (const line of lines) {
@@ -196,109 +182,19 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         if (!event)
           continue
 
-        switch (event.type) {
-          case 'reasoning-delta':
-            onReasoningDelta?.(event.reasoningDelta)
-            break
-          case 'text-delta':
-            onTextDelta?.(event.textDelta)
-            break
-          case 'tool-call-start':
-            onToolCallStart?.(event.toolCall)
-            break
-          case 'tool-call-result':
-            onToolCallResult?.(event.toolResult)
-            break
-          case 'tool-pending-approval':
-            onToolPendingApproval?.({
-              toolCallId: event.toolCallId,
-              toolName: event.toolName,
-              args: event.args,
-              suggestedPattern: event.suggestedPattern,
-              riskLevel: event.riskLevel,
-            })
-            break
-          case 'question-pending':
-            onQuestionPending?.({
-              toolCallId: event.toolCallId,
-              questions: event.questions,
-            })
-            break
-          case 'tool-output-delta':
-            onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
-            break
-          case 'delegate-delta':
-            onDelegateDelta?.({
-              toolCallId: event.toolCallId,
-              delta: event.delta,
-            })
-            break
-          case 'done':
-            onDone?.(event.messageId, event.usage, event.model)
-            break
-          case 'error':
-            onError?.(event.code, event.message)
-            break
-        }
+        dispatchEvent(event, handlers)
       }
     }
 
-    // Process any remaining data in buffer
     if (buffer.trim()) {
       const event = parseSSELine(buffer.trim())
-      if (event) {
-        switch (event.type) {
-          case 'reasoning-delta':
-            onReasoningDelta?.(event.reasoningDelta)
-            break
-          case 'text-delta':
-            onTextDelta?.(event.textDelta)
-            break
-          case 'tool-call-start':
-            onToolCallStart?.(event.toolCall)
-            break
-          case 'tool-call-result':
-            onToolCallResult?.(event.toolResult)
-            break
-          case 'tool-pending-approval':
-            onToolPendingApproval?.({
-              toolCallId: event.toolCallId,
-              toolName: event.toolName,
-              args: event.args,
-              suggestedPattern: event.suggestedPattern,
-              riskLevel: event.riskLevel,
-            })
-            break
-          case 'question-pending':
-            onQuestionPending?.({
-              toolCallId: event.toolCallId,
-              questions: event.questions,
-            })
-            break
-          case 'tool-output-delta':
-            onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
-            break
-          case 'delegate-delta':
-            onDelegateDelta?.({
-              toolCallId: event.toolCallId,
-              delta: event.delta,
-            })
-            break
-          case 'done':
-            onDone?.(event.messageId, event.usage, event.model)
-            break
-          case 'error':
-            onError?.(event.code, event.message)
-            break
-        }
-      }
+      if (event)
+        dispatchEvent(event, handlers)
     }
   }
   catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      // Request was aborted, this is expected
+    if (error instanceof Error && error.name === 'AbortError')
       return
-    }
     onError?.('NETWORK_ERROR', error instanceof Error ? error.message : 'Unknown error')
   }
   finally {
@@ -306,20 +202,11 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
   }
 }
 
-export interface ConversationPlansResponse {
-  currentPlan: {
-    filename: string
-    content: string
-  } | null
-}
-
 export async function fetchConversationPlans(conversationId: string): Promise<ConversationPlansResponse | null> {
   try {
     const response = await fetch(`/api/chat/plans/${conversationId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     })
     if (!response.ok)
       return null
@@ -331,24 +218,17 @@ export async function fetchConversationPlans(conversationId: string): Promise<Co
   }
 }
 
-/**
- * Abort an ongoing chat stream
- */
 export async function abortChat(conversationId: string): Promise<void> {
-  // Abort client-side stream
   const controller = abortControllers.get(conversationId)
   if (controller) {
     controller.abort()
     abortControllers.delete(conversationId)
   }
 
-  // Notify server to abort
   try {
     await fetch(`/api/chat/abort`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversationId }),
     })
   }
@@ -357,9 +237,6 @@ export async function abortChat(conversationId: string): Promise<void> {
   }
 }
 
-/**
- * Approve or reject a tool execution
- */
 export async function approveToolCall(
   conversationId: string,
   toolCallId: string,
@@ -370,9 +247,7 @@ export async function approveToolCall(
   try {
     const response = await fetch(`/api/chat/approve`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId,
         toolCallId,
@@ -396,9 +271,6 @@ export async function approveToolCall(
   }
 }
 
-/**
- * Submit answers to an ask_question tool call
- */
 export async function answerQuestion(
   toolCallId: string,
   answers: QuestionAnswer[],
@@ -406,9 +278,7 @@ export async function answerQuestion(
   try {
     const response = await fetch(`/api/chat/answer`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ toolCallId, answers }),
     })
 
@@ -423,525 +293,5 @@ export async function answerQuestion(
   catch (error) {
     console.error('Failed to answer question:', error)
     return false
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Whitelist API
-// ---------------------------------------------------------------------------
-
-/**
- * Fetch whitelist rules
- */
-export async function fetchWhitelistRules(conversationId?: string): Promise<WhitelistRule[]> {
-  try {
-    const params = conversationId ? `?conversationId=${conversationId}` : ''
-    const response = await fetch(`/api/chat/whitelist${params}`)
-    if (!response.ok)
-      return []
-    const data = await response.json()
-    return data.rules ?? []
-  }
-  catch (error) {
-    console.error('Failed to fetch whitelist rules:', error)
-    return []
-  }
-}
-
-/**
- * Delete a whitelist rule
- */
-export async function deleteWhitelistRule(ruleId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/chat/whitelist/${ruleId}`, {
-      method: 'DELETE',
-    })
-    if (!response.ok)
-      return false
-    const data = await response.json()
-    return data.success
-  }
-  catch (error) {
-    console.error('Failed to delete whitelist rule:', error)
-    return false
-  }
-}
-
-/**
- * Fetch all conversations
- */
-export async function fetchConversations(scope?: {
-  space?: 'chat' | 'coding'
-  projectKey?: string
-}): Promise<Conversation[]> {
-  try {
-    const params = new URLSearchParams()
-    if (scope?.space)
-      params.set('space', scope.space)
-    if (scope?.projectKey)
-      params.set('projectKey', scope.projectKey)
-
-    const query = params.toString()
-    const url = query ? `/api/conversations?${query}` : '/api/conversations'
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch conversations:', response.statusText)
-      return []
-    }
-
-    const data: ListConversationsResponse = await response.json()
-    return data.conversations
-  }
-  catch (error) {
-    console.error('Failed to fetch conversations:', error)
-    return []
-  }
-}
-
-/**
- * Fetch a single conversation with its messages
- */
-export async function fetchConversation(
-  conversationId: string,
-): Promise<{ conversation: Conversation, messages: Message[] } | null> {
-  try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch conversation:', response.statusText)
-      return null
-    }
-
-    // Server returns flat: { id, title, confirmMode, createdAt, updatedAt, messages }
-    const data = await response.json()
-    const { messages: msgs, ...conversation } = data
-    return {
-      conversation: conversation as Conversation,
-      messages: msgs as Message[],
-    }
-  }
-  catch (error) {
-    console.error('Failed to fetch conversation:', error)
-    return null
-  }
-}
-
-/**
- * Create a new conversation
- */
-export async function createConversation(options?: {
-  title?: string
-  space?: 'chat' | 'coding'
-  projectKey?: string
-}): Promise<Conversation | null> {
-  try {
-    const response = await fetch(`/api/conversations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title: options?.title,
-        space: options?.space,
-        projectKey: options?.projectKey,
-      }),
-    })
-
-    if (!response.ok) {
-      console.error('Failed to create conversation:', response.statusText)
-      return null
-    }
-
-    const data = await response.json()
-    return data.conversation
-  }
-  catch (error) {
-    console.error('Failed to create conversation:', error)
-    return null
-  }
-}
-
-/**
- * Truncate messages in a conversation, keeping only the first N messages
- */
-export async function truncateMessages(
-  conversationId: string,
-  keepCount: number,
-): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `/api/conversations/${conversationId}/truncate`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ keepCount }),
-      },
-    )
-
-    if (!response.ok) {
-      console.error('Failed to truncate messages:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
-    return result.success
-  }
-  catch (error) {
-    console.error('Failed to truncate messages:', error)
-    return false
-  }
-}
-
-/**
- * Update a conversation (title, confirmMode, etc.)
- */
-export async function updateConversation(
-  conversationId: string,
-  data: { title?: string, confirmMode?: boolean },
-): Promise<Conversation | null> {
-  try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    })
-
-    if (!response.ok) {
-      console.error('Failed to update conversation:', response.statusText)
-      return null
-    }
-
-    return await response.json()
-  }
-  catch (error) {
-    console.error('Failed to update conversation:', error)
-    return null
-  }
-}
-
-/**
- * Generate a title for a conversation using LLM
- */
-export async function generateConversationTitle(conversationId: string): Promise<string | null> {
-  try {
-    const response = await fetch(`/api/conversations/${conversationId}/generate-title`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to generate title:', response.statusText)
-      return null
-    }
-
-    const data = await response.json()
-    return data.title ?? null
-  }
-  catch (error) {
-    console.error('Failed to generate title:', error)
-    return null
-  }
-}
-
-/**
- * Delete a conversation
- */
-export async function deleteConversation(conversationId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to delete conversation:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
-    return result.success
-  }
-  catch (error) {
-    console.error('Failed to delete conversation:', error)
-    return false
-  }
-}
-
-/**
- * Fetch current LLM settings including model context window
- */
-export async function fetchSettings(): Promise<{
-  provider: string
-  model: string
-  contextWindow: number
-} | null> {
-  try {
-    const response = await fetch(`/api/settings`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch settings:', response.statusText)
-      return null
-    }
-
-    return await response.json()
-  }
-  catch (error) {
-    console.error('Failed to fetch settings:', error)
-    return null
-  }
-}
-
-export interface SettingsConfigResponse {
-  setupCompleted: boolean
-  provider: LLMProviderType
-  hasApiKey: boolean
-  apiKeyMasked: string | null
-  apiKeys: Partial<Record<LLMProviderType, string | null>>
-  apiBase?: string
-  model?: string
-  customMode?: CustomProviderMode
-  port: number
-  runtime?: { provider: string, model: string, contextWindow: number }
-}
-
-export async function fetchSettingsConfig(): Promise<SettingsConfigResponse | null> {
-  try {
-    const response = await fetch(`/api/settings/config`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch settings config:', response.statusText)
-      return null
-    }
-
-    return await response.json()
-  }
-  catch (error) {
-    console.error('Failed to fetch settings config:', error)
-    return null
-  }
-}
-
-export interface UpdateSettingsConfigRequest {
-  provider?: LLMProviderType
-  apiKey?: string
-  apiBase?: string
-  model?: string
-  customMode?: CustomProviderMode
-  port?: number
-}
-
-export async function updateSettingsConfig(
-  data: UpdateSettingsConfigRequest,
-): Promise<{
-  success: boolean
-  message?: string
-  requiresRestart?: boolean
-  config?: SettingsConfigResponse
-}> {
-  try {
-    const response = await fetch(`/api/settings/config`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    })
-
-    const json = await response.json().catch(() => null) as any
-
-    if (!response.ok) {
-      const msg = json?.message || response.statusText || 'Request failed'
-      const friendly = response.status >= 500 ? '服务器内部错误，请稍后重试' : msg
-      return {
-        success: false,
-        message: friendly,
-      }
-    }
-
-    if (json?.success === false) {
-      return {
-        success: false,
-        message: json?.message || '保存失败',
-      }
-    }
-
-    return {
-      success: true,
-      requiresRestart: !!json?.requiresRestart,
-      config: json?.config as SettingsConfigResponse | undefined,
-    }
-  }
-  catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// MCP
-// ---------------------------------------------------------------------------
-
-export async function fetchMCPConfig(): Promise<MCPServersConfig | null> {
-  try {
-    const response = await fetch('/api/mcp/config')
-    if (!response.ok)
-      return null
-    return await response.json()
-  }
-  catch (error) {
-    console.error('Failed to fetch MCP config:', error)
-    return null
-  }
-}
-
-export async function updateMCPConfig(
-  config: MCPServersConfig,
-): Promise<{ success: boolean, message?: string, status?: MCPServerStatus[] }> {
-  try {
-    const response = await fetch('/api/mcp/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    })
-    const json = await response.json().catch(() => null) as any
-    if (!response.ok || json?.success === false) {
-      return { success: false, message: json?.message || 'Failed to update MCP config' }
-    }
-    return { success: true, status: json?.status }
-  }
-  catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
-  }
-}
-
-export async function fetchMCPStatus(): Promise<MCPServerStatus[]> {
-  try {
-    const response = await fetch('/api/mcp/status')
-    if (!response.ok)
-      return []
-    return await response.json()
-  }
-  catch (error) {
-    console.error('Failed to fetch MCP status:', error)
-    return []
-  }
-}
-
-export async function fetchMCPLogs(limit = 1000): Promise<string[]> {
-  try {
-    const safeLimit = Math.max(1, Math.min(limit, 1000))
-    const response = await fetch(`/api/mcp/logs?limit=${safeLimit}`)
-    if (!response.ok)
-      return []
-    const json = await response.json().catch(() => null) as { lines?: string[] } | null
-    if (!json?.lines || !Array.isArray(json.lines))
-      return []
-    return json.lines
-  }
-  catch (error) {
-    console.error('Failed to fetch MCP logs:', error)
-    return []
-  }
-}
-
-export async function restartMCPServer(
-  name?: string,
-): Promise<{ success: boolean, message?: string, status?: MCPServerStatus[] }> {
-  try {
-    const url = name ? `/api/mcp/restart/${encodeURIComponent(name)}` : '/api/mcp/restart'
-    const response = await fetch(url, { method: 'POST' })
-    const json = await response.json().catch(() => null) as any
-    if (!response.ok || json?.success === false) {
-      return { success: false, message: json?.message || 'Failed to restart MCP server' }
-    }
-    return { success: true, status: json?.status }
-  }
-  catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
-  }
-}
-
-/**
- * MCP 状态变化事件
- */
-export interface MCPStatusChangeEvent {
-  name: string
-  status: 'connected' | 'connecting' | 'error' | 'disconnected'
-  error?: string
-  tools: string[]
-  disabled: boolean
-}
-
-/**
- * 订阅 MCP 状态变化（SSE）
- * @param onInit 初始化时回调，接收当前所有状态
- * @param onChange 状态变化时回调
- * @returns 关闭 SSE 连接的函数
- */
-export function subscribeMCPStatus(
-  onInit: (status: MCPServerStatus[]) => void,
-  onChange: (event: MCPStatusChangeEvent) => void,
-): () => void {
-  const eventSource = new EventSource('/api/mcp/events')
-
-  eventSource.addEventListener('init', (e) => {
-    try {
-      const data = JSON.parse(e.data) as MCPServerStatus[]
-      onInit(data)
-    }
-    catch {
-      // 忽略解析错误
-    }
-  })
-
-  eventSource.addEventListener('statusChange', (e) => {
-    try {
-      const data = JSON.parse(e.data) as MCPStatusChangeEvent
-      onChange(data)
-    }
-    catch {
-      // 忽略解析错误
-    }
-  })
-
-  eventSource.addEventListener('error', () => {
-    // SSE 会自动重连，这里不需要额外处理
-  })
-
-  // 返回关闭函数
-  return () => {
-    eventSource.close()
   }
 }

@@ -9,7 +9,7 @@ import {
   restartMCPServer,
   subscribeMCPStatus,
   updateMCPConfig,
-} from '@/api/chat'
+} from '@/api/mcp'
 import MonacoEditor from '@/components/code/MonacoEditor.vue'
 
 const toast = useToast()
