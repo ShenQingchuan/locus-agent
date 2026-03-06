@@ -14,6 +14,25 @@ export interface MessageMetadata {
   trigger?: string
 }
 
+export interface MessageImageAttachment {
+  /** 附件唯一标识 */
+  id: string
+  /** 附件类型，预留给未来扩展 */
+  kind: 'image'
+  /** 原始文件名 */
+  name: string
+  /** MIME 类型 */
+  mimeType: string
+  /** 图片数据，当前使用 data URL 直接透传给 AI SDK 和本地持久化 */
+  dataUrl: string
+  /** 原始文件大小（字节） */
+  sizeBytes: number
+  /** 图片宽度 */
+  width?: number
+  /** 图片高度 */
+  height?: number
+}
+
 /**
  * 消息类型定义
  * 符合 Vercel AI SDK 的消息格式
@@ -27,6 +46,8 @@ export interface Message {
   role: MessageRole
   /** 消息文本内容 */
   content: string
+  /** 用户上传的图片附件 */
+  attachments?: MessageImageAttachment[] | null
   /** 思考过程内容 */
   reasoning?: string | null
   /** 生成该助手消息使用的模型（格式：provider/model） */
@@ -53,6 +74,7 @@ export interface Message {
 export interface UserMessage {
   role: 'user'
   content: string
+  attachments?: MessageImageAttachment[]
 }
 
 /**

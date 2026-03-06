@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import type { DropdownItem } from '@locus-agent/ui'
+import type { CustomProviderMode, LLMProviderType, MessageImageAttachment } from '@locus-agent/shared'
+import type { DropdownItem, ImageAttachmentStripItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
-import { Dropdown, Select, useToast } from '@locus-agent/ui'
+import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -21,7 +21,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [payload: { content: string, attachments: MessageImageAttachment[] }]
   stop: []
 }>()
 
@@ -30,13 +30,24 @@ const toast = useToast()
 const markDirty = useMarkConversationDirty()
 
 const { textarea, input } = useTextareaAutosize()
+const fileInput = ref<HTMLInputElement | null>(null)
 const whitelistOpen = ref(false)
 const ESC_CONFIRM_WINDOW_MS = 3000
 const escConfirmActive = ref(false)
 const escRemainingMs = ref(0)
 const escIntervalId = ref<number | null>(null)
+const selectedAttachments = ref<MessageImageAttachment[]>([])
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_IMAGE_COUNT = 6
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
+const hasComposerContent = computed(() => input.value.trim().length > 0 || selectedAttachments.value.length > 0)
+const attachmentStripItems = computed<ImageAttachmentStripItem[]>(() => selectedAttachments.value.map(attachment => ({
+  id: attachment.id,
+  src: attachment.dataUrl,
+  name: attachment.name,
+  alt: attachment.name,
+})))
 
 // Queue item inline editing
 const editingQueueId = ref<string | null>(null)
@@ -79,6 +90,98 @@ function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
   else if (event.key === 'Escape') {
     cancelEditQueueItem()
   }
+}
+
+function resetComposerAttachments() {
+  selectedAttachments.value = []
+  if (fileInput.value)
+    fileInput.value.value = ''
+}
+
+function removeAttachment(id: string) {
+  selectedAttachments.value = selectedAttachments.value.filter(attachment => attachment.id !== id)
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function loadImageDimensions(dataUrl: string): Promise<{ width: number, height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+    image.onerror = () => reject(new Error('Failed to decode image dimensions'))
+    image.src = dataUrl
+  })
+}
+
+async function toImageAttachment(file: File): Promise<MessageImageAttachment> {
+  const dataUrl = await readFileAsDataUrl(file)
+  const dimensions = await loadImageDimensions(dataUrl)
+
+  return {
+    id: crypto.randomUUID(),
+    kind: 'image',
+    name: file.name,
+    mimeType: file.type,
+    dataUrl,
+    sizeBytes: file.size,
+    width: dimensions.width,
+    height: dimensions.height,
+  }
+}
+
+async function handleImageFilesSelected(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  const files = Array.from(target?.files ?? [])
+  if (files.length === 0)
+    return
+
+  const availableSlots = MAX_IMAGE_COUNT - selectedAttachments.value.length
+  if (availableSlots <= 0) {
+    toast.info(`最多可附带 ${MAX_IMAGE_COUNT} 张图片`)
+    if (target)
+      target.value = ''
+    return
+  }
+
+  const nextFiles = files.slice(0, availableSlots)
+
+  if (files.length > nextFiles.length)
+    toast.info(`最多可附带 ${MAX_IMAGE_COUNT} 张图片，已忽略多余图片`)
+
+  const validFiles = nextFiles.filter((file) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error(`仅支持图片文件：${file.name}`)
+      return false
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error(`图片过大（>${Math.round(MAX_IMAGE_SIZE_BYTES / 1024 / 1024)}MB）：${file.name}`)
+      return false
+    }
+    return true
+  })
+
+  try {
+    const attachments = await Promise.all(validFiles.map(toImageAttachment))
+    selectedAttachments.value = [...selectedAttachments.value, ...attachments]
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '读取图片失败')
+  }
+  finally {
+    if (target)
+      target.value = ''
+  }
+}
+
+function openFilePicker() {
+  fileInput.value?.click()
 }
 
 const modeItems = computed<DropdownItem[]>(() => {
@@ -334,15 +437,26 @@ watch(input, (newValue) => {
 watch(() => chatStore.editingMessageId, async (newId) => {
   if (newId) {
     input.value = chatStore.editingContent
+    selectedAttachments.value = [...chatStore.editingAttachments]
     await nextTick()
     textarea.value?.focus()
+  }
+  else if (!chatStore.editingContent) {
+    resetComposerAttachments()
   }
 })
 
 // When new conversation is created, focus the prompt input
 watch(() => chatStore.focusInputTrigger, async () => {
+  if (!isEditing.value)
+    resetComposerAttachments()
   await nextTick()
   textarea.value?.focus()
+})
+
+watch(() => chatStore.currentConversationId, () => {
+  if (!isEditing.value)
+    resetComposerAttachments()
 })
 
 watch(
@@ -364,14 +478,16 @@ onUnmounted(() => {
 })
 
 async function handleSubmit() {
-  if (!input.value.trim())
+  if (!hasComposerContent.value)
     return
 
   if (isEditing.value) {
     const editContent = input.value
+    const editAttachments = [...selectedAttachments.value]
     const editMessageId = chatStore.editingMessageId!
     input.value = ''
-    const conversationId = await chatStore.saveEditMessage(editMessageId, editContent)
+    resetComposerAttachments()
+    const conversationId = await chatStore.saveEditMessage(editMessageId, editContent, editAttachments)
     if (conversationId) {
       markDirty(conversationId)
     }
@@ -379,13 +495,15 @@ async function handleSubmit() {
   }
 
   // 允许在 streaming 期间发送（消息会进入队列）
-  emit('send', input.value)
+  emit('send', { content: input.value, attachments: [...selectedAttachments.value] })
   input.value = ''
+  resetComposerAttachments()
 }
 
 function handleCancelEdit() {
   chatStore.cancelEditMessage()
   input.value = ''
+  resetComposerAttachments()
 }
 
 function handleStop() {
@@ -501,7 +619,12 @@ function handleKeydown(event: KeyboardEvent) {
           </template>
           <!-- Display mode -->
           <template v-else>
-            <span class="flex-1 text-xs text-foreground/80 truncate">{{ item.content }}</span>
+            <span class="flex-1 text-xs text-foreground/80 truncate">
+              {{ item.content || '图片消息' }}
+              <span v-if="item.attachments?.length" class="text-muted-foreground/70">
+                · {{ item.attachments.length }} 张图片
+              </span>
+            </span>
             <button
               class="flex-shrink-0 flex items-center justify-center h-4.5 w-4.5 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-all duration-150"
               title="编辑此消息"
@@ -535,6 +658,19 @@ function handleKeydown(event: KeyboardEvent) {
             :style="{ width: escProgressWidth }"
           />
         </div>
+      </div>
+
+      <div v-if="selectedAttachments.length > 0" class="px-3 pt-3 pb-1">
+        <div class="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div class="i-carbon:image-copy h-3.5 w-3.5" />
+          <span>已附带 {{ selectedAttachments.length }} 张图片</span>
+        </div>
+        <ImageAttachmentStrip
+          :images="attachmentStripItems"
+          size="sm"
+          removable
+          @remove="removeAttachment"
+        />
       </div>
 
       <textarea
@@ -593,25 +729,59 @@ function handleKeydown(event: KeyboardEvent) {
             </template>
           </Dropdown>
         </div>
-        <Dropdown :items="modeItems" placement="top-end" persistent @select="handleModeSelect">
-          <template #trigger>
-            <button
-              class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
-              aria-label="切换模式"
-            >
-              <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
-              <span>选项</span>
-              <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
-            </button>
-          </template>
-        </Dropdown>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
+            type="button"
+            title="上传图片"
+            :disabled="disabled"
+            @click="openFilePicker"
+          >
+            <div class="i-carbon-image-search h-3.5 w-3.5" />
+            <span>图片</span>
+          </button>
+
+          <Dropdown :items="modeItems" placement="top-end" persistent @select="handleModeSelect">
+            <template #trigger>
+              <button
+                class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+                aria-label="切换模式"
+              >
+                <div class="i-carbon-settings-adjust h-3.5 w-3.5" />
+                <span>选项</span>
+                <div class="i-carbon-chevron-up h-3 w-3 opacity-50" />
+              </button>
+            </template>
+          </Dropdown>
+        </div>
       </div>
 
       <!-- Bottom toolbar -->
-      <div class="flex items-center justify-between px-3 py-2">
+      <div class="px-3 py-2 space-y-2">
         <div class="flex items-center gap-1.5">
+          <input
+            ref="fileInput"
+            class="hidden"
+            type="file"
+            accept="image/*"
+            multiple
+            @change="handleImageFilesSelected"
+          >
+          <button
+            v-if="!showCodingMode"
+            class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
+            type="button"
+            title="上传图片"
+            :disabled="disabled"
+            @click="openFilePicker"
+          >
+            <div class="i-carbon-image-search h-3.5 w-3.5" />
+            <span>图片</span>
+          </button>
+
           <!-- Mode selector dropdown (Chat 页面显示，Coding 页面已移到上方) -->
           <template v-if="!showCodingMode">
+            <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
             <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
               <template #trigger>
                 <button
@@ -624,98 +794,96 @@ function handleKeydown(event: KeyboardEvent) {
                 </button>
               </template>
             </Dropdown>
-            <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
           </template>
-          <!-- Session whitelist popover (triggered from dropdown menu) -->
+
           <div v-if="whitelistOpen" class="absolute left-0 bottom-full mb-1 z-[999]">
             <SessionWhitelistPopover @close="whitelistOpen = false" />
           </div>
+        </div>
 
-          <!-- Provider + model inline -->
-          <Select
-            :options="providerOptions"
-            :model-value="chatStore.provider"
-            placement="top-start"
-            size="sm"
-            arrow-direction="up"
-            @update:model-value="handleProviderChange"
-          />
-
-          <!-- 自定义提供商兼容模式选择 -->
-          <template v-if="isCustomProvider">
-            <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
+        <div class="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background/55 px-2 py-1.5">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
             <Select
-              :options="customModeOptions"
-              :model-value="chatStore.customMode"
+              :options="providerOptions"
+              :model-value="chatStore.provider"
               placement="top-start"
               size="sm"
               arrow-direction="up"
-              @update:model-value="handleCustomModeChange"
+              @update:model-value="handleProviderChange"
             />
-          </template>
 
-          <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
-          <input
-            id="model-name-input"
-            v-model="localModel"
-            class="bg-transparent border-b border-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:border-border focus:text-foreground focus:outline-none transition-colors duration-150 py-0.5 font-mono min-w-0"
-            :style="{ width: modelInputWidth }"
-            type="text"
-            :placeholder="modelPlaceholder"
-            spellcheck="false"
-            autocomplete="off"
-            @input="handleModelInput"
-          >
-          <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+            <template v-if="isCustomProvider">
+              <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
+              <Select
+                :options="customModeOptions"
+                :model-value="chatStore.customMode"
+                placement="top-start"
+                size="sm"
+                arrow-direction="up"
+                @update:model-value="handleCustomModeChange"
+              />
+            </template>
 
-          <!-- Coding provider indicator (coding space only) -->
-          <template v-if="showCodingMode && chatStore.codingProvider">
-            <span class="text-muted-foreground/40 text-xs font-mono flex-shrink-0">/ {{ chatStore.codingProvider }}</span>
-          </template>
-        </div>
+            <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
+            <input
+              id="model-name-input"
+              v-model="localModel"
+              class="min-w-[10ch] flex-1 bg-transparent border-b border-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:border-border focus:text-foreground focus:outline-none transition-colors duration-150 py-0.5 font-mono"
+              :style="{ width: modelInputWidth }"
+              type="text"
+              :placeholder="modelPlaceholder"
+              spellcheck="false"
+              autocomplete="off"
+              @input="handleModelInput"
+            >
+            <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
 
-        <!-- Send/stop button -->
-        <div class="flex items-center gap-4">
-          <!-- Context usage ring -->
-          <ContextUsageRing
-            :used="chatStore.contextTokensUsed"
-            :total="chatStore.MAX_CONTEXT_TOKENS"
-          />
-          <!-- Cancel edit button -->
-          <button
-            v-if="isEditing"
-            class="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
-            title="取消编辑"
-            @click="handleCancelEdit"
-          >
-            <div class="i-carbon-close h-3.5 w-3.5" />
-            <span>取消编辑</span>
-          </button>
+            <template v-if="showCodingMode && chatStore.codingProvider">
+              <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-mono">
+                {{ chatStore.codingProvider }}
+              </span>
+            </template>
+          </div>
 
-          <!-- Stop button: shown during streaming -->
-          <button
-            v-if="isStreaming"
-            class="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/90 text-destructive-foreground hover:bg-destructive transition-colors duration-150"
-            title="停止生成"
-            @click="handleStop"
-          >
-            <div class="i-carbon-stop-filled h-4 w-4" />
-          </button>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <ContextUsageRing
+              :used="chatStore.contextTokensUsed"
+              :total="chatStore.MAX_CONTEXT_TOKENS"
+            />
 
-          <!-- Send button: always visible, enabled when there's text to send -->
-          <button
-            class="flex items-center justify-center h-8 w-8 rounded-lg transition-colors duration-150"
-            :class="[
-              input.trim() && !disabled
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground cursor-not-allowed',
-            ]"
-            :disabled="!input.trim() || disabled"
-            :title="isEditing ? '保存并发送' : isStreaming ? '排队发送' : '发送消息'"
-            @click="handleSubmit"
-          >
-            <div class="i-material-symbols:send-rounded h-5 w-5" />
-          </button>
+            <button
+              v-if="isEditing"
+              class="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150"
+              title="取消编辑"
+              @click="handleCancelEdit"
+            >
+              <div class="i-carbon-close h-3.5 w-3.5" />
+              <span>取消编辑</span>
+            </button>
+
+            <button
+              v-if="isStreaming"
+              class="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/90 text-destructive-foreground hover:bg-destructive transition-colors duration-150"
+              title="停止生成"
+              @click="handleStop"
+            >
+              <div class="i-carbon-stop-filled h-4 w-4" />
+            </button>
+
+            <button
+              class="flex items-center justify-center h-8 w-8 rounded-lg transition-colors duration-150"
+              :class="[
+                hasComposerContent && !disabled
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed',
+              ]"
+              :disabled="!hasComposerContent || disabled"
+              :title="isEditing ? '保存并发送' : isStreaming ? '排队发送' : '发送消息'"
+              @click="handleSubmit"
+            >
+              <div class="i-material-symbols:send-rounded h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

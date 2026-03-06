@@ -1,4 +1,4 @@
-import type { ToolCall, ToolResult } from '@locus-agent/shared'
+import type { MessageImageAttachment, ToolCall, ToolResult } from '@locus-agent/shared'
 import type { Message, NewMessage } from '../db/schema.js'
 import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db, messages } from '../db/index.js'
@@ -10,6 +10,7 @@ import { touchConversation } from './conversation.js'
 export interface AddMessageInput {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  attachments?: MessageImageAttachment[]
   /** 思考过程内容 (Kimi K2.5 原生 reasoning_content) */
   reasoning?: string
   /** 助手消息所使用的模型（格式：provider/model） */
@@ -40,6 +41,7 @@ export async function addMessage(
     conversationId,
     role: message.role,
     content: message.content,
+    attachments: message.attachments ?? null,
     reasoning: message.reasoning ?? null,
     model: message.model ?? null,
     toolCalls: message.toolCalls ?? null,
@@ -76,6 +78,7 @@ export async function addMessages(
     conversationId,
     role: message.role,
     content: message.content,
+    attachments: message.attachments ?? null,
     reasoning: message.reasoning ?? null,
     model: message.model ?? null,
     toolCalls: message.toolCalls ?? null,

@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import type {
-  Conversation,
-  WorkspaceDirectoryEntry,
-} from '@locus-agent/shared'
+import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@locus-agent/shared'
 import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'
@@ -349,11 +346,13 @@ function goToParentBrowsePath() {
   }
 }
 
-async function handleSend(content: string) {
-  if (!content.trim() || !canUseAssistant.value)
+async function handleSend(payload: { content: string, attachments: MessageImageAttachment[] }) {
+  if ((!payload.content.trim() && payload.attachments.length === 0) || !canUseAssistant.value)
     return
 
-  const targetConversationId = await chatStore.sendMessage(content)
+  const targetConversationId = await chatStore.sendMessage(payload.content, undefined, undefined, {
+    attachments: payload.attachments,
+  })
   if (targetConversationId) {
     dirtyConversations.add(targetConversationId)
   }

@@ -1,5 +1,6 @@
 import type {
   ChatRequest,
+  MessageImageAttachment,
   SSEEvent,
   ToolApprovalRequest,
   ToolCall,
@@ -8,6 +9,7 @@ import type {
 } from '@locus-agent/shared'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
+import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
@@ -63,13 +65,34 @@ function createSSEEvent(event: SSEEvent): { event: string, data: string } {
   }
 }
 
+function toModelImagePayload(attachment: MessageImageAttachment): string | Uint8Array {
+  const match = attachment.dataUrl.match(/^data:.*?;base64,(.+)$/)
+  if (!match?.[1])
+    return attachment.dataUrl
+  return Uint8Array.from(Buffer.from(match[1], 'base64'))
+}
+
 /**
  * 将用户消息转换为 CoreMessage 格式
  */
-function createUserMessage(content: string): ModelMessage {
+function createUserMessage(content: string, attachments?: MessageImageAttachment[]): ModelMessage {
+  if (!attachments || attachments.length === 0) {
+    return {
+      role: 'user',
+      content,
+    }
+  }
+
   return {
     role: 'user',
-    content,
+    content: [
+      ...(content.trim().length > 0 ? [{ type: 'text' as const, text: content }] : []),
+      ...attachments.map(attachment => ({
+        type: 'image' as const,
+        image: toModelImagePayload(attachment),
+        mimeType: attachment.mimeType,
+      })),
+    ],
   }
 }
 
@@ -79,6 +102,7 @@ function createUserMessage(content: string): ModelMessage {
 function dbMessagesToModelMessages(dbMsgs: Array<{
   role: string
   content: string
+  attachments?: MessageImageAttachment[] | null
   toolCalls?: unknown[] | null
   toolResults?: unknown[] | null
 }>): ModelMessage[] {
@@ -97,7 +121,7 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
   for (const msg of dbMsgs) {
     switch (msg.role) {
       case 'user':
-        result.push({ role: 'user', content: msg.content })
+        result.push(createUserMessage(msg.content, msg.attachments ?? undefined))
         break
       case 'assistant': {
         const tcs = msg.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
@@ -260,6 +284,7 @@ chatRoutes.post('/', async (c) => {
   const {
     conversationId,
     message,
+    attachments,
     confirmMode,
     thinkingMode,
     codingMode,
@@ -276,13 +301,13 @@ chatRoutes.post('/', async (c) => {
     : undefined
 
   // 验证请求
-  if (!conversationId || !message) {
+  if (!conversationId || (!message.trim() && (!attachments || attachments.length === 0))) {
     return c.json(
       {
         success: false,
         error: {
           code: 'INVALID_REQUEST',
-          message: 'conversationId and message are required',
+          message: 'conversationId and either message or attachments are required',
         },
       },
       400,
@@ -293,7 +318,10 @@ chatRoutes.post('/', async (c) => {
   const exists = await conversationExists(conversationId)
   if (!exists) {
     // 自动创建会话，使用消息的前 50 个字符作为标题
-    const title = message.length > 50 ? `${message.substring(0, 50)}...` : message
+    const normalizedMessage = message.trim()
+    const title = normalizedMessage
+      ? (normalizedMessage.length > 50 ? `${normalizedMessage.substring(0, 50)}...` : normalizedMessage)
+      : '图片对话'
     await createScopedConversation({
       title,
       id: conversationId,
@@ -326,6 +354,7 @@ chatRoutes.post('/', async (c) => {
   await addMessage(conversationId, {
     role: 'user',
     content: message,
+    attachments,
     metadata: messageMetadata,
   })
 
@@ -377,7 +406,7 @@ chatRoutes.post('/', async (c) => {
         }
       }
 
-      const messages: ModelMessage[] = [...convertedHistory, createUserMessage(effectiveUserMessage)]
+      const messages: ModelMessage[] = [...convertedHistory, createUserMessage(effectiveUserMessage, attachments)]
 
       const effectiveThinkingMode = thinkingMode ?? true
       const workspaceRoot = getWorkspaceRoot()

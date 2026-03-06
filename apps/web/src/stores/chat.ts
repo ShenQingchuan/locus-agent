@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, PlanBinding, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@locus-agent/shared'
 import type { QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
@@ -257,6 +257,7 @@ export const useChatStore = defineStore('chat', () => {
   // Edit message state
   const editingMessageId = ref<string | null>(null)
   const editingContent = ref<string>('')
+  const editingAttachments = ref<MessageImageAttachment[]>([])
 
   /** 过滤掉 trigger 消息后的可见消息列表（用于 UI 渲染） */
   const visibleMessages = computed(() =>
@@ -415,6 +416,7 @@ export const useChatStore = defineStore('chat', () => {
     if (id === currentConversationId.value)
       return
 
+    cancelEditMessage()
     currentConversationId.value = id
     getConversationRuntimeState(id)
     clearError(id)
@@ -468,6 +470,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function newConversation() {
     // 不立即生成 ID，发消息时再创建
+    cancelEditMessage()
     currentConversationId.value = null
     yoloMode.value = false
     clearConversationRuntimeState(null)
@@ -687,6 +690,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     editingMessageId.value = messageId
     editingContent.value = message.content
+    editingAttachments.value = [...(message.attachments ?? [])]
   }
 
   /**
@@ -695,17 +699,19 @@ export const useChatStore = defineStore('chat', () => {
   function cancelEditMessage() {
     editingMessageId.value = null
     editingContent.value = ''
+    editingAttachments.value = []
   }
 
   /**
    * 保存编辑后的消息并重新发送
    * @returns 会话 ID，用于调用方标记 dirtyConversations
    */
-  async function saveEditMessage(messageId: string, newContent: string): Promise<string | null> {
+  async function saveEditMessage(messageId: string, newContent: string, newAttachments: MessageImageAttachment[]): Promise<string | null> {
     // 清除编辑状态
     editingMessageId.value = null
     editingContent.value = ''
-    return saveEditedMessage(messageId, newContent)
+    editingAttachments.value = []
+    return saveEditedMessage(messageId, newContent, newAttachments)
   }
 
   return {
@@ -747,6 +753,7 @@ export const useChatStore = defineStore('chat', () => {
     // Edit message state
     editingMessageId,
     editingContent,
+    editingAttachments,
 
     // Focus input trigger (incremented on newConversation; ChatInput watches to focus)
     focusInputTrigger,

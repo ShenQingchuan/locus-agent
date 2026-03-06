@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { MessageImageAttachment } from '@locus-agent/shared'
 import { useQueryCache } from '@pinia/colada'
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -138,11 +139,13 @@ watch(
   },
 )
 
-async function handleSend(content: string) {
-  if (!content.trim())
+async function handleSend(payload: { content: string, attachments: MessageImageAttachment[] }) {
+  if (!payload.content.trim() && payload.attachments.length === 0)
     return
 
-  const targetConversationId = await chatStore.sendMessage(content)
+  const targetConversationId = await chatStore.sendMessage(payload.content, undefined, undefined, {
+    attachments: payload.attachments,
+  })
   // 标记会话为已修改，刷新会话列表
   if (targetConversationId) {
     dirtyConversations.add(targetConversationId)

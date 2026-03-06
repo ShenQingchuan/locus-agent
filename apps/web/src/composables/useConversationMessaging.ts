@@ -1,4 +1,4 @@
-import type { Conversation, CoreMessage, LLMProviderType, MessageMetadata, PlanBinding } from '@locus-agent/shared'
+import type { Conversation, CoreMessage, LLMProviderType, MessageImageAttachment, MessageMetadata, PlanBinding } from '@locus-agent/shared'
 import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
@@ -11,13 +11,15 @@ interface RuntimeState {
   messages: Message[]
   isLoading: boolean
   currentStreamingMessageId: string | null
-  messageQueue: Array<{ id: string, content: string }>
+  messageQueue: Array<{ id: string, content: string, attachments?: MessageImageAttachment[] }>
   isProcessingQueue: boolean
 }
 
 export interface SendMessageOptions {
   /** 附加到用户消息的元数据 — 含 trigger 字段时消息不在 UI 渲染 */
   metadata?: MessageMetadata
+  /** 用户上传的图片附件 */
+  attachments?: MessageImageAttachment[]
 }
 
 interface CreateConversationMessagingOptions {
@@ -73,7 +75,11 @@ export function createConversationMessagingActions(options: CreateConversationMe
     targetConversationId?: string,
     optionsOverride?: SendMessageOptions,
   ): Promise<string | null> {
-    if (!content.trim())
+    const trimmedContent = content.trim()
+    const attachments = optionsOverride?.attachments
+    const hasAttachments = !!attachments && attachments.length > 0
+
+    if (!trimmedContent && !hasAttachments)
       return null
 
     let conversationId = targetConversationId ?? options.currentConversationId.value
@@ -89,7 +95,9 @@ export function createConversationMessagingActions(options: CreateConversationMe
       const now = new Date()
       const optimisticConversation: Conversation = {
         id: conversationId,
-        title: content.length > 50 ? `${content.substring(0, 50)}...` : content,
+        title: trimmedContent
+          ? (trimmedContent.length > 50 ? `${trimmedContent.substring(0, 50)}...` : trimmedContent)
+          : '图片对话',
         space: options.conversationScope.value.space,
         projectKey: options.conversationScope.value.projectKey ?? null,
         confirmMode: !options.yoloMode.value,
@@ -101,7 +109,11 @@ export function createConversationMessagingActions(options: CreateConversationMe
 
     const runtimeState = options.getConversationRuntimeState(conversationId)
     if (runtimeState.isLoading && !historyMessages) {
-      runtimeState.messageQueue.push({ id: crypto.randomUUID(), content })
+      runtimeState.messageQueue.push({
+        id: crypto.randomUUID(),
+        content,
+        attachments,
+      })
       return conversationId
     }
 
@@ -111,7 +123,12 @@ export function createConversationMessagingActions(options: CreateConversationMe
     // 仅 edit/retry 场景会传入 historyMessages（用于 truncate 后的状态同步）
     const historyToSend = historyMessages
 
-    options.addMessage({ role: 'user', content, metadata: optionsOverride?.metadata }, conversationId)
+    options.addMessage({
+      role: 'user',
+      content,
+      attachments,
+      metadata: optionsOverride?.metadata,
+    }, conversationId)
 
     const selectedModel = (options.modelName.value || DEFAULT_MODELS[options.provider.value] || 'unknown').trim()
     const assistantModel = `${options.provider.value}/${selectedModel}`
@@ -134,6 +151,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
       conversationId,
       assistantMessageId,
       message: content,
+      attachments,
       messages: historyToSend,
       scope: options.conversationScope.value,
       confirmMode: !options.yoloMode.value,
@@ -239,7 +257,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
     try {
       while (runtimeState.messageQueue.length > 0) {
         const next = runtimeState.messageQueue.shift()!
-        await sendMessage(next.content, undefined, conversationId)
+        await sendMessage(next.content, undefined, conversationId, { attachments: next.attachments })
       }
     }
     finally {
@@ -277,7 +295,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
     await processMessageQueue(conversationId)
   }
 
-  async function saveEditMessage(messageId: string, newContent: string): Promise<string | null> {
+  async function saveEditMessage(messageId: string, newContent: string, attachments?: MessageImageAttachment[]): Promise<string | null> {
     const conversationId = options.currentConversationId.value
     const runtimeState = options.getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
@@ -302,7 +320,12 @@ export function createConversationMessagingActions(options: CreateConversationMe
       await truncateMessages(conversationId, backendKeepCount)
 
     runtimeState.messages = historyBeforeEdit
-    await sendMessage(newContent.trim(), options.messagesToCoreMessages(historyBeforeEdit), conversationId ?? undefined)
+    await sendMessage(
+      newContent,
+      options.messagesToCoreMessages(historyBeforeEdit),
+      conversationId ?? undefined,
+      { attachments },
+    )
     return conversationId
   }
 
@@ -328,7 +351,12 @@ export function createConversationMessagingActions(options: CreateConversationMe
       await truncateMessages(conversationId, backendKeepCount)
 
     runtimeState.messages = historyBeforeRetry
-    await sendMessage(message.content, options.messagesToCoreMessages(historyBeforeRetry), conversationId ?? undefined)
+    await sendMessage(
+      message.content,
+      options.messagesToCoreMessages(historyBeforeRetry),
+      conversationId ?? undefined,
+      { attachments: message.attachments },
+    )
     return conversationId
   }
 

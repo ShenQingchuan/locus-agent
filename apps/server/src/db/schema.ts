@@ -1,3 +1,4 @@
+import type { MessageImageAttachment } from '@locus-agent/shared'
 import { relations } from 'drizzle-orm'
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
@@ -29,6 +30,7 @@ export const messages = sqliteTable('messages', {
     .references(() => conversations.id, { onDelete: 'cascade' }),
   role: text('role', { enum: ['user', 'assistant', 'system', 'tool'] }).notNull(),
   content: text('content').notNull(),
+  attachments: text('attachments', { mode: 'json' }).$type<MessageImageAttachment[] | null>(),
   /** 思考过程内容 */
   reasoning: text('reasoning'),
   /** 助手消息所使用的模型（格式：provider/model） */

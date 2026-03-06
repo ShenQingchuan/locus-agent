@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageMetadata, PlanBinding } from '@locus-agent/shared'
+import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding } from '@locus-agent/shared'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
 import { streamChat } from '@/api/chat'
@@ -7,6 +7,7 @@ interface StreamAssistantReplyOptions {
   conversationId: string
   assistantMessageId: string
   message: string
+  attachments?: MessageImageAttachment[]
   messages?: CoreMessage[]
   scope: ConversationScope
   confirmMode: boolean
@@ -36,6 +37,7 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
       space: options.scope.space,
       projectKey: options.scope.projectKey,
       message: options.message,
+      attachments: options.attachments,
       messages: options.messages,
       confirmMode: options.confirmMode,
       thinkingMode: options.thinkingMode,

@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageMetadata, PlanBinding, RiskLevel, SSEEvent, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding, RiskLevel, SSEEvent, ToolCall, ToolResult } from '@locus-agent/shared'
 
 export interface PendingApproval {
   toolCallId: string
@@ -37,6 +37,7 @@ export interface ChatStreamOptions {
   space?: 'chat' | 'coding'
   projectKey?: string
   message: string
+  attachments?: MessageImageAttachment[]
   messages?: CoreMessage[]
   confirmMode?: boolean
   thinkingMode?: boolean

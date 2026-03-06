@@ -1,5 +1,5 @@
 import type { Conversation } from './conversation.js'
-import type { CoreMessage, Message, MessageMetadata } from './message.js'
+import type { CoreMessage, Message, MessageImageAttachment, MessageMetadata } from './message.js'
 import type { AddToWhitelistPayload } from './whitelist.js'
 
 export interface PlanBinding {
@@ -18,6 +18,8 @@ export interface ChatRequest {
   projectKey?: string
   /** 用户消息内容 */
   message: string
+  /** 用户上传的图片附件 */
+  attachments?: MessageImageAttachment[]
   /** 历史消息（可选，用于无状态调用） */
   messages?: CoreMessage[]
   /** 是否启用思考模式（默认 true） */

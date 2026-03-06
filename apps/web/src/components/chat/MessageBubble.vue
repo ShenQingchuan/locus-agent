@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { ImageAttachmentStripItem } from '@locus-agent/ui'
 import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS } from '@locus-agent/shared'
-import { Tooltip } from '@locus-agent/ui'
+import { ImageAttachmentStrip, Tooltip } from '@locus-agent/ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, reactive, watch } from 'vue'
@@ -241,6 +242,13 @@ const fullTextContent = computed(() => {
   return parts.join('\n\n') || props.message.content
 })
 
+const attachmentStripItems = computed<ImageAttachmentStripItem[]>(() => (props.message.attachments ?? []).map(attachment => ({
+  id: attachment.id,
+  src: attachment.dataUrl,
+  name: attachment.name,
+  alt: attachment.name,
+})))
+
 const { copy, copied } = useClipboard()
 </script>
 
@@ -294,11 +302,23 @@ const { copy, copied } = useClipboard()
           </button>
         </div>
 
-        <div class="prose prose-sm dark:prose-invert max-w-none w-full">
-          <MarkdownRender
-            :content="message.content"
-            custom-id="locus"
-          />
+        <div class="mt-1">
+          <div v-if="attachmentStripItems.length > 0" class="my-2">
+            <div class="mb-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <div class="i-carbon:image-copy h-3.5 w-3.5" />
+              <span>已附带 {{ attachmentStripItems.length }} 张图片</span>
+            </div>
+            <ImageAttachmentStrip
+              :images="attachmentStripItems"
+              size="sm"
+            />
+          </div>
+          <div class="prose prose-sm dark:prose-invert max-w-none w-full">
+            <MarkdownRender
+              :content="message.content"
+              custom-id="locus"
+            />
+          </div>
         </div>
       </div>
     </template>

@@ -50,6 +50,13 @@
       "when": 1772611575436,
       "tag": "0006_busy_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1772805228697,
+      "tag": "0007_right_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

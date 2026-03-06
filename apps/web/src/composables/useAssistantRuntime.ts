@@ -3,6 +3,7 @@ import type {
   Conversation,
   CoreMessage,
   DelegateDelta,
+  MessageImageAttachment,
   ToolCall,
   ToolResult,
 } from '@locus-agent/shared'
@@ -26,12 +27,14 @@ export type MessagePart
 export interface QueuedMessage {
   id: string
   content: string
+  attachments?: MessageImageAttachment[]
 }
 
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  attachments?: MessageImageAttachment[]
   model?: string
   timestamp: number
   toolCalls?: ToolCallState[]
@@ -332,6 +335,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
         id: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
+        attachments: m.attachments ?? undefined,
         model: m.role === 'assistant' ? (m.model ?? undefined) : undefined,
         reasoning: m.reasoning || undefined,
         metadata: m.metadata ?? undefined,
@@ -358,7 +362,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
     const out: CoreMessage[] = []
     for (const m of msgs) {
       if (m.role === 'user') {
-        out.push({ role: 'user', content: m.content })
+        out.push({ role: 'user', content: m.content, attachments: m.attachments })
       }
       else {
         const assistantMsg: CoreMessage = { role: 'assistant', content: m.content }
