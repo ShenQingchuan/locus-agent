@@ -11,7 +11,7 @@ export interface LLMProviderMeta {
 }
 
 export const LLM_PROVIDERS: LLMProviderMeta[] = [
-  { value: 'openai', label: 'OpenAI', icon: 'i-simple-icons:openai', defaultModel: 'gpt-5.3', defaultApiBase: 'https://api.openai.com/v1' },
+  { value: 'openai', label: 'OpenAI', icon: 'i-simple-icons:openai', defaultModel: 'gpt-5.4', defaultApiBase: 'https://api.openai.com/v1' },
   { value: 'anthropic', label: 'Anthropic', icon: 'i-simple-icons:anthropic', defaultModel: 'claude-opus-4.6', defaultApiBase: 'https://api.anthropic.com' },
   { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
   { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
@@ -35,6 +35,42 @@ export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEnt
  * Strip provider prefix when using direct provider.
  * Custom provider keeps the model name as-is.
  */
+// ---------------------------------------------------------------------------
+// Coding provider types (Kimi Code under Moonshot)
+// ---------------------------------------------------------------------------
+
+export type CodingProviderType = 'kimi-code'
+
+export interface CodingProviderMeta {
+  value: CodingProviderType
+  label: string
+  /** Which main LLM provider tab this coding provider lives under */
+  parentProvider: LLMProviderType
+  defaultModel: string
+  defaultApiBase: string
+  /** 'api-key' = normal key input */
+  authMode: 'api-key'
+  /** SDK format used for API calls */
+  apiFormat: 'anthropic'
+}
+
+export const CODING_PROVIDERS: CodingProviderMeta[] = [
+  {
+    value: 'kimi-code',
+    label: 'Kimi Code',
+    parentProvider: 'moonshotai',
+    defaultModel: 'kimi-k2.5',
+    defaultApiBase: 'https://api.kimi.com/coding/v1',
+    authMode: 'api-key',
+    apiFormat: 'anthropic',
+  },
+]
+
+/** Look up which coding provider belongs to a given main provider tab */
+export function getCodingProviderForParent(parent: LLMProviderType): CodingProviderMeta | undefined {
+  return CODING_PROVIDERS.find(cp => cp.parentProvider === parent)
+}
+
 export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {
   const trimmed = model.trim()
   if (provider === 'openrouter' || provider === 'custom')

@@ -7,8 +7,10 @@ export type * from './message.js'
 export type * from './provider.js'
 
 export {
+  CODING_PROVIDERS,
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
+  getCodingProviderForParent,
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './provider.js'

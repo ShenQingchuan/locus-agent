@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import type { ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
+import type { CodingKimiConfig, ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
 import { useToast } from '@locus-agent/ui'
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
+import { fetchSettingsConfig, updateKimiCodeSettings, updateSettingsConfig } from '@/api/settings'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import SettingsEmbeddingCard from '@/components/settings/SettingsEmbeddingCard.vue'
 import SettingsLLMCard from '@/components/settings/SettingsLLMCard.vue'
@@ -37,6 +37,17 @@ const port = ref<number>(3000)
 
 // Provider-specific configurations
 const providerConfigs = reactive<ProviderConfigs>({})
+
+// ---------------------------------------------------------------------------
+// Coding provider state
+// ---------------------------------------------------------------------------
+const codingKimi = ref<CodingKimiConfig>({
+  hasApiKey: false,
+  apiKeyMasked: null,
+  apiBase: 'https://api.kimi.com/coding/v1',
+  model: 'kimi-k2.5',
+  newApiKey: '',
+})
 
 // Helper to initialize provider config
 function initProviderConfig(
@@ -113,6 +124,14 @@ async function loadConfig() {
 
     runtimeInfo.value = config.runtime ?? null
     requiresRestart.value = false
+
+    // Coding providers
+    if (config.codingKimi) {
+      codingKimi.value = {
+        ...config.codingKimi,
+        newApiKey: '',
+      }
+    }
   }
   catch (error) {
     loadError.value = error instanceof Error ? error.message : '加载配置失败'
@@ -263,6 +282,22 @@ async function saveConfig() {
     isSaving.value = false
   }
 }
+
+// ---------------------------------------------------------------------------
+// Coding provider handlers
+// ---------------------------------------------------------------------------
+
+async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, model?: string }) {
+  const result = await updateKimiCodeSettings(payload)
+  if (!result.success) {
+    toast.error(result.message || '保存 Kimi Code 配置失败')
+    return
+  }
+  toast.success('Kimi Code 配置已保存')
+  if (result.config?.codingKimi) {
+    codingKimi.value = { ...result.config.codingKimi, newApiKey: '' }
+  }
+}
 </script>
 
 <template>
@@ -342,7 +377,9 @@ async function saveConfig() {
                   :requires-restart="requiresRestart"
                   :is-loading="isLoading"
                   :api-keys-masked="apiKeysMasked"
+                  :coding-kimi="codingKimi"
                   @submit="saveConfig"
+                  @kimi-code-save="handleKimiCodeSave"
                 />
               </div>
 

@@ -2,7 +2,7 @@
 import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import type { DropdownItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
+import { DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
 import { Dropdown, Select, useToast } from '@locus-agent/ui'
 import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
@@ -81,26 +81,43 @@ function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
   }
 }
 
-const modeItems = computed<DropdownItem[]>(() => [
-  {
-    key: 'think',
-    label: '思考模式',
-    icon: 'i-ri:brain-line',
-    active: chatStore.thinkMode,
-  },
-  {
-    key: 'yolo',
-    label: '自由执行',
-    icon: 'i-ic:sharp-cruelty-free',
-    active: chatStore.yoloMode,
-  },
-  {
+const modeItems = computed<DropdownItem[]>(() => {
+  const items: DropdownItem[] = [
+    {
+      key: 'think',
+      label: '思考模式',
+      icon: 'i-ri:brain-line',
+      active: chatStore.thinkMode,
+    },
+    {
+      key: 'yolo',
+      label: '自由执行',
+      icon: 'i-ic:sharp-cruelty-free',
+      active: chatStore.yoloMode,
+    },
+  ]
+
+  // Only show the coding provider that belongs to the current main provider
+  const codingMeta = getCodingProviderForParent(chatStore.provider)
+  if (codingMeta) {
+    items.push({
+      key: `coding-provider:${codingMeta.value}`,
+      label: `${codingMeta.label} 编码`,
+      icon: codingMeta.parentProvider === 'openai' ? 'i-simple-icons:openai' : 'i-custom:moonshot',
+      active: chatStore.codingProvider === codingMeta.value,
+      separator: true,
+    })
+  }
+
+  items.push({
     key: 'whitelist',
     label: '工具白名单',
     icon: 'i-carbon-tool-box',
-    separator: true,
-  },
-])
+    separator: !codingMeta,
+  })
+
+  return items
+})
 
 const currentPlanItems = computed<DropdownItem[]>(() => {
   if (!chatStore.activeBoundPlanFilename) {
@@ -180,12 +197,19 @@ function startEscConfirm() {
 }
 
 function handleModeSelect(key: string) {
-  if (key === 'think')
+  if (key === 'think') {
     chatStore.toggleThinkMode()
-  else if (key === 'yolo')
+  }
+  else if (key === 'yolo') {
     chatStore.toggleYoloMode()
-  else if (key === 'whitelist')
+  }
+  else if (key === 'whitelist') {
     whitelistOpen.value = !whitelistOpen.value
+  }
+  else if (key.startsWith('coding-provider:')) {
+    const provider = key.replace('coding-provider:', '') as 'kimi-code'
+    chatStore.codingProvider = chatStore.codingProvider === provider ? null : provider
+  }
 }
 
 function handleCurrentPlanSelect(key: string) {
@@ -643,6 +667,11 @@ function handleKeydown(event: KeyboardEvent) {
             @input="handleModelInput"
           >
           <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+
+          <!-- Coding provider indicator -->
+          <template v-if="chatStore.codingProvider">
+            <span class="text-muted-foreground/40 text-xs font-mono flex-shrink-0">/ {{ chatStore.codingProvider }}</span>
+          </template>
         </div>
 
         <!-- Send/stop button -->

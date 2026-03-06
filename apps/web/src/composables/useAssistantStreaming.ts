@@ -12,6 +12,7 @@ interface StreamAssistantReplyOptions {
   confirmMode: boolean
   thinkingMode: boolean
   codingMode?: 'build' | 'plan'
+  codingProvider?: 'kimi-code'
   planBinding?: PlanBinding
   messageMetadata?: MessageMetadata
   onReasoningDelta: (delta: string) => void
@@ -39,6 +40,7 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
       confirmMode: options.confirmMode,
       thinkingMode: options.thinkingMode,
       codingMode: options.codingMode,
+      codingProvider: options.codingProvider,
       planBinding: options.planBinding,
       messageMetadata: options.messageMetadata,
       onReasoningDelta: options.onReasoningDelta,

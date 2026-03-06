@@ -41,6 +41,7 @@ export interface ChatStreamOptions {
   confirmMode?: boolean
   thinkingMode?: boolean
   codingMode?: 'build' | 'plan'
+  codingProvider?: 'kimi-code'
   planBinding?: PlanBinding
   messageMetadata?: MessageMetadata
   onReasoningDelta?: (delta: string) => void

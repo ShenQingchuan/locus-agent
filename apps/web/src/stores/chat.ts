@@ -1,9 +1,9 @@
 import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, PlanBinding, WhitelistRule } from '@locus-agent/shared'
 import type { QuestionAnswer } from '@/api/chat'
-import { DEFAULT_API_BASES, DEFAULT_MODELS } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent } from '@locus-agent/shared'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { answerQuestion, approveToolCall, fetchConversationPlans } from '@/api/chat'
 import { deleteConversation, generateConversationTitle, updateConversation } from '@/api/conversations'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
@@ -231,6 +231,25 @@ export const useChatStore = defineStore('chat', () => {
   const modelName = ref('')
   const customMode = ref<CustomProviderMode>('openai-compatible')
   const isSavingModelSettings = ref(false)
+
+  // Coding provider selection (kimi-code / null = use default model)
+  const codingProvider = ref<'kimi-code' | null>(null)
+
+  // Clear coding provider when switching to a provider that doesn't have one
+  watch(provider, (newProvider) => {
+    if (codingProvider.value && !getCodingProviderForParent(newProvider)) {
+      codingProvider.value = null
+    }
+  })
+
+  // Auto-enable coding provider when entering coding space
+  watch(conversationScope, (scope) => {
+    if (scope.space === 'coding') {
+      const meta = getCodingProviderForParent(provider.value)
+      if (meta && !codingProvider.value)
+        codingProvider.value = meta.value
+    }
+  })
 
   // Edit message state
   const editingMessageId = ref<string | null>(null)
@@ -510,6 +529,7 @@ export const useChatStore = defineStore('chat', () => {
     yoloMode,
     thinkMode,
     codingMode,
+    codingProvider,
     provider,
     modelName,
     conversations,
@@ -704,6 +724,7 @@ export const useChatStore = defineStore('chat', () => {
     modelName,
     customMode,
     isSavingModelSettings,
+    codingProvider,
 
     // Current conversation state
     messages,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS } from '@locus-agent/shared'
 import { computed, ref, watch } from 'vue'
 
 export interface ProviderConfig {
@@ -14,17 +14,28 @@ export interface ProviderConfigs {
   [provider: string]: ProviderConfig
 }
 
+export interface CodingKimiConfig {
+  hasApiKey: boolean
+  apiKeyMasked: string | null
+  apiBase: string
+  model: string
+  /** New key input (not yet saved) */
+  newApiKey: string
+}
+
 const props = defineProps<{
   runtimeInfo: { provider: string, model: string, contextWindow: number } | null
   requiresRestart: boolean
   isLoading: boolean
   apiKeysMasked: Partial<Record<LLMProviderType, string | null>>
   activeProvider: LLMProviderType
+  codingKimi: CodingKimiConfig
 }>()
 
 const emit = defineEmits<{
   'submit': []
   'update:activeProvider': [provider: LLMProviderType]
+  'kimiCodeSave': [config: { apiKey?: string, apiBase?: string, model?: string }]
 }>()
 
 const providerConfigs = defineModel<ProviderConfigs>('providerConfigs', { required: true })
@@ -84,6 +95,9 @@ function getApiKeyHelperText(provider: LLMProviderType) {
 // Check if current tab is custom provider
 const isCustomProvider = computed(() => activeTab.value === 'custom')
 
+// Check if current tab has a coding provider section
+const codingProviderForTab = computed(() => getCodingProviderForParent(activeTab.value))
+
 // Current active config (guaranteed to exist after ensureProviderConfig)
 const currentConfig = computed<ProviderConfig>(() => {
   ensureProviderConfig(activeTab.value)
@@ -114,6 +128,29 @@ watch(() => providerConfigs.value[activeTab.value]?.apiBase, (newValue) => {
     config.apiBase = DEFAULT_API_BASES[activeTab.value] ?? ''
   }
 })
+
+// ---------------------------------------------------------------------------
+// Kimi Code local state
+// ---------------------------------------------------------------------------
+const kimiApiKey = ref('')
+const kimiApiBase = ref('')
+const kimiModel = ref('')
+
+watch(() => props.codingKimi, (v) => {
+  kimiApiBase.value = v.apiBase
+  kimiModel.value = v.model
+}, { immediate: true })
+
+function saveKimiCode() {
+  const payload: { apiKey?: string, apiBase?: string, model?: string } = {}
+  const trimmedKey = kimiApiKey.value.trim()
+  if (trimmedKey)
+    payload.apiKey = trimmedKey
+  payload.apiBase = kimiApiBase.value.trim() || undefined
+  payload.model = kimiModel.value.trim() || undefined
+  emit('kimiCodeSave', payload)
+  kimiApiKey.value = ''
+}
 </script>
 
 <template>
@@ -257,6 +294,75 @@ watch(() => providerConfigs.value[activeTab.value]?.apiBase, (newValue) => {
           <span>当前正在使用此提供商</span>
         </div>
       </div>
+
+      <!-- ============================================================ -->
+      <!-- Coding Provider Section (Kimi Code under Moonshot) -->
+      <!-- ============================================================ -->
+      <template v-if="codingProviderForTab">
+        <div class="border-t border-border pt-4 mt-2">
+          <h3 class="text-xs font-medium text-foreground mb-3 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="i-custom:moonshot h-3.5 w-3.5" />
+              {{ codingProviderForTab.label }} 编码
+            </span>
+            <span
+              v-if="codingKimi.hasApiKey"
+              class="text-xs text-green-600 dark:text-green-400 font-normal flex items-center gap-1"
+            >
+              <span class="i-carbon-checkmark-filled h-3 w-3" />
+              已配置
+            </span>
+          </h3>
+
+          <div class="grid gap-3">
+            <p class="text-xs text-muted-foreground">
+              采用 Anthropic API 格式，独立配置 API Key 和端点。
+            </p>
+
+            <!-- Kimi Code API Key -->
+            <div class="grid gap-1.5">
+              <label class="text-xs text-muted-foreground">Kimi Code API Key</label>
+              <input
+                v-model="kimiApiKey"
+                class="input-field font-mono"
+                type="password"
+                autocomplete="new-password"
+                :placeholder="codingKimi.apiKeyMasked || '请输入 Kimi Code API Key (sk-kimi-...)'"
+              >
+            </div>
+
+            <!-- Kimi Code API Base -->
+            <div class="grid gap-1.5">
+              <label class="text-xs text-muted-foreground">API 端点</label>
+              <input
+                v-model="kimiApiBase"
+                class="input-field"
+                type="text"
+                placeholder="https://api.kimi.com/coding/v1"
+              >
+            </div>
+
+            <!-- Kimi Code Model -->
+            <div class="grid gap-1.5">
+              <label class="text-xs text-muted-foreground">模型名称</label>
+              <input
+                v-model="kimiModel"
+                class="input-field font-mono"
+                type="text"
+                placeholder="kimi-k2.5"
+              >
+            </div>
+
+            <button
+              type="button"
+              class="btn-outline btn-sm"
+              @click="saveKimiCode"
+            >
+              保存 Kimi Code 配置
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
 
     <p class="mt-3 text-xs text-muted-foreground/60">

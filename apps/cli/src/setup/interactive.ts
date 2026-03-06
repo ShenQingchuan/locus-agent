@@ -85,7 +85,7 @@ export async function runSetup(existing?: LLMSettings | null, existingPort?: num
 
       model: ({ results }) => {
         const placeholders: Record<string, string> = {
-          openai: 'gpt-5.3',
+          openai: 'gpt-5.4',
           anthropic: 'claude-opus-4-6',
           moonshotai: 'kimi-k2.5',
           openrouter: 'moonshotai/kimi-k2.5',

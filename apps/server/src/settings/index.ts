@@ -64,7 +64,9 @@ export function getLLMSettings(): LLMSettings | null {
 
 export function saveLLMSettings(settings: LLMSettings): void {
   setSetting('llm.provider', settings.provider)
-  setSetting(`llm.api_key.${settings.provider}`, settings.apiKey)
+  // Only persist non-empty API keys to avoid corrupting the DB state
+  if (settings.apiKey)
+    setSetting(`llm.api_key.${settings.provider}`, settings.apiKey)
   if (settings.apiBase)
     setSetting('llm.api_base', settings.apiBase)
   if (settings.model)
@@ -80,4 +82,35 @@ export function getServerPort(): number {
 
 export function isYoloMode(): boolean {
   return getSetting('server.yolo_mode') === 'true'
+}
+
+// ---------------------------------------------------------------------------
+// Coding provider settings (Kimi Code)
+// ---------------------------------------------------------------------------
+
+export interface CodingSettings {
+  kimiCode: {
+    apiKey: string
+    apiBase: string
+    model: string
+  }
+}
+
+export function getCodingSettings(): CodingSettings {
+  return {
+    kimiCode: {
+      apiKey: getSetting('coding.kimi.api_key') || '',
+      apiBase: getSetting('coding.kimi.api_base') || 'https://api.kimi.com/coding/v1',
+      model: getSetting('coding.kimi.model') || 'kimi-k2.5',
+    },
+  }
+}
+
+export function saveKimiCodeSettings(settings: { apiKey?: string, apiBase?: string, model?: string }): void {
+  if (settings.apiKey !== undefined)
+    setSetting('coding.kimi.api_key', settings.apiKey)
+  if (settings.apiBase !== undefined)
+    setSetting('coding.kimi.api_base', settings.apiBase)
+  if (settings.model !== undefined)
+    setSetting('coding.kimi.model', settings.model)
 }

@@ -10,12 +10,12 @@ import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
+import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { getPendingApproval, requestApproval, resolveApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
-import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
+import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
 import { getWorkspaceRoot } from '../agent/tools/workspace-root.js'
@@ -267,6 +267,7 @@ chatRoutes.post('/', async (c) => {
     messageMetadata,
     space,
     projectKey,
+    codingProvider,
   } = body
 
   const conversationSpace = space === 'coding' ? 'coding' : 'chat'
@@ -355,7 +356,9 @@ chatRoutes.post('/', async (c) => {
 
     try {
       const runtimeModelInfo = getCurrentModelInfo()
-      const assistantModel = `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
+      const assistantModel = codingProvider
+        ? `${codingProvider}/${CODING_PROVIDERS.find(cp => cp.value === codingProvider)?.defaultModel || 'unknown'}`
+        : `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
       // 限制加载最近 100 条消息，避免长对话的 DB 查询和序列化开销
@@ -378,8 +381,14 @@ chatRoutes.post('/', async (c) => {
 
       const effectiveThinkingMode = thinkingMode ?? true
       const workspaceRoot = getWorkspaceRoot()
+
+      // Use coding provider model if requested, otherwise use main LLM model
+      const model = codingProvider
+        ? await createCodingModel(codingProvider)
+        : createLLMModel(runtimeModelInfo.model, effectiveThinkingMode)
+
       const result = await runAgentLoop({
-        model: createLLMModel(runtimeModelInfo.model, effectiveThinkingMode),
+        model,
         messages,
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,

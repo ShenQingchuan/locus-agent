@@ -100,6 +100,13 @@ async function buildConfigResponse(): Promise<{
   customMode?: CustomProviderMode
   port: number
   runtime?: { provider: string, model: string, contextWindow: number }
+  // Coding providers
+  codingKimi: {
+    hasApiKey: boolean
+    apiKeyMasked: string | null
+    apiBase: string
+    model: string
+  }
 }> {
   const keys = [
     'setup.completed',
@@ -108,6 +115,10 @@ async function buildConfigResponse(): Promise<{
     'llm.model',
     'llm.custom_mode',
     'server.port',
+    // Coding provider keys
+    'coding.kimi.api_key',
+    'coding.kimi.api_base',
+    'coding.kimi.model',
     ...ALL_PROVIDERS.map(p => `llm.api_key.${p}`),
   ]
   const map = await getSettingsMap(keys)
@@ -134,6 +145,15 @@ async function buildConfigResponse(): Promise<{
     runtime = undefined
   }
 
+  // Coding provider: Kimi Code
+  const kimiApiKey = map['coding.kimi.api_key']
+  const codingKimi = {
+    hasApiKey: !!kimiApiKey,
+    apiKeyMasked: kimiApiKey ? maskApiKey(kimiApiKey) : null,
+    apiBase: map['coding.kimi.api_base'] || 'https://api.kimi.com/coding/v1',
+    model: map['coding.kimi.model'] || 'kimi-k2.5',
+  }
+
   return {
     setupCompleted: map['setup.completed'] === 'true',
     provider,
@@ -145,6 +165,7 @@ async function buildConfigResponse(): Promise<{
     customMode,
     port,
     runtime,
+    codingKimi,
   }
 }
 
@@ -296,6 +317,58 @@ settingsRoutes.put('/config', async (c) => {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error',
       },
+      500,
+    )
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Coding provider settings (Kimi Code)
+// ---------------------------------------------------------------------------
+
+const updateCodingKimiSchema = z.object({
+  apiKey: z.string().optional(),
+  apiBase: z.string().optional(),
+  model: z.string().optional(),
+})
+
+/**
+ * PUT /api/settings/coding/kimi - Update Kimi Code settings
+ */
+settingsRoutes.put('/coding/kimi', async (c) => {
+  const json = await c.req.json().catch(() => null)
+  const parsed = updateCodingKimiSchema.safeParse(json)
+  if (!parsed.success) {
+    return c.json({ success: false, message: '参数格式错误' }, 400)
+  }
+
+  try {
+    const { apiKey, apiBase, model } = parsed.data
+    if (apiKey !== undefined) {
+      const trimmed = apiKey.trim()
+      if (trimmed)
+        await upsertSetting('coding.kimi.api_key', trimmed)
+    }
+    if (apiBase !== undefined) {
+      const trimmed = apiBase.trim()
+      if (trimmed)
+        await upsertSetting('coding.kimi.api_base', trimmed)
+      else
+        await deleteSetting('coding.kimi.api_base')
+    }
+    if (model !== undefined) {
+      const trimmed = model.trim()
+      if (trimmed)
+        await upsertSetting('coding.kimi.model', trimmed)
+      else
+        await deleteSetting('coding.kimi.model')
+    }
+
+    return c.json({ success: true, config: await buildConfigResponse() })
+  }
+  catch (error) {
+    return c.json(
+      { success: false, message: error instanceof Error ? error.message : 'Unknown error' },
       500,
     )
   }
