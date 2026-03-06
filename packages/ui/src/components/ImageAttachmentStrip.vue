@@ -87,19 +87,17 @@ function handleRemove(id: string) {
 
   <Modal
     :open="!!activeImage"
-    max-width="max-w-5xl"
-    panel-class="overflow-hidden p-0"
+    max-width="max-w-none"
+    panel-class="h-full max-h-none overflow-hidden border-0 rounded-none bg-black/72 p-0 shadow-none"
     @close="closePreview"
   >
-    <div v-if="activeImage" class="flex max-h-[85vh] flex-col bg-background">
-      <div class="flex items-center justify-between border-b border-border px-4 py-3">
-        <div class="min-w-0">
-          <p class="truncate text-sm font-medium text-foreground">
-            {{ activeImage.name || '图片预览' }}
-          </p>
-        </div>
+    <div
+      v-if="activeImage"
+      class="relative flex h-full flex-col overflow-hidden bg-transparent"
+    >
+      <div class="absolute right-4 top-4 z-10">
         <button
-          class="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          class="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/16 hover:text-white"
           type="button"
           title="关闭预览"
           @click="closePreview"
@@ -108,12 +106,18 @@ function handleRemove(id: string) {
         </button>
       </div>
 
-      <div class="flex flex-1 items-center justify-center overflow-auto bg-muted/20 p-4">
+      <div class="flex flex-1 items-center justify-center overflow-auto px-8 py-8">
         <img
           :src="activeImage.src"
           :alt="activeImage.alt || activeImage.name || 'image attachment'"
-          class="max-h-[75vh] max-w-full rounded-lg object-contain shadow-sm"
+          class="max-h-full max-w-full object-contain"
         >
+      </div>
+
+      <div class="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-6">
+        <div class="max-w-full truncate rounded-full bg-white/12 px-4 py-1.5 text-sm text-white/90">
+          {{ activeImage.name || '图片预览' }}
+        </div>
       </div>
     </div>
   </Modal>
