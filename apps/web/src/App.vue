@@ -17,9 +17,9 @@ const {
   handleCommandSelect,
 } = useGlobalSearch()
 
-// Cmd/Ctrl + , 呼出设置页面
+// Cmd/Ctrl + Shift + , 呼出设置页面
 const keys = useMagicKeys()
-const openSettings = computed(() => !!(keys['Cmd+,']?.value || keys['Ctrl+,']?.value))
+const openSettings = computed(() => !!(keys['Cmd+Shift+,']?.value || keys['Ctrl+Shift+,']?.value))
 
 whenever(openSettings, () => {
   router.push({ name: 'settings' })

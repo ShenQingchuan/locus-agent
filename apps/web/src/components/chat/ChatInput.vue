@@ -97,8 +97,8 @@ const modeItems = computed<DropdownItem[]>(() => {
     },
   ]
 
-  // Only show the coding provider that belongs to the current main provider
-  const codingMeta = getCodingProviderForParent(chatStore.provider)
+  // Only show the coding provider toggle in coding space
+  const codingMeta = props.showCodingMode ? getCodingProviderForParent(chatStore.provider) : undefined
   if (codingMeta) {
     items.push({
       key: `coding-provider:${codingMeta.value}`,
@@ -654,7 +654,7 @@ function handleKeydown(event: KeyboardEvent) {
             />
           </template>
 
-          <span class="text-muted-foreground/30 text-xs flex-shrink-0">/</span>
+          <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
           <input
             id="model-name-input"
             v-model="localModel"
@@ -668,8 +668,8 @@ function handleKeydown(event: KeyboardEvent) {
           >
           <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
 
-          <!-- Coding provider indicator -->
-          <template v-if="chatStore.codingProvider">
+          <!-- Coding provider indicator (coding space only) -->
+          <template v-if="showCodingMode && chatStore.codingProvider">
             <span class="text-muted-foreground/40 text-xs font-mono flex-shrink-0">/ {{ chatStore.codingProvider }}</span>
           </template>
         </div>

@@ -242,12 +242,15 @@ export const useChatStore = defineStore('chat', () => {
     }
   })
 
-  // Auto-enable coding provider when entering coding space
+  // Auto-enable coding provider when entering coding space; clear when leaving
   watch(conversationScope, (scope) => {
     if (scope.space === 'coding') {
       const meta = getCodingProviderForParent(provider.value)
       if (meta && !codingProvider.value)
         codingProvider.value = meta.value
+    }
+    else {
+      codingProvider.value = null
     }
   })
 
