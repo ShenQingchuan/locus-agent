@@ -15,7 +15,12 @@ import { join } from 'node:path'
 import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { getPendingApproval, requestApproval, resolveApproval } from '../agent/approval.js'
+import {
+  getPendingApproval,
+  requestApproval,
+  resolveApproval,
+  resolvePendingApprovalsForConversation,
+} from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
 import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
@@ -521,7 +526,7 @@ chatRoutes.post('/', async (c) => {
 
         // 获取工具确认结果（确认模式下使用）
         getToolApproval: async (toolCallId, toolName, args) => {
-          return requestApproval(toolCallId, toolName, args)
+          return requestApproval(conversationId, toolCallId, toolName, args)
         },
 
         // 提问等待回答回调（ask_question 工具使用）
@@ -676,7 +681,7 @@ chatRoutes.post('/approve', async (c) => {
   }
 
   // 实时切换当前运行中 loop 的 confirmMode
-  if (switchToYolo) {
+  if (switchToYolo && approved) {
     const state = activeConfirmModes.get(conversationId)
     if (state) {
       state.value = false
@@ -731,6 +736,10 @@ chatRoutes.post('/approve', async (c) => {
       },
       404,
     )
+  }
+
+  if (switchToYolo && approved) {
+    resolvePendingApprovalsForConversation(conversationId, true, toolCallId)
   }
 
   return c.json({ success: true, approved })

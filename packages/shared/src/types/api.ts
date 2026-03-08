@@ -119,7 +119,7 @@ export interface ToolApprovalRequest {
   toolCallId: string
   /** 是否批准 */
   approved: boolean
-  /** 同时切换为 YOLO 模式，后续工具调用直接放行 */
+  /** 同时切换为 YOLO 模式，并自动通过当前会话中已在等待的审批 */
   switchToYolo?: boolean
   /** 同时将该工具调用模式加入白名单 */
   addToWhitelist?: AddToWhitelistPayload

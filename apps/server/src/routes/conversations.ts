@@ -10,6 +10,7 @@ import {
   updateConversation,
 } from '../services/conversation.js'
 import { addMessage, getMessages, truncateMessages } from '../services/message.js'
+import { resolvePendingApprovalsForConversation } from '../agent/approval.js'
 import { updateActiveConfirmMode } from './chat.js'
 
 export const conversationsRoutes = new Hono()
@@ -73,6 +74,9 @@ conversationsRoutes.patch('/:id', async (c) => {
   // Sync to the running agent loop (if any)
   if (confirmMode !== undefined) {
     updateActiveConfirmMode(id, confirmMode)
+    if (!confirmMode) {
+      resolvePendingApprovalsForConversation(id, true)
+    }
   }
 
   return c.json(updated)
