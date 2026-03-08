@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import Modal from './Modal.vue'
+import { onKeyStroke } from '@vueuse/core'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 export interface ImageAttachmentStripItem {
   id: string
@@ -45,6 +45,24 @@ function handleRemove(id: string) {
   if (activeImageId.value === id)
     closePreview()
 }
+
+onKeyStroke('Escape', (event) => {
+  if (!activeImage.value)
+    return
+  event.preventDefault()
+  closePreview()
+})
+
+watch(activeImage, (image) => {
+  if (typeof document === 'undefined')
+    return
+  document.body.style.overflow = image ? 'hidden' : ''
+}, { immediate: true })
+
+onUnmounted(() => {
+  if (typeof document !== 'undefined')
+    document.body.style.overflow = ''
+})
 </script>
 
 <template>
@@ -85,40 +103,40 @@ function handleRemove(id: string) {
     {{ emptyText }}
   </p>
 
-  <Modal
-    :open="!!activeImage"
-    max-width="max-w-none"
-    panel-class="h-full max-h-none overflow-hidden border-0 rounded-none bg-black/72 p-0 shadow-none"
-    @close="closePreview"
-  >
-    <div
-      v-if="activeImage"
-      class="relative flex h-full flex-col overflow-hidden bg-transparent"
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
-      <div class="absolute right-4 top-4 z-10">
-        <button
-          class="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/16 hover:text-white"
-          type="button"
-          title="关闭预览"
-          @click="closePreview"
-        >
-          <span class="i-carbon-close h-4 w-4" />
-        </button>
-      </div>
+      <div
+        v-if="activeImage"
+        class="fixed inset-0 z-50 flex flex-col bg-black/72 select-none"
+        aria-modal="true"
+        role="dialog"
+        @click="closePreview"
+      >
+        <div class="flex flex-1 items-center justify-center overflow-auto px-8 py-8">
+          <img
+            :src="activeImage.src"
+            :alt="activeImage.alt || activeImage.name || 'image attachment'"
+            class="max-h-full max-w-full object-contain"
+            @click.stop
+          >
+        </div>
 
-      <div class="flex flex-1 items-center justify-center overflow-auto px-8 py-8">
-        <img
-          :src="activeImage.src"
-          :alt="activeImage.alt || activeImage.name || 'image attachment'"
-          class="max-h-full max-w-full object-contain"
-        >
-      </div>
-
-      <div class="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-6">
-        <div class="max-w-full truncate rounded-full bg-white/12 px-4 py-1.5 text-sm text-white/90">
-          {{ activeImage.name || '图片预览' }}
+        <div class="pb-5 flex justify-center px-6">
+          <div
+            class="max-w-full truncate rounded-full bg-white/12 px-4 py-1.5 text-sm text-white/90 select-text cursor-text"
+            @click.stop
+          >
+            {{ activeImage.name || '图片预览' }}
+          </div>
         </div>
       </div>
-    </div>
-  </Modal>
+    </Transition>
+  </Teleport>
 </template>

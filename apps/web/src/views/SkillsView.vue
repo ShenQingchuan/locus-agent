@@ -11,6 +11,13 @@ import AppNavRail from '@/components/layout/AppNavRail.vue'
 type SourceFilter = 'all' | 'system' | 'project'
 type DetailTab = 'content' | 'overview'
 
+function getWorkspaceDisplayName(path: string): string {
+  const normalized = path.trim()
+  if (!normalized)
+    return '未选择工作空间'
+  return normalized.split('/').filter(Boolean).pop() || normalized
+}
+
 const sourceFilterOptions: Array<{ value: SourceFilter, label: string }> = [
   { value: 'all', label: '所有' },
   { value: 'system', label: '全局' },
@@ -22,8 +29,9 @@ const detailTabs: Array<{ value: DetailTab, label: string }> = [
 ]
 const toast = useToast()
 const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
-const workspaceRootInput = ref(lastWorkspacePath.value)
-const currentWorkspaceName = ref(lastWorkspacePath.value ? lastWorkspacePath.value.split('/').filter(Boolean).pop() || '未选择工作空间' : '未选择工作空间')
+const initialWorkspacePath = lastWorkspacePath.value.trim()
+const workspaceRootInput = ref(initialWorkspacePath)
+const currentWorkspaceName = ref(getWorkspaceDisplayName(initialWorkspacePath))
 const sourceFilter = ref<SourceFilter>('all')
 const skills = ref<SkillSummary[]>([])
 const selectedSkillId = ref<string | null>(null)
@@ -36,7 +44,7 @@ const activeDetailTab = ref<DetailTab>('content')
 const isWorkspacePickerOpen = ref(false)
 const isWorkspacePickerLoading = ref(false)
 const isWorkspacePathLoading = ref(false)
-const currentBrowsePath = ref(lastWorkspacePath.value.trim())
+const currentBrowsePath = ref(initialWorkspacePath)
 const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
 let browseRequestToken = 0
@@ -85,9 +93,7 @@ function updateWorkspaceDisplay(path?: string) {
   const normalized = path?.trim() || ''
   workspaceRootInput.value = normalized
   currentBrowsePath.value = normalized
-  currentWorkspaceName.value = normalized
-    ? normalized.split('/').filter(Boolean).pop() || normalized
-    : '未选择工作空间'
+  currentWorkspaceName.value = getWorkspaceDisplayName(normalized)
 }
 
 async function loadBrowseEntries(path: string) {
@@ -229,19 +235,23 @@ async function patchSkillPreference(patch: Partial<Pick<SkillSummary, 'enabled' 
     })
 
     if (result.skill) {
-      skills.value = skills.value.map(skill => skill.id === result.skill!.id ? result.skill! : skill)
-      if (selectedSkill.value.id === result.skill.id) {
-        selectedSkill.value = {
-          ...selectedSkill.value,
-          enabled: result.skill.enabled,
-          modelInvocable: result.skill.modelInvocable,
-          userInvocable: result.skill.userInvocable,
-          effective: result.skill.effective,
-          overriddenById: result.skill.overriddenById,
-        }
+      const currentSelectedId = selectedSkill.value.id
+
+      selectedSkill.value = {
+        ...selectedSkill.value,
+        enabled: result.skill.enabled,
+        modelInvocable: result.skill.modelInvocable,
+        userInvocable: result.skill.userInvocable,
+        effective: result.skill.effective,
+        overriddenById: result.skill.overriddenById,
       }
-      await loadSkills()
-      await loadSkillDetail(result.skill.id)
+
+      const listResult = await fetchSkills(selectedWorkspaceRoot.value)
+      skills.value = listResult.skills
+
+      if (!listResult.skills.some(skill => skill.id === currentSelectedId)) {
+        selectedSkillId.value = listResult.skills[0]?.id ?? null
+      }
     }
   }
   catch (error) {

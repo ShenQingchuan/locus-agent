@@ -347,6 +347,9 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
   const winnerByName = new Map<string, string>()
   for (const record of sorted) {
+    if (!record.summary.enabled) {
+      continue
+    }
     if (!winnerByName.has(record.summary.name)) {
       winnerByName.set(record.summary.name, record.summary.id)
     }
@@ -358,7 +361,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
   for (const record of records) {
     const effectiveId = winnerByName.get(record.summary.name)
-    const isEffective = effectiveId === record.summary.id
+    const isEffective = record.summary.enabled && effectiveId === record.summary.id
     const nextSummary: SkillSummary = {
       ...record.summary,
       effective: isEffective,
@@ -381,8 +384,6 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   }
 
   skills.sort((a, b) => {
-    if (a.effective !== b.effective)
-      return a.effective ? -1 : 1
     if (a.source !== b.source)
       return a.source === 'project' ? -1 : 1
     return a.name.localeCompare(b.name)

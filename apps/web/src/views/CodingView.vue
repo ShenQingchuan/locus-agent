@@ -3,7 +3,7 @@ import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } fr
 import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
@@ -23,15 +23,23 @@ import { createProjectKey } from '@/utils/projectKey'
 
 type CodingSection = 'planning' | 'workspace'
 
+function getWorkspaceDisplayName(path: string): string {
+  const normalized = path.trim()
+  if (!normalized)
+    return '未选择工作空间'
+  return normalized.split('/').filter(Boolean).pop() || normalized
+}
+
 const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')
-const currentProjectName = ref('未选择工作空间')
-const currentProjectPath = ref('')
+const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
+const initialWorkspacePath = lastWorkspacePath.value.trim()
+const currentProjectName = ref(getWorkspaceDisplayName(initialWorkspacePath))
+const currentProjectPath = ref(initialWorkspacePath)
 const isWorkspaceLoading = ref(false)
 const isWorkspacePickerOpen = ref(false)
 const isWorkspacePickerLoading = ref(false)
 const isWorkspacePathLoading = ref(false)
-const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
-const currentBrowsePath = ref(lastWorkspacePath.value.trim())
+const currentBrowsePath = ref(initialWorkspacePath)
 const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const allBrowseEntries = ref<WorkspaceDirectoryEntry[]>([])
 const isBrowseTruncated = ref(false)
@@ -157,8 +165,14 @@ watch(() => chatStore.currentConversationId, (_newId, oldId) => {
 async function restoreWorkspaceFromLastPath() {
   const savedPath = lastWorkspacePath.value.trim()
   if (!savedPath) {
+    currentProjectName.value = '未选择工作空间'
+    currentProjectPath.value = ''
     return
   }
+
+  currentProjectName.value = getWorkspaceDisplayName(savedPath)
+  currentProjectPath.value = savedPath
+  currentBrowsePath.value = savedPath
 
   try {
     await runWithLoadingState(isWorkspaceLoading, async () => {
@@ -172,6 +186,10 @@ async function restoreWorkspaceFromLastPath() {
   }
   catch {
     lastWorkspacePath.value = ''
+    currentProjectName.value = '未选择工作空间'
+    currentProjectPath.value = ''
+    currentProjectKey.value = undefined
+    currentBrowsePath.value = ''
   }
 }
 
@@ -429,11 +447,12 @@ function toggleHistory() {
   isHistoryOpen.value = !isHistoryOpen.value
 }
 
-function handleNewConversation() {
+async function handleNewConversation() {
   if (!canUseAssistant.value)
     return
-  chatStore.newConversation()
   isHistoryOpen.value = false
+  await nextTick()
+  chatStore.newConversation()
 }
 
 async function handleCommit() {
@@ -656,10 +675,10 @@ watch(manageKanbanResultCount, (current, previous) => {
                 <span class="i-material-symbols:folder-managed h-4 w-4 flex-none text-muted-foreground" />
                 <span class="text-sm text-foreground/90 whitespace-nowrap">工作目录</span>
                 <span
-                  class="max-w-[28rem] truncate text-xs font-mono text-muted-foreground"
-                  :title="currentProjectPath || currentProjectName"
+                  class="max-w-[28rem] truncate text-xs font-sans text-muted-foreground"
+                  :title="currentProjectName"
                 >
-                  {{ currentProjectPath || currentProjectName }}
+                  {{ currentProjectName }}
                 </span>
               </button>
 
