@@ -36,6 +36,7 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
       conversationId: options.conversationId,
       space: options.scope.space,
       projectKey: options.scope.projectKey,
+      workspaceRoot: options.scope.workspaceRoot,
       message: options.message,
       attachments: options.attachments,
       messages: options.messages,

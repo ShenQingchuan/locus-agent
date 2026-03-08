@@ -11,7 +11,7 @@ const toggleDark = useToggle(isDark)
 const { openSearch } = useGlobalSearch()
 
 const currentModule = computed(() => {
-  if (route.name === 'chat' || route.name === 'memories' || route.name === 'coding')
+  if (route.name === 'chat' || route.name === 'memories' || route.name === 'coding' || route.name === 'skills')
     return route.name
   return ''
 })
@@ -36,12 +36,17 @@ const navItems: NavItem[] = [
   },
   {
     key: 'coding',
-    icon: 'i-fa7-solid:leaf',
+    icon: 'i-streamline-ultimate:programming-user-chat-bold',
     title: '编程',
   },
   {
+    key: 'skills',
+    icon: 'i-material-symbols:skillet',
+    title: '技能',
+  },
+  {
     key: 'memories',
-    icon: 'i-material-symbols:book-2',
+    icon: 'i-ph:plant-fill',
     title: '记忆',
   },
 ]

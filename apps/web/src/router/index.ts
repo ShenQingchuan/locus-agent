@@ -19,8 +19,16 @@ const router = createRouter({
       component: () => import('@/views/SettingsView.vue'),
     },
     {
+      path: '/skills',
+      name: 'skills',
+      component: () => import('@/views/SkillsView.vue'),
+    },
+    {
       path: '/coding',
       name: 'coding',
+      meta: {
+        keepAlive: true,
+      },
       component: () => import('@/views/CodingView.vue'),
     },
   ],

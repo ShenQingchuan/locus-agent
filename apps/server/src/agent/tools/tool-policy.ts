@@ -6,6 +6,7 @@ export const interactiveTools = new Set<string>([
 export const trustedBuiltinTools = new Set<string>([
   'save_memory',
   'search_memories',
+  'skill',
   'manage_todos',
   'manage_kanban',
   'write_plan',

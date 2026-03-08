@@ -6,6 +6,7 @@ export interface ToolExecutionContext {
   conversationId?: string
   projectKey?: string
   workspaceRoot?: string
+  skillsWorkspaceRoot?: string
 }
 
 export type ToolExecutor<T = unknown, R = unknown> = (args: T) => Promise<R>

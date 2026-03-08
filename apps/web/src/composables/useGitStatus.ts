@@ -27,7 +27,7 @@ export function getGitStatusQueryKey(path: string) {
   return ['git-status', path] as const
 }
 
-export function useGitStatus(workspacePath: Ref<string>) {
+export function useGitStatus(workspacePath: Ref<string>, isActive: Ref<boolean> = ref(true)) {
   const queryCache = useQueryCache()
   const selectedFilePath = ref<string | null>(null)
   const selectedFileStaged = ref<boolean | undefined>(undefined)
@@ -76,8 +76,8 @@ export function useGitStatus(workspacePath: Ref<string>) {
     }
   }
 
-  watch(workspacePath, (path) => {
-    if (path)
+  watch([workspacePath, isActive], ([path, active]) => {
+    if (path && active)
       connectWatcher(path)
     else
       disconnectWatcher()

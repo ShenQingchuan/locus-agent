@@ -16,6 +16,7 @@ import { executeManageTodos, formatManageTodosResult } from './manage_todos.js'
 import { executeReadFile, formatReadResult } from './read.js'
 import { executeSaveMemory, formatSaveMemoryResult } from './save_memory.js'
 import { executeSearchMemories, formatSearchMemoriesResult } from './search_memories.js'
+import { executeSkill, formatSkillResult } from './skill.js'
 import { executeStrReplace, formatStrReplaceResult } from './str-replace.js'
 import { executeTree, formatTreeResult } from './tree.js'
 import { executeWriteFile, formatWriteResult } from './write.js'
@@ -76,6 +77,10 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     const result = await executeSearchMemories(args as Parameters<typeof executeSearchMemories>[0])
     return formatSearchMemoriesResult(result)
   },
+  skill: async (args, _callbacks, context) => {
+    const result = await executeSkill(args as Parameters<typeof executeSkill>[0], context?.skillsWorkspaceRoot)
+    return formatSkillResult(result)
+  },
   manage_todos: async (args, _callbacks, context) => {
     const result = await executeManageTodos(args as Parameters<typeof executeManageTodos>[0], context?.conversationId)
     return formatManageTodosResult(result)
@@ -117,6 +122,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   write_file: executeWriteFile as ToolExecutor,
   save_memory: executeSaveMemory as ToolExecutor,
   search_memories: executeSearchMemories as ToolExecutor,
+  skill: executeSkill as ToolExecutor,
   manage_todos: executeManageTodos as ToolExecutor,
   manage_kanban: executeManageKanban as ToolExecutor,
   write_plan: executeWritePlan as ToolExecutor,

@@ -70,6 +70,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   'grep',
   'tree',
   'search_memories',
+  'skill',
   'write_plan',
   'read_plan',
   'ask_question',

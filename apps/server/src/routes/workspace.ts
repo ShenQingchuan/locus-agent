@@ -7,60 +7,15 @@ import type {
 import { watch as fsWatch } from 'node:fs'
 import { readdir, readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, join, relative, resolve, sep } from 'node:path'
-import process from 'node:process'
+import { basename, join, relative, sep } from 'node:path'
 import { Hono } from 'hono'
+import { getAllowedRoots, resolveAllowedDirectory } from '../services/workspace-access.js'
 
 export const workspaceRoutes = new Hono()
 
 const MAX_LIST_ENTRIES = 1200
 const MAX_TREE_NODES = 8000
 const MAX_TREE_DEPTH = 12
-
-function isWithinRoot(targetPath: string, rootPath: string): boolean {
-  return targetPath === rootPath || targetPath.startsWith(`${rootPath}${sep}`)
-}
-
-async function getAllowedRoots(): Promise<string[]> {
-  const candidates = [
-    process.cwd(),
-    join(homedir(), 'workspace'),
-    join(homedir(), 'projects'),
-    homedir(),
-  ]
-
-  const resolved = await Promise.all(candidates.map(async (path) => {
-    try {
-      return await realpath(path)
-    }
-    catch {
-      return null
-    }
-  }))
-
-  return Array.from(new Set(resolved.filter((path): path is string => !!path)))
-}
-
-async function resolveAllowedDirectory(inputPath: string | undefined): Promise<string> {
-  if (!inputPath) {
-    throw new Error('Missing path query parameter')
-  }
-
-  const candidate = resolve(inputPath)
-  const normalized = await realpath(candidate)
-  const allowedRoots = await getAllowedRoots()
-
-  if (!allowedRoots.some(root => isWithinRoot(normalized, root))) {
-    throw new Error('Path is outside allowed workspace roots')
-  }
-
-  const dirents = await readdir(normalized, { withFileTypes: true })
-  if (!dirents) {
-    throw new Error('Path is not a readable directory')
-  }
-
-  return normalized
-}
 
 function sortDirentNames(a: string, b: string): number {
   return a.localeCompare(b, 'zh-Hans-CN', { sensitivity: 'base', numeric: true })

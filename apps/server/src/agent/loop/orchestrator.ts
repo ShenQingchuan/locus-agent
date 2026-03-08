@@ -2,6 +2,7 @@ import type { ModelMessage } from 'ai'
 import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult, PendingToolCall } from './types.js'
 import process from 'node:process'
 import { streamText } from 'ai'
+import { getModelInvocableSkillCatalog } from '../../services/skills.js'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
 import { getCurrentModelInfo } from '../providers/index.js'
@@ -149,6 +150,34 @@ function buildRuntimeContextPrompt(workspaceRoot: string): string {
 - Before broad discovery, use tree with limited depth to inspect structure.`
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+async function buildSkillsCatalogPrompt(workspaceRoot?: string): Promise<string> {
+  const skills = await getModelInvocableSkillCatalog(workspaceRoot)
+  if (skills.length === 0) {
+    return ''
+  }
+
+  const serialized = skills
+    .map(skill => `  <skill>\n    <name>${escapeXml(skill.name)}</name>\n    <description>${escapeXml(skill.description)}</description>\n    <source>${escapeXml(skill.source)}</source>\n  </skill>`)
+    .join('\n')
+
+  return `## Skills
+
+The following Agent Skills are available in this session. Skills are specialized, on-demand capability packs.
+When a task clearly matches a skill description, call the \`skill\` tool with the skill's exact name before proceeding.
+Do not call \`skill\` repeatedly for the same skill unless you need to reload it.
+
+<available_skills>
+${serialized}
+</available_skills>`
+}
+
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
   const {
     messages: initialMessages,
@@ -180,10 +209,15 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
   const messages: ModelMessage[] = [...initialMessages]
   const workspaceRoot = workspaceRootOption || getWorkspaceRoot()
-  const toolContext = { conversationId, projectKey, workspaceRoot }
+  const toolContext = { conversationId, projectKey, workspaceRoot, skillsWorkspaceRoot: workspaceRootOption }
 
   // 根据 codingMode 扩展 system prompt
   let effectiveSystemPrompt = `${systemPrompt}\n\n${buildRuntimeContextPrompt(workspaceRoot)}`
+  const skillsCatalogPrompt = await buildSkillsCatalogPrompt(workspaceRootOption)
+  const hasAvailableSkills = skillsCatalogPrompt.length > 0
+  if (skillsCatalogPrompt) {
+    effectiveSystemPrompt += `\n\n${skillsCatalogPrompt}`
+  }
   if (codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
   }
@@ -217,6 +251,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     let retryCount = 0
     const maxRetries = 2
     const tools = getMergedToolsForMode(codingMode, toolAllowlist)
+    if (!hasAvailableSkills) {
+      delete tools.skill
+    }
 
     while (retryCount <= maxRetries) {
       try {

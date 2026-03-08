@@ -22,11 +22,23 @@ export function getSettingsDbPath(): string {
 }
 
 /**
+ * Locus-managed skills directory path
+ */
+export function getSkillsDataDir(): string {
+  return join(getDataDir(), 'skills')
+}
+
+/**
  * Ensure required directories exist
  */
 export function ensureDataDir(): void {
   const dataDir = getDataDir()
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true })
+  }
+
+  const skillsDir = getSkillsDataDir()
+  if (!existsSync(skillsDir)) {
+    mkdirSync(skillsDir, { recursive: true })
   }
 }

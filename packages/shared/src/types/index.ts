@@ -5,7 +5,6 @@ export type * from './knowledge.js'
 export type * from './mcp.js'
 export type * from './message.js'
 export type * from './provider.js'
-
 export {
   CODING_PROVIDERS,
   DEFAULT_API_BASES,
@@ -14,6 +13,8 @@ export {
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './provider.js'
+
+export type * from './skill.js'
 export type * from './sse-events.js'
 export type * from './task.js'
 export type * from './tool.js'

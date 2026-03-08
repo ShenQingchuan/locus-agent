@@ -9,6 +9,7 @@ import { manageTodosTool } from './manage_todos.js'
 import { readFileTool } from './read.js'
 import { saveMemoryTool } from './save_memory.js'
 import { searchMemoriesTool } from './search_memories.js'
+import { skillTool } from './skill.js'
 import { strReplaceTool } from './str-replace.js'
 import { treeTool } from './tree.js'
 import { writeFileTool } from './write.js'
@@ -25,6 +26,7 @@ export const tools = {
   delegate: delegateTool,
   save_memory: saveMemoryTool,
   search_memories: searchMemoriesTool,
+  skill: skillTool,
   manage_todos: manageTodosTool,
   manage_kanban: manageKanbanTool,
   write_plan: writePlanTool,

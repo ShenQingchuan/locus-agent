@@ -30,6 +30,7 @@ import {
 import { config } from '../config.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
 import { addMessage, getLastNMessages, getMessages } from '../services/message.js'
+import { resolveAllowedDirectory } from '../services/workspace-access.js'
 
 export const chatRoutes = new Hono()
 
@@ -292,6 +293,7 @@ chatRoutes.post('/', async (c) => {
     messageMetadata,
     space,
     projectKey,
+    workspaceRoot: workspaceRootInput,
     codingProvider,
   } = body
 
@@ -308,6 +310,25 @@ chatRoutes.post('/', async (c) => {
         error: {
           code: 'INVALID_REQUEST',
           message: 'conversationId and either message or attachments are required',
+        },
+      },
+      400,
+    )
+  }
+
+  let resolvedWorkspaceRoot: string
+  try {
+    resolvedWorkspaceRoot = workspaceRootInput
+      ? await resolveAllowedDirectory(workspaceRootInput)
+      : getWorkspaceRoot()
+  }
+  catch (error) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'INVALID_WORKSPACE_ROOT',
+          message: error instanceof Error ? error.message : 'Invalid workspace root',
         },
       },
       400,
@@ -409,8 +430,6 @@ chatRoutes.post('/', async (c) => {
       const messages: ModelMessage[] = [...convertedHistory, createUserMessage(effectiveUserMessage, attachments)]
 
       const effectiveThinkingMode = thinkingMode ?? true
-      const workspaceRoot = getWorkspaceRoot()
-
       // Use coding provider model if requested, otherwise use main LLM model
       const model = codingProvider
         ? await createCodingModel(codingProvider)
@@ -425,7 +444,7 @@ chatRoutes.post('/', async (c) => {
         codingMode: conversationSpace === 'coding' ? codingMode : undefined,
         conversationId,
         projectKey: conversationProjectKey,
-        workspaceRoot,
+        workspaceRoot: resolvedWorkspaceRoot,
 
         // 思考过程增量回调
         onReasoningDelta: async (delta) => {

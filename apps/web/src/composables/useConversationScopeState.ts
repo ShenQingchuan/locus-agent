@@ -4,6 +4,7 @@ import { ref } from 'vue'
 export interface ConversationScope {
   space: ConversationSpace
   projectKey?: string
+  workspaceRoot?: string
 }
 
 interface ConversationScopeState {
@@ -27,6 +28,7 @@ export function createConversationScopeState() {
     return {
       space: scope.space,
       projectKey: scope.projectKey?.trim() || undefined,
+      workspaceRoot: scope.workspaceRoot?.trim() || undefined,
     }
   }
 

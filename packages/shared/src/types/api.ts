@@ -16,6 +16,8 @@ export interface ChatRequest {
   space?: 'chat' | 'coding'
   /** 项目维度分组键（仅 coding 空间使用） */
   projectKey?: string
+  /** 当前会话绑定的工作空间根目录（用于工具路径解析与 project skills 发现） */
+  workspaceRoot?: string
   /** 用户消息内容 */
   message: string
   /** 用户上传的图片附件 */

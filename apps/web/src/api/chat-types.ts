@@ -36,6 +36,7 @@ export interface ChatStreamOptions {
   conversationId: string
   space?: 'chat' | 'coding'
   projectKey?: string
+  workspaceRoot?: string
   message: string
   attachments?: MessageImageAttachment[]
   messages?: CoreMessage[]

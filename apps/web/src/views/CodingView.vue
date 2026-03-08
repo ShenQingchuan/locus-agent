@@ -3,7 +3,7 @@ import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } fr
 import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
@@ -45,7 +45,8 @@ const dirtyConversations = new Set<string>()
 const toast = useToast()
 const chatStore = useChatStore()
 const queryCache = useQueryCache()
-const gitStatus = useGitStatus(currentProjectPath)
+const isCodingViewActive = ref(true)
+const gitStatus = useGitStatus(currentProjectPath, isCodingViewActive)
 
 const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
 const STORAGE_KEY_ASSISTANT_WIDTH = 'locus-agent:coding-assistant-width'
@@ -104,9 +105,11 @@ const {
 const codingScope = computed(() => ({
   space: 'coding' as const,
   projectKey: currentProjectKey.value,
+  workspaceRoot: currentProjectPath.value || undefined,
 }))
 
 const canUseAssistant = computed(() => !!currentProjectKey.value)
+const hasHandledFirstActivation = ref(false)
 
 provideMarkConversationDirty((conversationId: string) => {
   dirtyConversations.add(conversationId)
@@ -151,9 +154,7 @@ watch(() => chatStore.currentConversationId, (_newId, oldId) => {
   }
 })
 
-onMounted(async () => {
-  await chatStore.loadModelSettings()
-
+async function restoreWorkspaceFromLastPath() {
   const savedPath = lastWorkspacePath.value.trim()
   if (!savedPath) {
     return
@@ -172,6 +173,44 @@ onMounted(async () => {
   catch {
     lastWorkspacePath.value = ''
   }
+}
+
+function refreshCodingDataOnActivate() {
+  if (!currentProjectKey.value)
+    return
+
+  queryCache.invalidateQueries({ key: getConversationListQueryKey(codingScope.value) })
+
+  if (chatStore.currentConversationId && !chatStore.isLoading && !chatStore.isStreaming) {
+    queryCache.invalidateQueries({ key: ['conversation', chatStore.currentConversationId] })
+  }
+
+  queryCache.invalidateQueries({ key: getTasksListQueryKey(currentProjectKey.value) })
+  gitStatus.refresh()
+}
+
+onMounted(async () => {
+  await chatStore.loadModelSettings()
+  await restoreWorkspaceFromLastPath()
+})
+
+onActivated(async () => {
+  isCodingViewActive.value = true
+
+  if (!hasHandledFirstActivation.value) {
+    hasHandledFirstActivation.value = true
+    return
+  }
+
+  if (!currentProjectKey.value && lastWorkspacePath.value.trim() && !isWorkspaceLoading.value) {
+    await restoreWorkspaceFromLastPath()
+  }
+
+  refreshCodingDataOnActivate()
+})
+
+onDeactivated(() => {
+  isCodingViewActive.value = false
 })
 
 function sleep(ms: number) {

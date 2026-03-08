@@ -2,7 +2,7 @@ import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
 import { eq } from 'drizzle-orm'
 import { db, settings as settingsTable } from '../db/index.js'
 
-export { ensureDataDir, getDataDir, getSettingsDbPath } from './paths.js'
+export { ensureDataDir, getDataDir, getSettingsDbPath, getSkillsDataDir } from './paths.js'
 
 export function getSetting(key: string): string | undefined {
   const rows = db

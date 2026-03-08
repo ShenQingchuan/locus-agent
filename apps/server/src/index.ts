@@ -12,6 +12,7 @@ import { foldersRoutes } from './routes/folders.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
 import { settingsRoutes } from './routes/settings.js'
+import { skillsRoutes } from './routes/skills.js'
 import { tagsRoutes } from './routes/tags.js'
 import { tasksRoutes } from './routes/tasks.js'
 import { workspaceRoutes } from './routes/workspace.js'
@@ -52,6 +53,7 @@ export function createApp(): Hono {
   app.route('/api/folders', foldersRoutes)
   app.route('/api/tags', tagsRoutes)
   app.route('/api/settings', settingsRoutes)
+  app.route('/api/skills', skillsRoutes)
   app.route('/api/embedding', embeddingRoutes)
   app.route('/api/mcp', mcpRoutes)
   app.route('/api/tasks', tasksRoutes)
