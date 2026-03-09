@@ -835,6 +835,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 :is-streaming="chatStore.isStreaming"
                 :show-bottom-hint="false"
                 show-coding-mode
+                :workspace-root="currentProjectPath || undefined"
                 disabled-placeholder="请选择工作空间后开始项目内对话。"
                 @send="handleSend"
                 @stop="handleStop"

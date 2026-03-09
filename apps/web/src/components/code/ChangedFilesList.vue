@@ -162,7 +162,7 @@ function fileName(filePath: string): string {
           :disabled="summary.totalFiles === 0"
           @click="emit('discard')"
         >
-          <span class="i-carbon-reset h-3 w-3" />
+          <span class="i-radix-icons:reset h-3 w-3" />
         </button>
       </div>
     </div>

@@ -4,7 +4,6 @@ import type { DropdownItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
 import { getCodingProviderForParent } from '@locus-agent/agent-sdk'
 import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@locus-agent/ui'
-import { useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useEscConfirm } from '@/composables/useEscConfirm'
@@ -12,6 +11,7 @@ import { useImageAttachments } from '@/composables/useImageAttachments'
 import { useModelSelector } from '@/composables/useModelSelector'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
+import PromptEditor from './prompt-editor/PromptEditor.vue'
 import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
 
 const props = defineProps<{
@@ -21,6 +21,8 @@ const props = defineProps<{
   disabledPlaceholder?: string
   /** 是否显示 Build/Plan 模式切换（仅 Coding 空间使用） */
   showCodingMode?: boolean
+  /** 工作空间根路径（用于加载项目级 skills 等） */
+  workspaceRoot?: string
 }>()
 
 const emit = defineEmits<{
@@ -32,7 +34,8 @@ const chatStore = useChatStore()
 const toast = useToast()
 const markDirty = useMarkConversationDirty()
 
-const { textarea, input } = useTextareaAutosize()
+const promptEditorRef = ref<InstanceType<typeof PromptEditor> | null>(null)
+const editorText = ref('')
 const whitelistOpen = ref(false)
 
 const {
@@ -66,7 +69,17 @@ const {
 } = useModelSelector()
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
-const hasComposerContent = computed(() => input.value.trim().length > 0 || selectedAttachments.value.length > 0)
+const hasComposerContent = computed(() => editorText.value.trim().length > 0 || selectedAttachments.value.length > 0)
+
+const dynamicPlaceholder = computed(() => {
+  if (props.disabled && props.disabledPlaceholder)
+    return props.disabledPlaceholder
+  if (isEditing.value)
+    return '编辑消息…'
+  if (props.isStreaming)
+    return '输入消息（将在当前回答结束后发送）…'
+  return '输入消息…'
+})
 
 // Queue item inline editing
 const editingQueueId = ref<string | null>(null)
@@ -233,20 +246,13 @@ function handleCodingModeSelect(key: string) {
     chatStore.setCodingMode('plan')
 }
 
-// Reset height when input is cleared
-watch(input, (newValue) => {
-  if (!newValue && textarea.value) {
-    textarea.value.style.height = 'auto'
-  }
-})
-
 // When entering edit mode, populate the input with the editing content
 watch(() => chatStore.editingMessageId, async (newId) => {
   if (newId) {
-    input.value = chatStore.editingContent
+    promptEditorRef.value?.setText(chatStore.editingContent)
     selectedAttachments.value = [...chatStore.editingAttachments]
     await nextTick()
-    textarea.value?.focus()
+    promptEditorRef.value?.focus()
   }
   else if (!chatStore.editingContent) {
     resetComposerAttachments()
@@ -258,7 +264,7 @@ watch(() => chatStore.focusInputTrigger, async () => {
   if (!isEditing.value)
     resetComposerAttachments()
   await nextTick()
-  textarea.value?.focus()
+  promptEditorRef.value?.focus()
 })
 
 watch(() => chatStore.currentConversationId, () => {
@@ -285,10 +291,10 @@ async function handleSubmit() {
     return
 
   if (isEditing.value) {
-    const editContent = input.value
+    const editContent = editorText.value
     const editAttachments = [...selectedAttachments.value]
     const editMessageId = chatStore.editingMessageId!
-    input.value = ''
+    promptEditorRef.value?.clear()
     resetComposerAttachments()
     const conversationId = await chatStore.saveEditMessage(editMessageId, editContent, editAttachments)
     if (conversationId) {
@@ -298,14 +304,14 @@ async function handleSubmit() {
   }
 
   // 允许在 streaming 期间发送（消息会进入队列）
-  emit('send', { content: input.value, attachments: [...selectedAttachments.value] })
-  input.value = ''
+  emit('send', { content: editorText.value, attachments: [...selectedAttachments.value] })
+  promptEditorRef.value?.clear()
   resetComposerAttachments()
 }
 
 function handleCancelEdit() {
   chatStore.cancelEditMessage()
-  input.value = ''
+  promptEditorRef.value?.clear()
   resetComposerAttachments()
 }
 
@@ -314,36 +320,24 @@ function handleStop() {
   emit('stop')
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  // 输入法组合输入时不触发发送
-  if (event.isComposing)
-    return
-
-  if (event.key === 'Escape' && isEditing.value) {
+function handleEscape() {
+  if (isEditing.value) {
     handleCancelEdit()
     return
   }
 
-  if (event.key === 'Escape' && props.isStreaming) {
-    event.preventDefault()
+  if (props.isStreaming) {
     if (escConfirmActive.value) {
       handleStop()
       return
     }
     startEscConfirm()
-    return
   }
+}
 
-  // Shift+Tab 切换 Build/Plan 模式（仅 Coding 空间）
-  if (event.key === 'Tab' && event.shiftKey && props.showCodingMode) {
-    event.preventDefault()
+function handleShiftTab() {
+  if (props.showCodingMode) {
     chatStore.toggleCodingMode()
-    return
-  }
-
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    handleSubmit()
   }
 }
 </script>
@@ -396,7 +390,7 @@ function handleKeydown(event: KeyboardEvent) {
     <div
       class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50"
     >
-      <!-- Queue panel: shows pending messages above the textarea -->
+      <!-- Queue panel: shows pending messages above the editor -->
       <div
         v-if="chatStore.messageQueue.length > 0"
         class="flex flex-col gap-1 px-3 pt-3 pb-1 border-b border-border/40"
@@ -446,7 +440,7 @@ function handleKeydown(event: KeyboardEvent) {
         </div>
       </div>
 
-      <!-- Textarea -->
+      <!-- ESC confirm banner -->
       <div
         v-if="escConfirmActive && isStreaming"
         class="mx-3 mt-2 mb-1 rounded-full border border-amber-300/50 bg-amber-500/10 px-3 py-1"
@@ -476,20 +470,16 @@ function handleKeydown(event: KeyboardEvent) {
         />
       </div>
 
-      <textarea
-        ref="textarea"
-        v-model="input"
-        class="w-full resize-none bg-transparent px-4 pt-4 min-h-[80px] pb-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        :placeholder="disabled && disabledPlaceholder
-          ? disabledPlaceholder
-          : isEditing
-            ? '编辑消息…'
-            : isStreaming
-              ? '输入消息（将在当前回答结束后发送）…'
-              : '输入消息…'"
-        rows="1"
+      <!-- Prompt Editor (replaces textarea) -->
+      <PromptEditor
+        ref="promptEditorRef"
+        v-model="editorText"
+        :placeholder="dynamicPlaceholder"
         :disabled="disabled"
-        @keydown="handleKeydown"
+        :workspace-root="workspaceRoot"
+        @submit="handleSubmit"
+        @escape="handleEscape"
+        @shift-tab="handleShiftTab"
       />
 
       <!-- Build/Plan mode toggle row (Coding 空间独有) -->
