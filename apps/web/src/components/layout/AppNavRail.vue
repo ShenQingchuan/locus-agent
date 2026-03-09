@@ -31,22 +31,22 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     key: 'chat',
-    icon: 'i-material-symbols:conversation',
+    icon: 'i-streamline-pixel:email-mail-chat',
     title: '对话',
   },
   {
     key: 'coding',
-    icon: 'i-octicon:copilot-24',
+    icon: 'i-streamline-pixel:coding-apps-websites-plugin',
     title: '编程',
   },
   {
     key: 'skills',
-    icon: 'i-streamline-ultimate:kitchenware-spatula-1-bold',
+    icon: 'i-streamline-pixel:music-walkman-cassette',
     title: '技能',
   },
   {
     key: 'memories',
-    icon: 'i-famicons:library-sharp',
+    icon: 'i-streamline-pixel:content-files-archive-books-1',
     title: '记忆',
   },
 ]
