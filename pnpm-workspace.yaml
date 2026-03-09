@@ -1,6 +1,5 @@
 shellEmulator: true
 trustPolicy: no-downgrade
-
 packages:
   - packages/*
   - apps/*
@@ -8,7 +7,7 @@ packages:
 catalogs:
   ai-sdk:
     '@ai-sdk/anthropic': ^3.0.37
-    '@ai-sdk/deepseek': ^2.0.20
+    '@ai-sdk/deepseek': ^2.0.24
     '@ai-sdk/mcp': ^1.0.19
     '@ai-sdk/moonshotai': ^2.0.1
     '@ai-sdk/openai': ^3.0.25

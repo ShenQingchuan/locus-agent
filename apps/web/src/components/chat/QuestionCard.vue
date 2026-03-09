@@ -23,6 +23,8 @@ const multiAnswers = ref<Map<number, Set<string>>>(new Map())
 const customActive = ref<Map<number, boolean>>(new Map())
 // 自定义输入文本
 const customTexts = ref<Map<number, string>>(new Map())
+// IME composition state (avoid updating during Chinese/Japanese/Korean input)
+const isComposing = ref(false)
 
 function triggerReactivity() {
   singleAnswers.value = new Map(singleAnswers.value)
@@ -69,6 +71,32 @@ function activateCustom(qIdx: number) {
 function updateCustomText(qIdx: number, text: string) {
   customTexts.value.set(qIdx, text)
   triggerReactivity()
+}
+
+function handleCompositionStart() {
+  isComposing.value = true
+}
+
+function handleCustomInput(qIdx: number, value: string) {
+  if (!isComposing.value)
+    updateCustomText(qIdx, value)
+}
+
+function handleCompositionEnd(qIdx: number, event: CompositionEvent) {
+  isComposing.value = false
+  const target = event.target as HTMLTextAreaElement | null
+  if (target)
+    updateCustomText(qIdx, target.value)
+}
+
+function handleCustomKeydown(event: KeyboardEvent) {
+  if (event.isComposing)
+    return
+  // Ctrl/Cmd + Enter to submit (textarea uses Enter for newline)
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault()
+    handleSubmit()
+  }
 }
 
 function isCustomActive(qIdx: number): boolean {
@@ -242,16 +270,18 @@ function handleSubmit() {
               </template>
               <span class="text-muted-foreground">自定义回答</span>
             </button>
-            <input
+            <textarea
               v-if="isCustomActive(qIdx)"
-              type="text"
-              class="flex-1 bg-transparent border-b border-border/60 text-sm text-foreground placeholder-muted-foreground/50 outline-none py-0.5 px-1 focus:border-foreground/40 transition-colors"
+              rows="3"
+              class="flex-1 min-w-0 w-full textarea-field resize-y min-h-[60px] mt-0.25 pt-0"
               placeholder="输入你的回答..."
               :value="customTexts.get(qIdx) || ''"
               :disabled="isSubmitted"
-              @input="updateCustomText(qIdx, ($event.target as HTMLInputElement).value)"
-              @keydown.enter="handleSubmit"
-            >
+              @input="handleCustomInput(qIdx, ($event.target as HTMLTextAreaElement).value)"
+              @compositionstart="handleCompositionStart"
+              @compositionend="handleCompositionEnd(qIdx, $event)"
+              @keydown="handleCustomKeydown"
+            />
           </div>
         </div>
       </div>
