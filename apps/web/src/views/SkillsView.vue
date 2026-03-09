@@ -1,26 +1,18 @@
 <script setup lang="ts">
-import type { SkillDetail, SkillFileNode, SkillSummary, WorkspaceDirectoryEntry } from '@locus-agent/shared'
-import type { FileTreeNode } from '@locus-agent/ui'
 import { DirectoryBrowserModal, FileTree, useToast } from '@locus-agent/ui'
 import { useLocalStorage } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createSkill, fetchSkillDetail, fetchSkillFileContent, fetchSkillFiles, fetchSkills, saveSkillFileContent, updateSkillPreference, watchSkillFiles } from '@/api/skills'
 import * as workspaceApi from '@/api/workspace'
 import MonacoEditor from '@/components/code/MonacoEditor.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
+import { useSkillsManager } from '@/composables/useSkillsManager'
+import { useWorkspacePicker } from '@/composables/useWorkspacePicker'
+import { runWithLoadingState } from '@/utils/loadingState'
+import { getWorkspaceDisplayName } from '@/utils/workspace'
 
-type SourceFilter = 'all' | 'system' | 'project'
-
-function getWorkspaceDisplayName(path: string): string {
-  const normalized = path.trim()
-  if (!normalized)
-    return '未选择工作空间'
-  return normalized.split('/').filter(Boolean).pop() || normalized
-}
-
-const sourceFilterOptions: Array<{ value: SourceFilter, label: string }> = [
+const sourceFilterOptions: Array<{ value: 'all' | 'system' | 'project', label: string }> = [
   { value: 'all', label: '所有' },
   { value: 'system', label: '全局' },
   { value: 'project', label: '工作空间' },
@@ -33,209 +25,76 @@ const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-pat
 const initialWorkspacePath = lastWorkspacePath.value.trim()
 const workspaceRootInput = ref(initialWorkspacePath)
 const currentWorkspaceName = ref(getWorkspaceDisplayName(initialWorkspacePath))
-const sourceFilter = ref<SourceFilter>('all')
-const skills = ref<SkillSummary[]>([])
-const initialQuerySkillName = (route.query.skill as string) || null
-const selectedSkillId = ref<string | null>(null)
-const selectedSkill = ref<SkillDetail | null>(null)
-const isLoadingList = ref(false)
-const isLoadingDetail = ref(false)
-const isSaving = ref(false)
-const errorMessage = ref<string | null>(null)
-const isWorkspacePickerOpen = ref(false)
-const isWorkspacePickerLoading = ref(false)
-const isWorkspacePathLoading = ref(false)
-const currentBrowsePath = ref(initialWorkspacePath)
-const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
-const isBrowseTruncated = ref(false)
-let browseRequestToken = 0
-
-// File tree state
-const fileTreeNodes = ref<FileTreeNode[]>([])
-const isLoadingFileTree = ref(false)
-const fileTreeDefaultExpanded = ref<string[]>([])
-const selectedFilePath = ref<string | null>((route.query.file as string) || null)
-
-// File content state
-const fileContent = ref('')
-const fileLanguage = ref('markdown')
-const isLoadingFile = ref(false)
-const isEditMode = ref(false)
-const editorContent = ref('')
-const isSavingFile = ref(false)
-
-// Track whether editor content has been modified by user
-const hasUnsavedChanges = ref(false)
-
-// Create skill state
-const isCreating = ref(false)
-const newSkillName = ref('')
-const isCreateSubmitting = ref(false)
-const createNameInputRef = ref<HTMLInputElement | null>(null)
-
-// SSE watcher - suppress reload while user is editing
-let unwatchFiles: (() => void) | null = null
-let pendingSSERefresh = false
-
-const filteredSkills = computed(() => {
-  if (sourceFilter.value === 'all')
-    return skills.value
-  return skills.value.filter(skill => skill.source === sourceFilter.value)
-})
 
 const selectedWorkspaceRoot = computed(() => workspaceRootInput.value.trim() || undefined)
 
-const createSkillSource = computed(() => {
-  if (sourceFilter.value === 'system')
-    return 'system' as const
-  if (sourceFilter.value === 'project' && selectedWorkspaceRoot.value)
-    return 'project' as const
-  if (selectedWorkspaceRoot.value)
-    return 'project' as const
-  return 'system' as const
+const {
+  isWorkspacePickerOpen,
+  isWorkspacePickerLoading,
+  isWorkspacePathLoading,
+  currentBrowsePath,
+  browseEntries,
+  isBrowseTruncated,
+  loadBrowseEntries,
+  openWorkspacePicker,
+  goToParentBrowsePath,
+  closeWorkspacePicker,
+} = useWorkspacePicker({ initialPath: initialWorkspacePath })
+
+const {
+  sourceFilter,
+  skills,
+  filteredSkills,
+  selectedSkillId,
+  selectedSkill,
+  isLoadingList,
+  isLoadingDetail,
+  isSaving,
+  errorMessage,
+  createSkillSource,
+  loadSkills,
+  loadSkillDetail,
+  toggleSkillEnabled,
+  fileTreeNodes,
+  isLoadingFileTree,
+  fileTreeDefaultExpanded,
+  selectedFilePath,
+  fileTreeFileCount,
+  onFileSelect,
+  fileContent,
+  fileLanguage,
+  isLoadingFile,
+  isEditMode,
+  editorContent,
+  isSavingFile,
+  hasUnsavedChanges,
+  enterEditMode,
+  exitEditMode,
+  onEditorChange,
+  saveFile,
+  isMarkdownFile,
+  parsedFile,
+  previewContent,
+  isCreating,
+  newSkillName,
+  isCreateSubmitting,
+  createNameInputRef,
+  startCreateSkill,
+  cancelCreateSkill,
+  handleCreateKeydown,
+  setupFileWatcher,
+} = useSkillsManager({
+  selectedWorkspaceRoot: () => selectedWorkspaceRoot.value,
+  initialQuerySkillName: (route.query.skill as string) || null,
+  initialQueryFile: (route.query.file as string) || null,
 })
 
-// Whether the current file is markdown (for preview mode)
-const isMarkdownFile = computed(() => {
-  if (!selectedFilePath.value)
-    return false
-  return selectedFilePath.value.endsWith('.md') || selectedFilePath.value.endsWith('.markdown')
-})
-
-// Parse frontmatter from raw markdown content
-function parseFrontmatter(raw: string): { frontmatter: string, body: string } {
-  if (!raw.startsWith('---\n') && !raw.startsWith('---\r\n'))
-    return { frontmatter: '', body: raw }
-
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
-  if (!match)
-    return { frontmatter: '', body: raw }
-
-  return {
-    frontmatter: match[1] ?? '',
-    body: raw.slice(match[0].length).trim(),
-  }
-}
-
-// Parsed result for current file
-const parsedFile = computed(() => {
-  if (!isMarkdownFile.value && selectedFilePath.value)
-    return { frontmatter: '', body: fileContent.value }
-
-  // For SKILL.md, use server-parsed data
-  if (selectedFilePath.value === 'SKILL.md' && selectedSkill.value) {
-    return {
-      frontmatter: selectedSkill.value.rawFrontmatter,
-      body: selectedSkill.value.content,
-    }
-  }
-
-  // For other markdown files, parse on the client
-  return parseFrontmatter(fileContent.value)
-})
-
-// The content to show in preview (body without frontmatter)
-const previewContent = computed(() => {
-  if (!selectedFilePath.value)
-    return selectedSkill.value?.content ?? ''
-  return parsedFile.value.body
-})
-
-async function runWithLoadingState(
-  target: { value: boolean },
-  task: () => Promise<void>,
-  options: { delay?: number, minVisible?: number } = {},
-) {
-  const delay = options.delay ?? 140
-  const minVisible = options.minVisible ?? 160
-
-  let shownAt = 0
-  const timer = setTimeout(() => {
-    target.value = true
-    shownAt = Date.now()
-  }, delay)
-
-  try {
-    await task()
-  }
-  finally {
-    clearTimeout(timer)
-    if (shownAt > 0) {
-      const visibleFor = Date.now() - shownAt
-      if (visibleFor < minVisible) {
-        await new Promise(resolve => setTimeout(resolve, minVisible - visibleFor))
-      }
-      target.value = false
-    }
-  }
-}
-
+// ---- Workspace display ----
 function updateWorkspaceDisplay(path?: string) {
   const normalized = path?.trim() || ''
   workspaceRootInput.value = normalized
   currentBrowsePath.value = normalized
   currentWorkspaceName.value = getWorkspaceDisplayName(normalized)
-}
-
-async function loadBrowseEntries(path: string) {
-  if (!path)
-    return
-
-  const token = ++browseRequestToken
-  try {
-    await runWithLoadingState(isWorkspacePathLoading, async () => {
-      const result = await workspaceApi.fetchWorkspaceDirectories(path)
-      if (token !== browseRequestToken)
-        return
-      currentBrowsePath.value = result.path
-      browseEntries.value = result.entries
-      isBrowseTruncated.value = result.truncated
-    })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '加载目录失败')
-  }
-}
-
-async function openWorkspacePicker() {
-  isWorkspacePickerOpen.value = true
-  try {
-    await runWithLoadingState(isWorkspacePickerLoading, async () => {
-      const result = await workspaceApi.fetchWorkspaceRoots()
-      const nextPath = currentBrowsePath.value || result.defaultPath || result.roots[0]?.path || ''
-      if (nextPath) {
-        await loadBrowseEntries(nextPath)
-      }
-    })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '加载工作空间根目录失败')
-  }
-}
-
-function goToParentBrowsePath() {
-  if (!currentBrowsePath.value)
-    return
-
-  const normalized = currentBrowsePath.value.endsWith('/')
-    ? currentBrowsePath.value.slice(0, -1)
-    : currentBrowsePath.value
-  const index = normalized.lastIndexOf('/')
-
-  if (index <= 0)
-    return
-
-  loadBrowseEntries(normalized.slice(0, index) || '/')
-}
-
-function refreshBrowsePath() {
-  if (!currentBrowsePath.value)
-    return
-  loadBrowseEntries(currentBrowsePath.value)
-}
-
-function closeWorkspacePicker() {
-  isWorkspacePickerOpen.value = false
 }
 
 async function applyWorkspaceSelection(path: string) {
@@ -257,321 +116,6 @@ async function clearWorkspaceSelection() {
   updateWorkspaceDisplay('')
   lastWorkspacePath.value = ''
   await loadSkills()
-}
-
-async function loadSkills() {
-  isLoadingList.value = true
-  errorMessage.value = null
-  try {
-    const result = await fetchSkills(selectedWorkspaceRoot.value)
-    skills.value = result.skills
-
-    // If we have a current selection, try to keep it
-    let nextSelectedId = selectedSkillId.value && result.skills.some(s => s.id === selectedSkillId.value)
-      ? selectedSkillId.value
-      : null
-
-    // On first load, resolve skill name from query
-    if (!nextSelectedId && initialQuerySkillName) {
-      const match = result.skills.find(s => s.name === initialQuerySkillName)
-      if (match)
-        nextSelectedId = match.id
-    }
-
-    selectedSkillId.value = nextSelectedId || (result.skills[0]?.id ?? null)
-  }
-  catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载 Skills 失败'
-    skills.value = []
-    selectedSkillId.value = null
-  }
-  finally {
-    isLoadingList.value = false
-  }
-}
-
-async function loadSkillDetail(id: string | null) {
-  if (!id) {
-    selectedSkill.value = null
-    fileTreeNodes.value = []
-    selectedFilePath.value = null
-    fileContent.value = ''
-    return
-  }
-
-  isLoadingDetail.value = true
-  try {
-    const result = await fetchSkillDetail(id, selectedWorkspaceRoot.value)
-    selectedSkill.value = result.skill
-    await loadFileTree(id)
-    // Restore file from query, or default to SKILL.md
-    const fileToOpen = selectedFilePath.value || 'SKILL.md'
-    selectedFilePath.value = fileToOpen
-    await loadFileContent(fileToOpen)
-  }
-  catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载 Skill 详情失败'
-    selectedSkill.value = null
-    fileTreeNodes.value = []
-  }
-  finally {
-    isLoadingDetail.value = false
-  }
-}
-
-function convertToFileTreeNodes(nodes: SkillFileNode[]): FileTreeNode[] {
-  return nodes.map(node => ({
-    id: node.path,
-    label: node.name,
-    type: node.type,
-    children: node.children ? convertToFileTreeNodes(node.children) : undefined,
-  }))
-}
-
-function collectDirectoryIds(nodes: SkillFileNode[]): string[] {
-  const ids: string[] = []
-  for (const node of nodes) {
-    if (node.type === 'directory') {
-      ids.push(node.path)
-      if (node.children) {
-        ids.push(...collectDirectoryIds(node.children))
-      }
-    }
-  }
-  return ids
-}
-
-async function loadFileTree(id: string) {
-  isLoadingFileTree.value = true
-  try {
-    const result = await fetchSkillFiles(id, selectedWorkspaceRoot.value)
-    fileTreeNodes.value = convertToFileTreeNodes(result.files)
-    fileTreeDefaultExpanded.value = collectDirectoryIds(result.files)
-  }
-  catch {
-    fileTreeNodes.value = []
-  }
-  finally {
-    isLoadingFileTree.value = false
-  }
-}
-
-async function loadFileContent(filePath: string) {
-  if (!selectedSkillId.value)
-    return
-
-  isLoadingFile.value = true
-  isEditMode.value = false
-  hasUnsavedChanges.value = false
-  try {
-    const result = await fetchSkillFileContent(selectedSkillId.value, filePath, selectedWorkspaceRoot.value)
-    fileContent.value = result.content
-    fileLanguage.value = result.language
-    editorContent.value = result.content
-  }
-  catch (error) {
-    fileContent.value = ''
-    toast.error(error instanceof Error ? error.message : '加载文件失败')
-  }
-  finally {
-    isLoadingFile.value = false
-  }
-}
-
-async function onFileSelect(node: FileTreeNode) {
-  if (node.type === 'directory')
-    return
-  // Warn if unsaved changes
-  if (hasUnsavedChanges.value) {
-    const confirmed = await toast.confirm('当前文件有未保存的修改，确定要切换文件吗？')
-    if (!confirmed)
-      return
-  }
-  selectedFilePath.value = node.id
-  loadFileContent(node.id)
-}
-
-function enterEditMode() {
-  editorContent.value = fileContent.value
-  isEditMode.value = true
-  hasUnsavedChanges.value = false
-}
-
-async function exitEditMode() {
-  if (hasUnsavedChanges.value) {
-    const confirmed = await toast.confirm('当前文件有未保存的修改，确定要退出编辑模式吗？')
-    if (!confirmed)
-      return
-  }
-  isEditMode.value = false
-  hasUnsavedChanges.value = false
-}
-
-function onEditorChange(value: string) {
-  editorContent.value = value
-  hasUnsavedChanges.value = value !== fileContent.value
-}
-
-async function saveFile() {
-  if (!selectedSkillId.value || !selectedFilePath.value || isSavingFile.value)
-    return
-
-  isSavingFile.value = true
-  try {
-    await saveSkillFileContent({
-      skillId: selectedSkillId.value,
-      filePath: selectedFilePath.value,
-      content: editorContent.value,
-      workspaceRoot: selectedWorkspaceRoot.value,
-    })
-    fileContent.value = editorContent.value
-    hasUnsavedChanges.value = false
-    toast.success('保存成功')
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存失败')
-  }
-  finally {
-    isSavingFile.value = false
-  }
-}
-
-async function patchSkillPreference(patch: Partial<Pick<SkillSummary, 'enabled' | 'modelInvocable' | 'userInvocable'>>) {
-  if (!selectedSkill.value || isSaving.value)
-    return
-
-  isSaving.value = true
-  errorMessage.value = null
-  try {
-    const result = await updateSkillPreference({
-      id: selectedSkill.value.id,
-      workspaceRoot: selectedWorkspaceRoot.value,
-      ...patch,
-    })
-
-    if (result.skill) {
-      const currentSelectedId = selectedSkill.value.id
-
-      selectedSkill.value = {
-        ...selectedSkill.value,
-        enabled: result.skill.enabled,
-        modelInvocable: result.skill.modelInvocable,
-        userInvocable: result.skill.userInvocable,
-        effective: result.skill.effective,
-        overriddenById: result.skill.overriddenById,
-      }
-
-      const listResult = await fetchSkills(selectedWorkspaceRoot.value)
-      skills.value = listResult.skills
-
-      if (!listResult.skills.some(skill => skill.id === currentSelectedId)) {
-        selectedSkillId.value = listResult.skills[0]?.id ?? null
-      }
-    }
-  }
-  catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '更新 Skill 设置失败'
-  }
-  finally {
-    isSaving.value = false
-  }
-}
-
-async function toggleSkillEnabled(nextEnabled: boolean) {
-  await patchSkillPreference({ enabled: nextEnabled })
-}
-
-// ---- Create skill ----
-function startCreateSkill() {
-  isCreating.value = true
-  newSkillName.value = ''
-  nextTick(() => {
-    createNameInputRef.value?.focus()
-  })
-}
-
-function cancelCreateSkill() {
-  isCreating.value = false
-  newSkillName.value = ''
-}
-
-async function confirmCreateSkill() {
-  const name = newSkillName.value.trim()
-  if (!name || isCreateSubmitting.value)
-    return
-
-  isCreateSubmitting.value = true
-  try {
-    const result = await createSkill({
-      name,
-      source: createSkillSource.value,
-      workspaceRoot: selectedWorkspaceRoot.value,
-    })
-
-    if (result.success && result.skill) {
-      isCreating.value = false
-      newSkillName.value = ''
-      await loadSkills()
-      selectedSkillId.value = result.skill.id
-      toast.success(`技能 "${name}" 创建成功`)
-    }
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '创建技能失败')
-  }
-  finally {
-    isCreateSubmitting.value = false
-  }
-}
-
-function handleCreateKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    confirmCreateSkill()
-  }
-  else if (event.key === 'Escape') {
-    cancelCreateSkill()
-  }
-}
-
-// ---- SSE file watcher ----
-function setupFileWatcher() {
-  unwatchFiles?.()
-  unwatchFiles = null
-
-  unwatchFiles = watchSkillFiles(selectedWorkspaceRoot.value, async () => {
-    // If user is editing, defer the refresh
-    if (isEditMode.value && hasUnsavedChanges.value) {
-      pendingSSERefresh = true
-      return
-    }
-    await handleSSERefresh()
-  })
-}
-
-async function handleSSERefresh() {
-  pendingSSERefresh = false
-  const prevId = selectedSkillId.value
-  const prevFile = selectedFilePath.value
-
-  await loadSkills()
-
-  if (prevId && selectedSkillId.value === prevId) {
-    // Reload detail and file tree
-    try {
-      const detailResult = await fetchSkillDetail(prevId, selectedWorkspaceRoot.value)
-      selectedSkill.value = detailResult.skill
-    }
-    catch { /* ignore */ }
-
-    // Reload file tree
-    await loadFileTree(prevId)
-
-    // Reload current file content if not editing
-    if (prevFile && !isEditMode.value) {
-      await loadFileContent(prevFile)
-    }
-  }
 }
 
 // ---- Route query sync ----
@@ -605,21 +149,8 @@ watch(selectedWorkspaceRoot, () => {
   setupFileWatcher()
 })
 
-// When exiting edit mode, flush pending SSE refresh
-watch(isEditMode, async (editing) => {
-  if (!editing && pendingSSERefresh) {
-    await handleSSERefresh()
-  }
-})
-
-onMounted(async () => {
+onMounted(() => {
   updateWorkspaceDisplay(lastWorkspacePath.value)
-  await loadSkills()
-  setupFileWatcher()
-})
-
-onUnmounted(() => {
-  unwatchFiles?.()
 })
 </script>
 
@@ -879,7 +410,7 @@ onUnmounted(() => {
         <!-- File tree -->
         <div class="flex-1 overflow-hidden flex flex-col min-h-0">
           <div class="px-3 py-2 flex-shrink-0">
-            <span class="text-xs font-medium font-sans text-muted-foreground uppercase tracking-wider">{{ selectedSkill.resourceCount }} 个文件</span>
+            <span class="text-xs font-medium font-sans text-muted-foreground uppercase tracking-wider">{{ fileTreeFileCount }} 个文件</span>
           </div>
 
           <div v-if="isLoadingFileTree" class="px-3 py-3 text-xs text-muted-foreground">
@@ -925,7 +456,7 @@ onUnmounted(() => {
       :loading="isWorkspacePickerLoading || isWorkspacePathLoading"
       :truncated="isBrowseTruncated"
       @close="closeWorkspacePicker"
-      @refresh="refreshBrowsePath"
+      @refresh="loadBrowseEntries(currentBrowsePath)"
       @go-parent="goToParentBrowsePath"
       @navigate="loadBrowseEntries"
       @submit-path="loadBrowseEntries"

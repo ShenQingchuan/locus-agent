@@ -19,16 +19,11 @@ import { provideMarkConversationDirty } from '@/composables/useDirtyConversation
 import { useGitStatus } from '@/composables/useGitStatus'
 import { useResizePanel } from '@/composables/useResizePanel'
 import { useChatStore } from '@/stores/chat'
+import { runWithLoadingState } from '@/utils/loadingState'
 import { createProjectKey } from '@/utils/projectKey'
+import { getWorkspaceDisplayName } from '@/utils/workspace'
 
 type CodingSection = 'planning' | 'workspace'
-
-function getWorkspaceDisplayName(path: string): string {
-  const normalized = path.trim()
-  if (!normalized)
-    return '未选择工作空间'
-  return normalized.split('/').filter(Boolean).pop() || normalized
-}
 
 const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')
 const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
@@ -230,39 +225,6 @@ onActivated(async () => {
 onDeactivated(() => {
   isCodingViewActive.value = false
 })
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-async function runWithLoadingState(
-  target: { value: boolean },
-  task: () => Promise<void>,
-  options: { delay?: number, minVisible?: number } = {},
-) {
-  const delay = options.delay ?? 140
-  const minVisible = options.minVisible ?? 160
-
-  let shownAt = 0
-  const timer = setTimeout(() => {
-    target.value = true
-    shownAt = Date.now()
-  }, delay)
-
-  try {
-    await task()
-  }
-  finally {
-    clearTimeout(timer)
-    if (shownAt > 0) {
-      const visibleFor = Date.now() - shownAt
-      if (visibleFor < minVisible) {
-        await sleep(minVisible - visibleFor)
-      }
-      target.value = false
-    }
-  }
-}
 
 function filterDirectoryEntries(entries: WorkspaceDirectoryEntry[], keyword: string): WorkspaceDirectoryEntry[] {
   const query = keyword.trim().toLowerCase()

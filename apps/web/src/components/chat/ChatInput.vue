@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import type { CustomProviderMode, LLMProviderType, MessageImageAttachment } from '@locus-agent/shared'
-import type { DropdownItem, ImageAttachmentStripItem } from '@locus-agent/ui'
+import type { MessageImageAttachment } from '@locus-agent/shared'
+import type { DropdownItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
+import { getCodingProviderForParent } from '@locus-agent/shared'
 import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@locus-agent/ui'
-import { useDebounceFn, useTextareaAutosize } from '@vueuse/core'
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useTextareaAutosize } from '@vueuse/core'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
+import { useEscConfirm } from '@/composables/useEscConfirm'
+import { useImageAttachments } from '@/composables/useImageAttachments'
+import { useModelSelector } from '@/composables/useModelSelector'
 import { useChatStore } from '@/stores/chat'
 import ContextUsageRing from './ContextUsageRing.vue'
 import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
@@ -30,24 +33,40 @@ const toast = useToast()
 const markDirty = useMarkConversationDirty()
 
 const { textarea, input } = useTextareaAutosize()
-const fileInput = ref<HTMLInputElement | null>(null)
 const whitelistOpen = ref(false)
-const ESC_CONFIRM_WINDOW_MS = 3000
-const escConfirmActive = ref(false)
-const escRemainingMs = ref(0)
-const escIntervalId = ref<number | null>(null)
-const selectedAttachments = ref<MessageImageAttachment[]>([])
-const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
-const MAX_IMAGE_COUNT = 6
+
+const {
+  fileInput,
+  selectedAttachments,
+  attachmentStripItems,
+  resetComposerAttachments,
+  removeAttachment,
+  handleImageFilesSelected,
+  openFilePicker,
+} = useImageAttachments()
+
+const {
+  escConfirmActive,
+  escRemainingMs,
+  escProgressWidth,
+  startEscConfirm,
+  clearEscConfirm,
+} = useEscConfirm()
+
+const {
+  providerOptions,
+  isCustomProvider,
+  customModeOptions,
+  localModel,
+  modelPlaceholder,
+  modelInputWidth,
+  handleProviderChange,
+  handleCustomModeChange,
+  handleModelInput,
+} = useModelSelector()
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
 const hasComposerContent = computed(() => input.value.trim().length > 0 || selectedAttachments.value.length > 0)
-const attachmentStripItems = computed<ImageAttachmentStripItem[]>(() => selectedAttachments.value.map(attachment => ({
-  id: attachment.id,
-  src: attachment.dataUrl,
-  name: attachment.name,
-  alt: attachment.name,
-})))
 
 // Queue item inline editing
 const editingQueueId = ref<string | null>(null)
@@ -90,98 +109,6 @@ function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
   else if (event.key === 'Escape') {
     cancelEditQueueItem()
   }
-}
-
-function resetComposerAttachments() {
-  selectedAttachments.value = []
-  if (fileInput.value)
-    fileInput.value.value = ''
-}
-
-function removeAttachment(id: string) {
-  selectedAttachments.value = selectedAttachments.value.filter(attachment => attachment.id !== id)
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image file'))
-    reader.readAsDataURL(file)
-  })
-}
-
-function loadImageDimensions(dataUrl: string): Promise<{ width: number, height: number }> {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
-    image.onerror = () => reject(new Error('Failed to decode image dimensions'))
-    image.src = dataUrl
-  })
-}
-
-async function toImageAttachment(file: File): Promise<MessageImageAttachment> {
-  const dataUrl = await readFileAsDataUrl(file)
-  const dimensions = await loadImageDimensions(dataUrl)
-
-  return {
-    id: crypto.randomUUID(),
-    kind: 'image',
-    name: file.name,
-    mimeType: file.type,
-    dataUrl,
-    sizeBytes: file.size,
-    width: dimensions.width,
-    height: dimensions.height,
-  }
-}
-
-async function handleImageFilesSelected(event: Event) {
-  const target = event.target as HTMLInputElement | null
-  const files = Array.from(target?.files ?? [])
-  if (files.length === 0)
-    return
-
-  const availableSlots = MAX_IMAGE_COUNT - selectedAttachments.value.length
-  if (availableSlots <= 0) {
-    toast.info(`最多可附带 ${MAX_IMAGE_COUNT} 张图片`)
-    if (target)
-      target.value = ''
-    return
-  }
-
-  const nextFiles = files.slice(0, availableSlots)
-
-  if (files.length > nextFiles.length)
-    toast.info(`最多可附带 ${MAX_IMAGE_COUNT} 张图片，已忽略多余图片`)
-
-  const validFiles = nextFiles.filter((file) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error(`仅支持图片文件：${file.name}`)
-      return false
-    }
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      toast.error(`图片过大（>${Math.round(MAX_IMAGE_SIZE_BYTES / 1024 / 1024)}MB）：${file.name}`)
-      return false
-    }
-    return true
-  })
-
-  try {
-    const attachments = await Promise.all(validFiles.map(toImageAttachment))
-    selectedAttachments.value = [...selectedAttachments.value, ...attachments]
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '读取图片失败')
-  }
-  finally {
-    if (target)
-      target.value = ''
-  }
-}
-
-function openFilePicker() {
-  fileInput.value?.click()
 }
 
 const modeItems = computed<DropdownItem[]>(() => {
@@ -268,37 +195,6 @@ const currentCodingModeItem = computed(() => {
 const codingModeButtonIcon = computed(() => currentCodingModeItem.value?.icon ?? 'i-carbon:code')
 const codingModeButtonLabel = computed(() => currentCodingModeItem.value?.label ?? (chatStore.codingMode === 'build' ? 'Build' : 'Plan'))
 
-const escProgressWidth = computed(() => {
-  if (!escConfirmActive.value)
-    return '0%'
-  const ratio = Math.max(0, Math.min(1, escRemainingMs.value / ESC_CONFIRM_WINDOW_MS))
-  return `${Math.round(ratio * 100)}%`
-})
-
-function clearEscConfirm() {
-  escConfirmActive.value = false
-  escRemainingMs.value = 0
-  if (escIntervalId.value !== null) {
-    window.clearInterval(escIntervalId.value)
-    escIntervalId.value = null
-  }
-}
-
-function startEscConfirm() {
-  clearEscConfirm()
-  escConfirmActive.value = true
-  const deadline = Date.now() + ESC_CONFIRM_WINDOW_MS
-  escRemainingMs.value = ESC_CONFIRM_WINDOW_MS
-  escIntervalId.value = window.setInterval(() => {
-    const remaining = deadline - Date.now()
-    if (remaining <= 0) {
-      clearEscConfirm()
-      return
-    }
-    escRemainingMs.value = remaining
-  }, 50)
-}
-
 function handleModeSelect(key: string) {
   if (key === 'think') {
     chatStore.toggleThinkMode()
@@ -335,95 +231,6 @@ function handleCodingModeSelect(key: string) {
     chatStore.setCodingMode('build')
   else if (key === 'coding:plan')
     chatStore.setCodingMode('plan')
-}
-
-const providerOptions = LLM_PROVIDERS.map(p => ({ value: p.value, label: p.label, icon: p.icon }))
-
-const isCustomProvider = computed(() => chatStore.provider === 'custom')
-
-// 兼容模式选项
-const customModeOptions = [
-  { value: 'openai-compatible' as CustomProviderMode, label: 'OpenAI', icon: 'i-simple-icons:openai' },
-  { value: 'anthropic-compatible' as CustomProviderMode, label: 'Anthropic', icon: 'i-simple-icons:anthropic' },
-]
-
-const localModel = ref('')
-
-// Remember custom model names per provider so switching away and back preserves the value
-const customModelPerProvider = ref<Partial<Record<LLMProviderType, string>>>({})
-
-watch(() => chatStore.modelName, (v) => {
-  const normalized = normalizeModelForProvider(v ?? '', chatStore.provider)
-  localModel.value = normalized
-  // Seed the per-provider cache with the normalized value
-  if (normalized) {
-    customModelPerProvider.value[chatStore.provider] = normalized
-  }
-}, { immediate: true })
-
-/**
- * DeepSeek 默认模型根据 thinkMode 动态切换
- * -chat 无推理，-reasoner 带思考
- * 用户未填写时（使用 placeholder），显示对应的默认模型
- */
-const modelPlaceholder = computed(() => {
-  if (chatStore.provider !== 'deepseek')
-    return DEFAULT_MODELS[chatStore.provider] ?? ''
-
-  // DeepSeek 根据思考模式返回不同的默认模型
-  return chatStore.thinkMode ? 'deepseek-reasoner' : 'deepseek-chat'
-})
-
-// Auto-width: use the visible text (value or placeholder) to size the input in ch units
-const modelInputWidth = computed(() => {
-  const text = localModel.value || modelPlaceholder.value
-  // +1ch gives a little breathing room so the cursor doesn't feel cramped
-  return `${Math.max(3, text.length) + 1}ch`
-})
-
-const debouncedSaveModel = useDebounceFn(async () => {
-  const result = await chatStore.saveModelSettings(
-    chatStore.provider,
-    localModel.value.trim(),
-    isCustomProvider.value ? chatStore.customMode : undefined,
-  )
-  if (!result.success)
-    toast.error(result.message || '保存模型设置失败')
-}, 800)
-
-async function handleProviderChange(value: string) {
-  const p = value as LLMProviderType
-  // Save current model for the old provider before switching
-  if (localModel.value.trim()) {
-    customModelPerProvider.value[chatStore.provider] = localModel.value.trim()
-  }
-  // Restore previously remembered model for the new provider (or empty)
-  // Normalize: e.g. moonshotai/kimi-k2.5 -> kimi-k2.5 when switching to moonshotai
-  const remembered = normalizeModelForProvider(customModelPerProvider.value[p] ?? '', p)
-  localModel.value = remembered
-  // 自定义提供商时，使用当前 customMode
-  const result = await chatStore.saveModelSettings(
-    p,
-    remembered,
-    p === 'custom' ? chatStore.customMode : undefined,
-  )
-  if (!result.success) {
-    toast.error(result.message || '切换提供商失败')
-  }
-}
-
-async function handleCustomModeChange(value: string) {
-  const mode = value as CustomProviderMode
-  const result = await chatStore.saveModelSettings(chatStore.provider, localModel.value.trim(), mode)
-  if (!result.success) {
-    toast.error(result.message || '切换兼容模式失败')
-  }
-}
-
-function handleModelInput() {
-  // Keep per-provider cache in sync as user types
-  customModelPerProvider.value[chatStore.provider] = localModel.value.trim()
-  debouncedSaveModel()
 }
 
 // Reset height when input is cleared
@@ -471,10 +278,6 @@ watch(
 watch(() => props.isStreaming, (streaming) => {
   if (!streaming)
     clearEscConfirm()
-})
-
-onUnmounted(() => {
-  clearEscConfirm()
 })
 
 async function handleSubmit() {

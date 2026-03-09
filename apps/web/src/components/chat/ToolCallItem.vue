@@ -5,7 +5,9 @@ import type { ToolCallState } from '@/composables/useAssistantRuntime'
 import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import DiffViewer from '@/components/code/DiffViewer.vue'
+import { parseDelegateMeta } from '@/utils/delegateParsing'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
+import { toolsHideSummaryRow, toolSummaryResolvers, toolsWithOutputWidget } from '@/utils/toolSummary'
 import DelegateCard from './DelegateCard.vue'
 import PlanCard from './PlanCard.vue'
 import QuestionCard from './QuestionCard.vue'
@@ -72,77 +74,6 @@ const statusIconClass = computed(() => {
     default: return 'text-muted-foreground'
   }
 })
-
-/**
- * Tool-specific summary resolvers.
- * Each entry maps a toolName to a function that returns a summary string from args.
- * To add a new tool summary, just add an entry here — no other file needs to change.
- */
-const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => string> = {
-  bash: args => String(args.command ?? ''),
-  read_file: args => String(args.file_path ?? ''),
-  glob: args => String(args.pattern ?? ''),
-  tree: (args) => {
-    const path = String(args.path ?? '')
-    const depth = args.max_depth != null ? ` depth=${String(args.max_depth)}` : ''
-    return `${path || '.'}${depth}`
-  },
-  str_replace: args => String(args.file_path ?? ''),
-  write_file: args => String(args.file_path ?? ''),
-  ask_question: (args) => {
-    const questions = args.questions as Array<{ question: string }> | undefined
-    if (!questions || questions.length === 0)
-      return '提问'
-    return questions.length === 1
-      ? questions[0]!.question
-      : `${questions.length} 个问题`
-  },
-  delegate: (args) => {
-    const agentName = String(args.agent_name ?? args.agent_type ?? '子代理')
-    const task = String(args.task ?? '')
-    return `${agentName}: ${task.slice(0, 40)}${task.length > 40 ? '...' : ''}`
-  },
-  manage_todos: (args) => {
-    const action = String(args.action ?? '')
-    const content = typeof args.content === 'string' ? args.content.trim() : ''
-    const status = String(args.status ?? '')
-    const taskId = String(args.taskId ?? '')
-
-    if (action === 'add' && content)
-      return content
-
-    if (action === 'update') {
-      if (content)
-        return content
-      if (status === 'completed')
-        return '标记为已完成'
-      if (status === 'in_progress')
-        return '标记为进行中'
-      if (taskId)
-        return `更新任务 ${taskId}`
-    }
-
-    if (action === 'delete' && taskId)
-      return `删除任务 ${taskId}`
-    if (action === 'list')
-      return '查看待办'
-    if (action === 'clear')
-      return '清理待办'
-
-    return '待办管理'
-  },
-}
-
-/**
- * Tools that render their output via a custom inline widget.
- * When listed here:
- *   - The output is shown inline via the special widget
- *   - The compact summary row is hidden (no redundant display)
- *   - The modal result section is hidden
- * To add a new tool with custom output, just add its name to this set.
- */
-const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
-const toolsHideSummaryRow = new Set<string>(['manage_todos', 'write_plan', 'plan_exit'])
 
 /** Inline diff patch string for str_replace / write_file tool calls */
 const inlineDiff = computed<string | null>(() => {
@@ -267,73 +198,7 @@ const delegateMeta = computed(() => {
   const raw = props.tool.result?.result
   if (!raw)
     return null
-
-  // 后端可能返回对象（包含 deltas）或字符串（旧格式）
-  if (typeof raw === 'object' && raw !== null) {
-    const r = raw as {
-      success?: boolean
-      taskId?: string
-      agentName?: string
-      agentType?: string
-      iterations?: number
-      usage?: { inputTokens: number, outputTokens: number, totalTokens: number }
-    }
-    return {
-      taskId: r.taskId ?? '',
-      iterations: r.iterations ?? 0,
-      inputTokens: r.usage?.inputTokens ?? 0,
-      outputTokens: r.usage?.outputTokens ?? 0,
-      totalTokens: r.usage?.totalTokens ?? 0,
-      success: r.success ?? false,
-      agentName: r.agentName ?? '',
-      agentType: r.agentType ?? '',
-    }
-  }
-
-  // 旧格式：解析结果字符串
-  if (typeof raw === 'string') {
-    const lines = raw.split('\n')
-    let iterations = 0
-    let inputTokens = 0
-    let outputTokens = 0
-    let totalTokens = 0
-    let success = false
-    let taskId = ''
-    let agentName = ''
-    let agentType = ''
-
-    for (const line of lines.slice(0, 10)) {
-      if (line.startsWith('task_id:')) {
-        taskId = line.replace('task_id:', '').split(' ')[0]!.trim()
-      }
-      if (line.startsWith('## Delegate Result:')) {
-        agentName = line.replace('## Delegate Result:', '').trim()
-      }
-      if (line.startsWith('Type:')) {
-        agentType = line.replace('Type:', '').trim()
-      }
-      if (line.startsWith('Success:')) {
-        success = line.includes('true')
-      }
-      if (line.startsWith('Iterations:')) {
-        const match = line.match(/Iterations:\s*(\d+)/)
-        if (match)
-          iterations = Number.parseInt(match[1]!, 10)
-      }
-      if (line.startsWith('Tokens:')) {
-        const match = line.match(/Tokens:\s*(\d+)\D*in:\s*(\d+)\D*out:\s*(\d+)/)
-        if (match) {
-          totalTokens = Number.parseInt(match[1]!, 10)
-          inputTokens = Number.parseInt(match[2]!, 10)
-          outputTokens = Number.parseInt(match[3]!, 10)
-        }
-      }
-    }
-
-    return { taskId, iterations, inputTokens, outputTokens, totalTokens, success, agentName, agentType }
-  }
-
-  return null
+  return parseDelegateMeta(raw)
 })
 
 /** 从 delegate 结果中提取 deltas（用于恢复历史状态） */
