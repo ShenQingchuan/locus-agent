@@ -3,7 +3,7 @@ import type { ImageAttachmentStripItem } from '@locus-agent/ui'
 import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS } from '@locus-agent/agent-sdk'
-import { ImageAttachmentStrip, Tooltip } from '@locus-agent/ui'
+import { ImageAttachmentStrip, Tooltip, useToast } from '@locus-agent/ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, reactive, watch } from 'vue'
@@ -18,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const toast = useToast()
 
 // 每个 reasoning 块独立的展开/折叠状态
 // - 思考中自动展开，思考一结束（后续出现非 reasoning 的 part）立即自动折叠
@@ -74,7 +75,14 @@ const { relative: relativeTime, absolute: absoluteTime } = useRelativeTime(
 )
 
 async function handleApprove(toolCallId: string) {
-  await chatStore.approveToolExecution(toolCallId)
+  const autoApprovedCount = chatStore.yoloMode
+    ? Math.max(chatStore.pendingApprovals.size - 1, 0)
+    : 0
+  const approved = await chatStore.approveToolExecution(toolCallId)
+
+  if (approved && autoApprovedCount > 0) {
+    toast.success(`已开启 YOLO，并自动通过本会话另外 ${autoApprovedCount} 个等待审批`)
+  }
 }
 
 async function handleReject(toolCallId: string) {
