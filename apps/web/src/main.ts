@@ -1,10 +1,9 @@
 import { PiniaColada } from '@pinia/colada'
 import { setCustomComponents } from 'markstream-vue'
 import { createPinia } from 'pinia'
-import { createApp } from 'vue'
+import { createApp, defineAsyncComponent } from 'vue'
 import App from './App.vue'
 import CodeBlock from './components/code/CodeBlock.vue'
-import MermaidBlock from './components/code/MermaidBlock.vue'
 import router from './router'
 
 import '@unocss/reset/tailwind.css'
@@ -14,9 +13,10 @@ import './styles/main.css'
 import 'virtual:uno.css'
 
 // 注册自定义渲染器（对应 custom-id="locus"）
+// MermaidBlock 使用异步组件，避免 mermaid (~3MB) 进入初始 bundle
 setCustomComponents('locus', {
   code_block: CodeBlock,
-  mermaid: MermaidBlock,
+  mermaid: defineAsyncComponent(() => import('./components/code/MermaidBlock.vue')),
 })
 
 const app = createApp(App)

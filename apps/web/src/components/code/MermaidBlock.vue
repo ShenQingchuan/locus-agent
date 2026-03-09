@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { PanZoom } from 'panzoom'
 import { useDark, useDebounceFn } from '@vueuse/core'
-import mermaid from 'mermaid'
 import createPanZoom from 'panzoom'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+
+// 动态加载 mermaid，避免 ~3MB 进入主 chunk
+const mermaidPromise = import('mermaid').then(m => m.default)
 
 const props = defineProps<{
   node: any
@@ -24,6 +26,7 @@ function enqueuRender(
       }
       const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       try {
+        const mermaid = await mermaidPromise
         mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' })
         const { svg } = await mermaid.render(id, code)
         resolve(isStale() ? null : svg)
