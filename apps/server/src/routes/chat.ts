@@ -9,6 +9,7 @@ import type {
 } from '@locus-agent/agent-sdk'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
+import type { AddMessageInput } from '../services/message.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -22,6 +23,7 @@ import {
   resolvePendingApprovalsForConversation,
 } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
+import { normalizeToolCallMessageSequence } from '../agent/loop/message-utils.js'
 import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
@@ -34,7 +36,7 @@ import {
 } from '../agent/whitelist.js'
 import { config } from '../config.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
-import { addMessage, getLastNMessages, getMessages } from '../services/message.js'
+import { addMessage, addMessages, getLastNMessages, getMessages } from '../services/message.js'
 import { resolveAllowedDirectory } from '../services/workspace-access.js'
 
 export const chatRoutes = new Hono()
@@ -94,6 +96,225 @@ function createUserMessage(content: string, attachments?: MessageImageAttachment
   }
 }
 
+function normalizeToolArgs(args: unknown): Record<string, unknown> {
+  if (typeof args === 'string') {
+    try {
+      const parsed = JSON.parse(args)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        return parsed as Record<string, unknown>
+    }
+    catch {
+      // Ignore non-JSON strings and preserve them below.
+    }
+  }
+
+  return args && typeof args === 'object' && !Array.isArray(args)
+    ? args as Record<string, unknown>
+    : { value: args }
+}
+
+function buildAssistantMessageFromDbMessage(message: {
+  content: string
+  reasoning?: string | null
+  toolCalls?: unknown[] | null
+}): ModelMessage | null {
+  const content: Array<
+    | { type: 'reasoning', text: string }
+    | { type: 'text', text: string }
+    | { type: 'tool-call', toolCallId: string, toolName: string, input: Record<string, unknown> }
+  > = []
+
+  if (message.reasoning) {
+    content.push({
+      type: 'reasoning',
+      text: message.reasoning,
+    })
+  }
+
+  const toolCalls = message.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
+  if (toolCalls?.length) {
+    for (const toolCall of toolCalls) {
+      if (!toolCall?.toolCallId || !toolCall.toolName)
+        continue
+      content.push({
+        type: 'tool-call',
+        toolCallId: toolCall.toolCallId,
+        toolName: toolCall.toolName,
+        input: normalizeToolArgs(toolCall.args),
+      })
+    }
+  }
+
+  if (message.content) {
+    content.push({
+      type: 'text',
+      text: message.content,
+    })
+  }
+
+  return content.length > 0
+    ? {
+        role: 'assistant',
+        content,
+      }
+    : null
+}
+
+function buildToolMessageFromDbMessage(message: {
+  toolResults?: unknown[] | null
+}): ModelMessage | null {
+  const toolResults = message.toolResults as Array<{ toolCallId: string, toolName: string, result: unknown, isError?: boolean }> | null
+  if (!toolResults?.length)
+    return null
+
+  const content = toolResults
+    .filter(toolResult => toolResult?.toolCallId && toolResult.toolName)
+    .map(toolResult => ({
+      type: 'tool-result' as const,
+      toolCallId: toolResult.toolCallId,
+      toolName: toolResult.toolName,
+      output: toolResult.isError
+        ? { type: 'error-text' as const, value: typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result) }
+        : { type: 'text' as const, value: typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result) },
+    }))
+
+  if (content.length === 0)
+    return null
+
+  return {
+    role: 'tool',
+    content,
+  }
+}
+
+function decodeToolOutput(output: {
+  type: string
+  value?: unknown
+  reason?: string
+}): {
+  result: unknown
+  isError?: boolean
+} {
+  switch (output.type) {
+    case 'error-text':
+      return {
+        result: output.value ?? '',
+        isError: true,
+      }
+    case 'error-json':
+      return {
+        result: output.value,
+        isError: true,
+      }
+    case 'execution-denied':
+      return {
+        result: output.reason ?? 'Tool execution denied.',
+        isError: true,
+      }
+    case 'json':
+    case 'content':
+    case 'text':
+    default:
+      return {
+        result: output.value ?? '',
+      }
+  }
+}
+
+function agentMessagesToDbInputs(
+  messages: ModelMessage[],
+  assistantModel: string,
+  usage: AddMessageInput['usage'],
+): AddMessageInput[] {
+  const dbInputs: AddMessageInput[] = []
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      if (typeof message.content === 'string') {
+        if (!message.content)
+          continue
+        dbInputs.push({
+          role: 'assistant',
+          content: message.content,
+          model: assistantModel,
+        })
+        continue
+      }
+
+      let content = ''
+      let reasoning = ''
+      const toolCalls: ToolCall[] = []
+
+      for (const part of message.content) {
+        switch (part.type) {
+          case 'text':
+            content += part.text
+            break
+          case 'reasoning':
+            reasoning += part.text
+            break
+          case 'tool-call':
+            toolCalls.push({
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              args: normalizeToolArgs(part.input),
+            })
+            break
+        }
+      }
+
+      if (!content && !reasoning && toolCalls.length === 0)
+        continue
+
+      dbInputs.push({
+        role: 'assistant',
+        content,
+        reasoning: reasoning || undefined,
+        model: assistantModel,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      })
+      continue
+    }
+
+    if (message.role === 'tool' && Array.isArray(message.content)) {
+      const toolResults: ToolResult[] = []
+
+      for (const part of message.content) {
+        if (part.type !== 'tool-result')
+          continue
+        const decoded = decodeToolOutput(part.output as { type: string, value?: unknown, reason?: string })
+        toolResults.push({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          result: decoded.result,
+          isError: decoded.isError,
+        })
+      }
+
+      if (toolResults.length === 0)
+        continue
+
+      dbInputs.push({
+        role: 'tool',
+        content: '',
+        toolResults,
+      })
+    }
+  }
+
+  for (let i = dbInputs.length - 1; i >= 0; i--) {
+    if (dbInputs[i]?.role === 'assistant') {
+      dbInputs[i] = {
+        ...dbInputs[i]!,
+        usage,
+      }
+      break
+    }
+  }
+
+  return dbInputs
+}
+
 /**
  * 将数据库 Message 记录转换为 AI SDK 的 ModelMessage[]
  */
@@ -101,20 +322,10 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
   role: string
   content: string
   attachments?: MessageImageAttachment[] | null
+  reasoning?: string | null
   toolCalls?: unknown[] | null
   toolResults?: unknown[] | null
 }>): ModelMessage[] {
-  // Pre-collect all tool-result IDs to filter orphan tool-calls
-  const availableResultIds = new Set<string>()
-  for (const msg of dbMsgs) {
-    if (msg.role === 'tool' && msg.toolResults) {
-      for (const tr of msg.toolResults as Array<{ toolCallId: string }>) {
-        if (tr.toolCallId)
-          availableResultIds.add(tr.toolCallId)
-      }
-    }
-  }
-
   const result: ModelMessage[] = []
   for (const msg of dbMsgs) {
     switch (msg.role) {
@@ -122,44 +333,15 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
         result.push(createUserMessage(msg.content, msg.attachments ?? undefined))
         break
       case 'assistant': {
-        const tcs = msg.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
-        if (tcs && tcs.length > 0) {
-          const validCalls = tcs.filter(tc => availableResultIds.has(tc.toolCallId))
-          if (validCalls.length > 0) {
-            result.push({
-              role: 'assistant',
-              content: validCalls.map(tc => ({
-                type: 'tool-call' as const,
-                toolCallId: tc.toolCallId,
-                toolName: tc.toolName,
-                input: tc.args,
-              })),
-            })
-          }
-          else {
-            result.push({ role: 'assistant', content: msg.content || '' })
-          }
-        }
-        else {
-          result.push({ role: 'assistant', content: msg.content })
-        }
+        const assistantMessage = buildAssistantMessageFromDbMessage(msg)
+        if (assistantMessage)
+          result.push(assistantMessage)
         break
       }
       case 'tool': {
-        const trs = msg.toolResults as Array<{ toolCallId: string, toolName: string, result: unknown, isError?: boolean }> | null
-        if (trs && trs.length > 0) {
-          result.push({
-            role: 'tool',
-            content: trs.map(tr => ({
-              type: 'tool-result' as const,
-              toolCallId: tr.toolCallId,
-              toolName: tr.toolName,
-              output: tr.isError
-                ? { type: 'error-text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) }
-                : { type: 'text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) },
-            })),
-          })
-        }
+        const toolMessage = buildToolMessageFromDbMessage(msg)
+        if (toolMessage)
+          result.push(toolMessage)
         break
       }
       case 'system':
@@ -167,7 +349,7 @@ function dbMessagesToModelMessages(dbMsgs: Array<{
         break
     }
   }
-  return result
+  return normalizeToolCallMessageSequence(result)
 }
 
 interface PlanSnapshot {
@@ -398,8 +580,6 @@ chatRoutes.post('/', async (c) => {
     // 收集 AI 响应数据以便保存
     let assistantText = ''
     let assistantReasoning = ''
-    const collectedToolCalls: ToolCall[] = []
-    const collectedToolResults: ToolResult[] = []
 
     try {
       const runtimeModelInfo = getCurrentModelInfo()
@@ -468,7 +648,6 @@ chatRoutes.post('/', async (c) => {
             toolName,
             args: args as Record<string, unknown>,
           }
-          collectedToolCalls.push(toolCall)
           await stream.writeSSE(createSSEEvent({
             type: 'tool-call-start',
             toolCall,
@@ -484,7 +663,6 @@ chatRoutes.post('/', async (c) => {
             isError,
             isInterrupted,
           }
-          collectedToolResults.push(toolResult)
           await stream.writeSSE(createSSEEvent({
             type: 'tool-call-result',
             toolResult,
@@ -568,29 +746,11 @@ chatRoutes.post('/', async (c) => {
           totalTokens: result.usage.totalTokens,
         }
 
-        // 如果有工具调用，保存包含工具信息的消息
-        if (collectedToolCalls.length > 0) {
-          // 保存 assistant 消息（包含工具调用）
-          await addMessage(conversationId, {
-            role: 'assistant',
-            content: assistantText || '',
-            reasoning: assistantReasoning || undefined,
-            model: assistantModel,
-            toolCalls: collectedToolCalls,
-            usage,
-          })
-
-          // 保存 tool 消息（包含工具结果）
-          if (collectedToolResults.length > 0) {
-            await addMessage(conversationId, {
-              role: 'tool',
-              content: '',
-              toolResults: collectedToolResults,
-            })
-          }
+        const dbInputs = agentMessagesToDbInputs(result.generatedMessages, assistantModel, usage)
+        if (dbInputs.length > 0) {
+          await addMessages(conversationId, dbInputs)
         }
-        else {
-          // 没有工具调用，只保存普通文本响应
+        else if (assistantText || assistantReasoning) {
           await addMessage(conversationId, {
             role: 'assistant',
             content: assistantText,

@@ -450,7 +450,7 @@ onMounted(() => {
 
     <DirectoryBrowserModal
       v-model:open="isWorkspacePickerOpen"
-      title="选择工作目录"
+      title="选择工作空间"
       :current-path="currentBrowsePath"
       :entries="browseEntries"
       :loading="isWorkspacePickerLoading || isWorkspacePathLoading"

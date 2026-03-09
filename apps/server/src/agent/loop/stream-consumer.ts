@@ -11,6 +11,7 @@ interface StreamConsumeOptions {
 
 interface StreamConsumeResult {
   iterationText: string
+  iterationReasoning: string
   pendingToolCalls: PendingToolCall[]
   finishReason: string
 }
@@ -26,6 +27,7 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
   } = options
 
   let iterationText = ''
+  let iterationReasoning = ''
   const pendingToolCalls: PendingToolCall[] = []
   const seenToolCallIds = new Set<string>()
   let finishReason = initialFinishReason
@@ -38,6 +40,7 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
 
     switch (part.type) {
       case 'reasoning-delta':
+        iterationReasoning += (part as any).text
         if (onReasoningDelta) {
           await onReasoningDelta((part as any).text)
         }
@@ -77,6 +80,7 @@ export async function consumeResponseStream(options: StreamConsumeOptions): Prom
 
   return {
     iterationText,
+    iterationReasoning,
     pendingToolCalls,
     finishReason,
   }

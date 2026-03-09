@@ -10,6 +10,7 @@ import { getCurrentModelInfo } from '../providers/index.js'
 import { getMergedToolsForMode } from '../tools/registry.js'
 import { interactiveTools } from '../tools/tool-policy.js'
 import { getWorkspaceRoot } from '../tools/workspace-root.js'
+import { buildAssistantStepMessage, buildToolResultMessage, normalizeToolCallMessageSequence } from './message-utils.js'
 import { consumeResponseStream } from './stream-consumer.js'
 import { executePendingToolCall } from './tool-call-pipeline.js'
 
@@ -211,6 +212,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
   const messages: ModelMessage[] = [...initialMessages]
+  const generatedMessages: ModelMessage[] = []
   const workspaceRoot = workspaceRootOption || getWorkspaceRoot()
   const toolContext = { conversationId, projectKey, workspaceRoot, skillsWorkspaceRoot: workspaceRootOption }
 
@@ -246,6 +248,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       finishReason = 'aborted'
       break
     }
+
+    const normalizedMessages = normalizeToolCallMessageSequence(messages)
+    messages.length = 0
+    messages.push(...normalizedMessages)
 
     // Microcompaction: 将旧的大型工具结果缓存到磁盘，只保留引用
     compactToolResults(messages)
@@ -332,12 +338,17 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     }
 
     finalText += streamResult.iterationText
-
-    const responseData = await response.response
-    const responseMessages = responseData.messages ?? []
+    const assistantMessage = buildAssistantStepMessage({
+      text: streamResult.iterationText,
+      reasoning: streamResult.iterationReasoning,
+      pendingToolCalls: streamResult.pendingToolCalls,
+    })
 
     if (streamResult.pendingToolCalls.length > 0) {
-      messages.push(...responseMessages)
+      if (assistantMessage) {
+        messages.push(assistantMessage)
+        generatedMessages.push(assistantMessage)
+      }
 
       // 将工具调用分为可并行组和串行组
       const parallelBatch: PendingToolCall[] = []
@@ -364,22 +375,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           )
         }
 
-        const resultText = pipelineResult.contextResult
-          ?? (typeof pipelineResult.result === 'string'
-            ? pipelineResult.result
-            : JSON.stringify(pipelineResult.result))
-
-        return {
-          role: 'tool' as const,
-          content: [{
-            type: 'tool-result' as const,
-            toolCallId: tc.toolCallId,
-            toolName: tc.toolName,
-            output: pipelineResult.isError
-              ? { type: 'error-text' as const, value: resultText }
-              : { type: 'text' as const, value: resultText },
-          }],
-        }
+        return buildToolResultMessage(tc, pipelineResult)
       }
 
       const pipelineOpts = {
@@ -409,6 +405,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         for (const { tc, result } of parallelResults) {
           const msg = await handleToolResult(tc, result)
           messages.push(msg)
+          generatedMessages.push(msg)
         }
       }
 
@@ -418,6 +415,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
         const msg = await handleToolResult(tc, pipelineResult)
         messages.push(msg)
+        generatedMessages.push(msg)
 
         if (tc.toolName === 'plan_exit' && !pipelineResult.isError) {
           finishReason = 'end_turn'
@@ -435,8 +433,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       continue
     }
 
-    if (responseMessages.length > 0) {
-      messages.push(...responseMessages)
+    if (assistantMessage) {
+      messages.push(assistantMessage)
+      generatedMessages.push(assistantMessage)
     }
 
     if (finishReason === 'stop' || finishReason === 'end_turn' || finishReason === 'length') {
@@ -462,5 +461,6 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     },
     iterations,
     messages,
+    generatedMessages,
   }
 }

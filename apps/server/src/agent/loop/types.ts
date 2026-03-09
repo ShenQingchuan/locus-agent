@@ -39,6 +39,7 @@ export interface AgentLoopResult {
   }
   iterations: number
   messages: ModelMessage[]
+  generatedMessages: ModelMessage[]
 }
 
 export interface ExecuteToolPipelineOptions {

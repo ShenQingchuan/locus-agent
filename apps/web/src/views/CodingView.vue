@@ -636,7 +636,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 @click="openWorkspacePicker"
               >
                 <span class="i-material-symbols:folder-managed h-4 w-4 flex-none text-muted-foreground" />
-                <span class="text-sm text-foreground/90 whitespace-nowrap">工作目录</span>
+                <span class="text-sm text-foreground/90 whitespace-nowrap">工作空间</span>
                 <span
                   class="max-w-[28rem] truncate text-xs font-sans text-muted-foreground"
                   :title="currentProjectName"
@@ -693,7 +693,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                   <div class="text-center">
                     <span class="i-material-symbols:folder-managed-outline h-8 w-8 text-muted-foreground/50 mx-auto block mb-2" />
                     <span class="text-sm text-muted-foreground block">请先选择工作空间</span>
-                    <span class="text-xs text-muted-foreground/80 block mt-1">点击左侧「工作目录」打开项目</span>
+                    <span class="text-xs text-muted-foreground/80 block mt-1">点击左侧「工作空间」打开项目</span>
                   </div>
                 </div>
               </section>
