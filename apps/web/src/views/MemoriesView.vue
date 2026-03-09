@@ -265,7 +265,7 @@ onKeyStroke('Escape', () => {
 
       <!-- Center: composer + card stream -->
       <div class="flex-1 flex flex-col min-w-0 h-full">
-        <div class="flex-shrink-0 h-10 flex items-center px-3 border-b border-border/50">
+        <div class="flex-shrink-0 h-10 flex items-center px-3 border-b border-border/50 font-mono">
           <button
             class="flex-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
             :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"

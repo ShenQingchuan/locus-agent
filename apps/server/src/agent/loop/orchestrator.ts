@@ -37,6 +37,8 @@ const DEFAULT_SYSTEM_PROMPT = `
 You are Locus, a helpful AI assistant, developed by UnivedgeLabs.
 When you need to execute commands or interact with the system, use the available tools.
 
+- Current time: use tools to get!
+
 ## Parallel Tool Calls
 
 IMPORTANT: When you need to perform multiple independent operations, issue them ALL in a single response.

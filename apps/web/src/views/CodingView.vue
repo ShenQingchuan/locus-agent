@@ -209,6 +209,7 @@ onMounted(async () => {
 
 onActivated(async () => {
   isCodingViewActive.value = true
+  chatStore.setConversationScope(codingScope.value)
 
   if (!hasHandledFirstActivation.value) {
     hasHandledFirstActivation.value = true

@@ -4,12 +4,12 @@ import { useDark, useDebounceFn } from '@vueuse/core'
 import createPanZoom from 'panzoom'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-// 动态加载 mermaid，避免 ~3MB 进入主 chunk
-const mermaidPromise = import('mermaid').then(m => m.default)
-
 const props = defineProps<{
   node: any
 }>()
+
+// 动态加载 mermaid，避免 ~3MB 进入主 chunk
+const mermaidPromise = import('mermaid').then(m => m.default)
 
 let queue = Promise.resolve()
 

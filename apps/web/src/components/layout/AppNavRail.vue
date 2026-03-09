@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   },
   {
     key: 'memories',
-    icon: 'i-ph:plant-fill',
+    icon: 'i-famicons:library-sharp',
     title: '记忆',
   },
 ]
