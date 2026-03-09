@@ -6,7 +6,8 @@
 import type { WhitelistRule } from '@locus-agent/agent-sdk'
 import { getRiskLevel } from '@locus-agent/agent-sdk'
 import { eq } from 'drizzle-orm'
-import { db, whitelistRules } from '../db/index.js'
+import { db } from '../db/index.js'
+import { whitelistRules } from '../db/schema.js'
 
 // ---------------------------------------------------------------------------
 // 数据转换：DB row <-> WhitelistRule

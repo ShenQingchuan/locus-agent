@@ -1,17 +1,5 @@
-export interface ToolOutputCallbacks {
-  onOutputDelta?: (stream: 'stdout' | 'stderr', delta: string) => void | Promise<void>
-}
-
-export interface ToolExecutionContext {
-  conversationId?: string
-  projectKey?: string
-  workspaceRoot?: string
-  skillsWorkspaceRoot?: string
-}
-
-export type ToolExecutor<T = unknown, R = unknown> = (args: T) => Promise<R>
-export type StreamingToolExecutor<T = unknown, R = unknown> = (
-  args: T,
-  callbacks?: ToolOutputCallbacks,
-  context?: ToolExecutionContext,
-) => Promise<R>
+// Types are now defined in @locus-agent/agent-sdk.
+// Import directly: import type { ToolExecutionContext, ... } from '@locus-agent/agent-sdk'
+//
+// This file is kept as a tombstone to prevent broken imports during migration.
+// TODO: Remove once all consumers are updated.

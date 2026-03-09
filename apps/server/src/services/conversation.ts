@@ -1,6 +1,7 @@
 import type { Conversation, NewConversation } from '../db/schema.js'
 import { and, desc, eq, isNull } from 'drizzle-orm'
-import { conversations, db } from '../db/index.js'
+import { db } from '../db/index.js'
+import { conversations } from '../db/schema.js'
 
 interface ConversationScope {
   space?: 'chat' | 'coding'

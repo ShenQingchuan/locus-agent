@@ -1,5 +1,44 @@
+// Context management
+export type * from './context/index.js'
+export {
+  CACHED_MARKER,
+  COMPACTION_SYSTEM_PROMPT,
+  compactToolResults,
+  DEFAULT_COMPACTION_THRESHOLD,
+  DEFAULT_HOT_TAIL_COUNT,
+  DEFAULT_MIN_SIZE_TO_CACHE,
+  DEFAULT_RECENT_TURNS_TO_KEEP,
+  shouldCompact,
+} from './context/index.js'
+// Hook event model
+export type * from './hooks/index.js'
+export { HOOK_CATEGORIES } from './hooks/index.js'
+
+// Plugin contracts
+export type * from './plugins/index.js'
+export { hasPermission, PLUGIN_SCOPE_ORDER } from './plugins/index.js'
+
+// Prompt builder
+export type * from './prompt/index.js'
+export { createPromptBuilder } from './prompt/index.js'
+
+// Runtime contracts
+export type * from './runtime/index.js'
+export { classifyTool } from './runtime/index.js'
+
+// SSE protocol
+export type * from './sse/index.js'
+export {
+  consumeSSEStream,
+  createSSEEventPayload,
+  dispatchSSEEvent,
+  parseSSELine,
+  serializeSSEEvent,
+} from './sse/index.js'
+
 export type * from './types/index.js'
 export { CODING_PROVIDERS, DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS, normalizeModelForProvider } from './types/index.js'
+
 export {
   DANGEROUS_COMMAND_PREFIXES,
   extractDefaultPattern,

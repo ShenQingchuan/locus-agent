@@ -12,7 +12,7 @@ import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
+import { CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import {
@@ -61,15 +61,7 @@ export function updateActiveConfirmMode(conversationId: string, confirmMode: boo
   }
 }
 
-/**
- * 发送 SSE 事件的辅助函数
- */
-function createSSEEvent(event: SSEEvent): { event: string, data: string } {
-  return {
-    event: 'message',
-    data: JSON.stringify(event),
-  }
-}
+const createSSEEvent = createSSEEventPayload
 
 function toModelImagePayload(attachment: MessageImageAttachment): string | Uint8Array {
   const match = attachment.dataUrl.match(/^data:.*?;base64,(.+)$/)

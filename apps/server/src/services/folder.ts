@@ -1,6 +1,7 @@
 import type { Folder, NewFolder } from '../db/schema.js'
 import { asc, eq, isNull } from 'drizzle-orm'
-import { db, folders } from '../db/index.js'
+import { db } from '../db/index.js'
+import { folders } from '../db/schema.js'
 
 /**
  * 创建文件夹

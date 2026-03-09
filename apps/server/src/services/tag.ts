@@ -1,6 +1,7 @@
 import type { Tag } from '../db/schema.js'
 import { asc, eq } from 'drizzle-orm'
-import { db, noteTags, tags } from '../db/index.js'
+import { db } from '../db/index.js'
+import { noteTags, tags } from '../db/schema.js'
 
 /**
  * 获取或创建标签（按名称去重）

@@ -1,6 +1,6 @@
+import type { DelegateDelta, PendingToolCall, ToolExecutionContext } from '@locus-agent/agent-sdk'
 import type { LanguageModel, ModelMessage } from 'ai'
 import type { QuestionAnswer, QuestionItem } from '../tools/ask_question.js'
-import type { ToolExecutionContext } from '../tools/registry.js'
 
 export interface AgentLoopOptions {
   messages: ModelMessage[]
@@ -17,7 +17,6 @@ export interface AgentLoopOptions {
   abortSignal?: AbortSignal
   confirmMode?: boolean | (() => boolean)
   thinkingMode?: boolean
-  /** Coding 空间模式：build（直接编码）/ plan（先规划再编码） */
   codingMode?: 'build' | 'plan'
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
   onQuestionPending?: (toolCallId: string, questions: QuestionItem[]) => void | Promise<void>
@@ -42,19 +41,6 @@ export interface AgentLoopResult {
   messages: ModelMessage[]
 }
 
-export interface PendingToolCall {
-  toolCallId: string
-  toolName: string
-  args: unknown
-}
-
-export interface DelegateDelta {
-  type: 'text' | 'reasoning' | 'tool_start' | 'tool_result'
-  content: string
-  toolName?: string
-  isError?: boolean
-}
-
 export interface ExecuteToolPipelineOptions {
   pendingToolCall: PendingToolCall
   model: LanguageModel
@@ -73,7 +59,6 @@ export interface ExecuteToolPipelineOptions {
 
 export interface ExecuteToolPipelineResult {
   result: unknown
-  /** 精简版结果，用于推入 LLM 上下文的 messages（不设置则使用 result 序列化） */
   contextResult?: string
   isError: boolean
   isInterrupted: boolean

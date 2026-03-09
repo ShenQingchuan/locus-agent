@@ -1,27 +1,10 @@
+import type { DelegateArgs, DelegateCallbacks, DelegateResult, SubAgentConfig } from '@locus-agent/agent-sdk'
 import type { LanguageModel, ModelMessage } from 'ai'
 import type { AgentLoopResult } from '../loop.js'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getDelegateSession, upsertDelegateSession } from '../../services/delegate-session.js'
 import { runAgentLoop } from '../loop.js'
-
-/**
- * 子代理配置定义
- */
-export interface SubAgentConfig {
-  /** 代理名称 */
-  name: string
-  /** 系统提示词（专注于特定任务） */
-  systemPrompt: string
-  /** 使用的模型（默认使用主代理相同的模型） */
-  model?: LanguageModel
-  /** 可用工具列表（undefined = 使用所有工具） */
-  tools?: string[]
-  /** 最大迭代次数 */
-  maxIterations?: number
-  /** 是否启用思考模式 */
-  thinkingMode?: boolean
-}
 
 interface DelegateSessionState {
   taskId: string
@@ -56,11 +39,6 @@ Execute multi-step tasks efficiently and return concise, actionable results.`,
   }
 }
 
-/**
- * Delegate 工具定义
- * 用于将任务委派给专门的子代理处理
- * 注意：需要调用方提供完整的 system_prompt，系统不再内置任何预设
- */
 export const delegateTool = tool({
   description: `
 Delegate a specific task to a specialized sub-agent.
@@ -91,49 +69,8 @@ IMPORTANT:
   }),
 })
 
-/**
- * 子代理默认工具超时（毫秒）
- * 防止 MCP 等外部工具长时间不返回导致阻塞
- */
-const SUB_AGENT_TOOL_TIMEOUT_MS = 60_000 // 60 秒
+const SUB_AGENT_TOOL_TIMEOUT_MS = 60_000
 
-/**
- * Delegate 工具执行参数
- * LLM 在调用时需要提供完整的 system_prompt，不再有任何内置预设
- */
-export interface DelegateArgs {
-  agent_name: string
-  /** 子代理类型描述，用于标识和展示 */
-  agent_type: string
-  task: string
-  context?: string
-  /** 完整的系统提示词，由 LLM 在运行时根据任务需求自行定义 */
-  system_prompt?: string
-  max_iterations?: number
-  task_id?: string
-  command?: string
-}
-
-/**
- * Delegate 工具执行结果
- */
-export interface DelegateResult {
-  success: boolean
-  taskId: string
-  agentName: string
-  agentType: string
-  result: string
-  iterations: number
-  usage: {
-    inputTokens: number
-    outputTokens: number
-    totalTokens: number
-  }
-}
-
-/**
- * 构建子代理的输入消息
- */
 function buildSubAgentMessages(args: DelegateArgs): ModelMessage[] {
   const content = [`## Task\n${args.task}`]
 
@@ -153,10 +90,6 @@ function buildSubAgentMessages(args: DelegateArgs): ModelMessage[] {
   ]
 }
 
-/**
- * 获取子代理配置
- * 完全由调用方提供的 system_prompt 决定子代理的行为
- */
 function getSubAgentConfig(
   args: DelegateArgs,
   defaultModel: LanguageModel,
@@ -173,28 +106,6 @@ function getSubAgentConfig(
   }
 }
 
-/**
- * Delegate 执行状态回调
- */
-export interface DelegateCallbacks {
-  /** 子代理文本输出回调 */
-  onTextDelta?: (delta: string) => void | Promise<void>
-  /** 子代理思考过程回调 */
-  onReasoningDelta?: (delta: string) => void | Promise<void>
-  /** 子代理工具调用开始回调 */
-  onToolCallStart?: (toolCallId: string, toolName: string, args: unknown) => void | Promise<void>
-  /** 子代理工具调用结果回调 */
-  onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void | Promise<void>
-  conversationId?: string
-}
-
-/**
- * 执行 Delegate 工具
- * @param args 工具参数
- * @param defaultModel 默认模型（继承自主代理）
- * @param callbacks 可选的流式状态回调
- * @returns 子代理执行结果
- */
 export async function executeDelegate(
   args: DelegateArgs,
   defaultModel: LanguageModel,
@@ -241,10 +152,10 @@ export async function executeDelegate(
     const result: AgentLoopResult = await runAgentLoop({
       messages: [...session.messages],
       systemPrompt: session.systemPrompt,
-      model: config.model ?? defaultModel,
+      model: config.model as LanguageModel ?? defaultModel,
       maxIterations: config.maxIterations ?? 10,
       thinkingMode: config.thinkingMode ?? true,
-      toolTimeoutMs: SUB_AGENT_TOOL_TIMEOUT_MS, // 子代理工具超时
+      toolTimeoutMs: SUB_AGENT_TOOL_TIMEOUT_MS,
       toolAllowlist: config.tools,
       onTextDelta: callbacks?.onTextDelta,
       onReasoningDelta: callbacks?.onReasoningDelta,
@@ -282,9 +193,6 @@ export async function executeDelegate(
   }
 }
 
-/**
- * 格式化 Delegate 结果为字符串
- */
 export function formatDelegateResult(result: DelegateResult): string {
   const parts = [
     `task_id: ${result.taskId} (for resuming this delegate task later)`,

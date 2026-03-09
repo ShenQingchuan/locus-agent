@@ -1,84 +1,11 @@
 import type { AddToWhitelistPayload } from '@locus-agent/agent-sdk'
-import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer, SSEEvent } from './chat-types.js'
+import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer } from './chat-types.js'
+import { consumeSSEStream } from '@locus-agent/agent-sdk'
 
-export type { ChatStreamOptions, ConversationPlansResponse, DelegateDeltaEvent, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
+export type { ChatStreamOptions, ConversationPlansResponse, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
+export type { DelegateDeltaEvent } from './chat-types.js'
 
 const abortControllers = new Map<string, AbortController>()
-
-function parseSSELine(line: string): SSEEvent | null {
-  if (!line.startsWith('data: '))
-    return null
-
-  const data = line.slice(6)
-  if (data === '[DONE]')
-    return null
-
-  try {
-    return JSON.parse(data) as SSEEvent
-  }
-  catch {
-    console.error('Failed to parse SSE data:', data)
-    return null
-  }
-}
-
-function dispatchEvent(
-  event: SSEEvent,
-  handlers: {
-    onReasoningDelta?: (delta: string) => void
-    onTextDelta?: (delta: string) => void
-    onToolCallStart?: (c: import('@locus-agent/agent-sdk').ToolCall) => void
-    onToolCallResult?: (r: import('@locus-agent/agent-sdk').ToolResult) => void
-    onToolPendingApproval?: (a: import('./chat-types.js').PendingApproval) => void
-    onQuestionPending?: (q: import('./chat-types.js').PendingQuestion) => void
-    onToolOutputDelta?: (id: string, stream: 'stdout' | 'stderr', delta: string) => void
-    onDelegateDelta?: (e: import('./chat-types.js').DelegateDeltaEvent) => void
-    onDone?: (id: string, usage?: { promptTokens: number, completionTokens: number, totalTokens: number }, model?: string) => void
-    onError?: (code: string, message: string) => void
-  },
-): void {
-  switch (event.type) {
-    case 'reasoning-delta':
-      handlers.onReasoningDelta?.(event.reasoningDelta)
-      break
-    case 'text-delta':
-      handlers.onTextDelta?.(event.textDelta)
-      break
-    case 'tool-call-start':
-      handlers.onToolCallStart?.(event.toolCall)
-      break
-    case 'tool-call-result':
-      handlers.onToolCallResult?.(event.toolResult)
-      break
-    case 'tool-pending-approval':
-      handlers.onToolPendingApproval?.({
-        toolCallId: event.toolCallId,
-        toolName: event.toolName,
-        args: event.args,
-        suggestedPattern: event.suggestedPattern,
-        riskLevel: event.riskLevel,
-      })
-      break
-    case 'question-pending':
-      handlers.onQuestionPending?.({
-        toolCallId: event.toolCallId,
-        questions: event.questions,
-      })
-      break
-    case 'tool-output-delta':
-      handlers.onToolOutputDelta?.(event.toolCallId, event.stream, event.delta)
-      break
-    case 'delegate-delta':
-      handlers.onDelegateDelta?.({ toolCallId: event.toolCallId, delta: event.delta })
-      break
-    case 'done':
-      handlers.onDone?.(event.messageId, event.usage, event.model)
-      break
-    case 'error':
-      handlers.onError?.(event.code, event.message)
-      break
-  }
-}
 
 export async function streamChat(options: ChatStreamOptions): Promise<void> {
   const {
@@ -95,16 +22,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     codingProvider,
     planBinding,
     messageMetadata,
-    onReasoningDelta,
-    onTextDelta,
-    onToolCallStart,
-    onToolCallResult,
-    onToolPendingApproval,
-    onQuestionPending,
-    onToolOutputDelta,
-    onDelegateDelta,
-    onDone,
-    onError,
+    ...handlers
   } = options
 
   const existingController = abortControllers.get(conversationId)
@@ -114,19 +32,6 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
 
   const controller = new AbortController()
   abortControllers.set(conversationId, controller)
-
-  const handlers = {
-    onReasoningDelta,
-    onTextDelta,
-    onToolCallStart,
-    onToolCallResult,
-    onToolPendingApproval,
-    onQuestionPending,
-    onToolOutputDelta,
-    onDelegateDelta,
-    onDone,
-    onError,
-  }
 
   try {
     const response = await fetch(`/api/chat`, {
@@ -152,7 +57,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      onError?.(
+      handlers.onError?.(
         errorData.code || 'HTTP_ERROR',
         errorData.message || `HTTP error: ${response.status}`,
       )
@@ -160,48 +65,16 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     }
 
     if (!response.body) {
-      onError?.('NO_BODY', 'Response body is empty')
+      handlers.onError?.('NO_BODY', 'Response body is empty')
       return
     }
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-
-      if (done)
-        break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmedLine = line.trim()
-        if (!trimmedLine)
-          continue
-
-        const event = parseSSELine(trimmedLine)
-        if (!event)
-          continue
-
-        dispatchEvent(event, handlers)
-      }
-    }
-
-    if (buffer.trim()) {
-      const event = parseSSELine(buffer.trim())
-      if (event)
-        dispatchEvent(event, handlers)
-    }
+    await consumeSSEStream(response.body.getReader(), handlers)
   }
   catch (error) {
     if (error instanceof Error && error.name === 'AbortError')
       return
-    onError?.('NETWORK_ERROR', error instanceof Error ? error.message : 'Unknown error')
+    handlers.onError?.('NETWORK_ERROR', error instanceof Error ? error.message : 'Unknown error')
   }
   finally {
     abortControllers.delete(conversationId)

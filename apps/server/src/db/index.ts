@@ -178,5 +178,3 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
 export function initDatabase(): void {
   getDb()
 }
-
-export * from './schema.js'

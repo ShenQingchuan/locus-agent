@@ -1,7 +1,8 @@
 import type { MessageImageAttachment, ToolCall, ToolResult } from '@locus-agent/agent-sdk'
 import type { Message, NewMessage } from '../db/schema.js'
 import { asc, desc, eq, sql } from 'drizzle-orm'
-import { db, messages } from '../db/index.js'
+import { db } from '../db/index.js'
+import { messages } from '../db/schema.js'
 import { touchConversation } from './conversation.js'
 
 /**

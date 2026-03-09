@@ -13,7 +13,9 @@
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm -F @locus-agent/server db:generate",
     "db:migrate": "pnpm -F @locus-agent/server db:migrate",
-    "db:studio": "pnpm -F @locus-agent/server db:studio"
+    "db:studio": "pnpm -F @locus-agent/server db:studio",
+    "reexport:chains": "node scripts/find-reexport-chains.mjs",
+    "reexport:scan": "sg scan"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-tools",

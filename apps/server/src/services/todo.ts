@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { db, todoItems } from '../db/index.js'
+import { db } from '../db/index.js'
+import { todoItems } from '../db/schema.js'
 
 export type TodoStatus = 'in_progress' | 'completed'
 

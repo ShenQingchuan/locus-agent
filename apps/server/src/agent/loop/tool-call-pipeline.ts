@@ -1,5 +1,5 @@
+import type { DelegateArgs, DelegateResult } from '@locus-agent/agent-sdk'
 import type { QuestionItem } from '../tools/ask_question.js'
-import type { DelegateArgs, DelegateResult } from '../tools/delegate.js'
 import type { ExecuteToolPipelineOptions, ExecuteToolPipelineResult } from './types.js'
 import { formatQuestionAnswers } from '../tools/ask_question.js'
 import { executeDelegate, formatDelegateResult } from '../tools/delegate.js'

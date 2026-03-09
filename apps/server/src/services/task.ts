@@ -1,6 +1,7 @@
 import type { NewTask, Task } from '../db/schema.js'
 import { and, asc, eq, gte, sql } from 'drizzle-orm'
-import { db, taskConversations, tasks } from '../db/index.js'
+import { db } from '../db/index.js'
+import { taskConversations, tasks } from '../db/schema.js'
 
 // ==================== Types ====================
 

@@ -1,6 +1,7 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
 import { count, desc, eq, inArray, like } from 'drizzle-orm'
-import { db, isVecAvailable, noteConversations, notes, noteTags, tags } from '../db/index.js'
+import { db, isVecAvailable } from '../db/index.js'
+import { noteConversations, notes, noteTags, tags } from '../db/schema.js'
 import { getOrCreateTag } from './tag.js'
 
 // ==================== Embedding 自动索引 ====================

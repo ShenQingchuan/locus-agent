@@ -7,7 +7,8 @@ import {
 
   setLLMConfig,
 } from '../agent/providers/index.js'
-import { db, settings as settingsTable } from '../db/index.js'
+import { db } from '../db/index.js'
+import { settings as settingsTable } from '../db/schema.js'
 
 export const settingsRoutes = new Hono()
 

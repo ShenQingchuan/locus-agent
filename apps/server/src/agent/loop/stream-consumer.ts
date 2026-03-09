@@ -1,4 +1,4 @@
-import type { PendingToolCall } from './types.js'
+import type { PendingToolCall } from '@locus-agent/agent-sdk'
 
 interface StreamConsumeOptions {
   response: { fullStream: AsyncIterable<any> }

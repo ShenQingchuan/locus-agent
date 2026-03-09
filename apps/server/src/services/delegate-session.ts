@@ -1,6 +1,7 @@
 import type { ModelMessage } from 'ai'
 import { eq } from 'drizzle-orm'
-import { db, delegateSessions } from '../db/index.js'
+import { db } from '../db/index.js'
+import { delegateSessions } from '../db/schema.js'
 
 export interface DelegateSessionState {
   taskId: string

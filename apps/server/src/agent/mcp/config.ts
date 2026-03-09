@@ -1,6 +1,7 @@
 import type { MCPServersConfig } from '@locus-agent/agent-sdk'
 import { eq } from 'drizzle-orm'
-import { db, settings as settingsTable } from '../../db/index.js'
+import { db } from '../../db/index.js'
+import { settings as settingsTable } from '../../db/schema.js'
 
 const MCP_CONFIG_KEY = 'mcp.servers'
 

@@ -1,5 +1,6 @@
+import type { PendingToolCall } from '@locus-agent/agent-sdk'
 import type { ModelMessage } from 'ai'
-import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult, PendingToolCall } from './types.js'
+import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult } from './types.js'
 import process from 'node:process'
 import { streamText } from 'ai'
 import { getModelInvocableSkillCatalog } from '../../services/skills.js'
