@@ -1,5 +1,6 @@
 import { generateText } from 'ai'
 import { Hono } from 'hono'
+import { resolvePendingApprovalsForConversation } from '../agent/approval.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import {
   conversationExists,
@@ -10,7 +11,6 @@ import {
   updateConversation,
 } from '../services/conversation.js'
 import { addMessage, getMessages, truncateMessages } from '../services/message.js'
-import { resolvePendingApprovalsForConversation } from '../agent/approval.js'
 import { updateActiveConfirmMode } from './chat.js'
 
 export const conversationsRoutes = new Hono()

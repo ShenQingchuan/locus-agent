@@ -1,5 +1,6 @@
 import type {
   SkillDetail,
+  SkillFileNode,
   SkillPreferenceUpdateRequest,
   SkillResource,
   SkillSource,
@@ -7,7 +8,7 @@ import type {
 } from '@locus-agent/shared'
 import { Buffer } from 'node:buffer'
 import { existsSync } from 'node:fs'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { db, settings as settingsTable } from '../db/index.js'
@@ -428,6 +429,180 @@ export async function updateSkillPreference(
 export async function getModelInvocableSkillCatalog(workspaceRoot?: string): Promise<SkillSummary[]> {
   const discovered = await discoverSkills({ workspaceRoot })
   return discovered.skills.filter(skill => skill.effective && skill.enabled && skill.modelInvocable)
+}
+
+export async function getSkillFileTree(skillRootDir: string): Promise<SkillFileNode[]> {
+  if (!existsSync(skillRootDir)) {
+    return []
+  }
+
+  async function walkDir(dir: string): Promise<SkillFileNode[]> {
+    const entries = await readdir(dir, { withFileTypes: true })
+    const nodes: SkillFileNode[] = []
+
+    // Sort: directories first, then files, alphabetically within each group
+    const sorted = entries.slice().sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory())
+        return a.isDirectory() ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+
+    for (const entry of sorted) {
+      const fullPath = join(dir, entry.name)
+      const relPath = relative(skillRootDir, fullPath).split('\\').join('/')
+
+      if (entry.isDirectory()) {
+        const children = await walkDir(fullPath)
+        nodes.push({
+          name: entry.name,
+          path: relPath,
+          type: 'directory',
+          children,
+        })
+      }
+      else if (entry.isFile()) {
+        nodes.push({
+          name: entry.name,
+          path: relPath,
+          type: 'file',
+        })
+      }
+    }
+
+    return nodes
+  }
+
+  return walkDir(skillRootDir)
+}
+
+export async function createSkill(options: {
+  name: string
+  source: SkillSource
+  workspaceRoot?: string
+  description?: string
+}): Promise<SkillSummary> {
+  const { name, source, workspaceRoot, description } = options
+
+  // Validate name (alphanumeric + hyphens only)
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name)) {
+    throw new Error('Skill name must be lowercase alphanumeric with optional hyphens, and cannot start or end with a hyphen')
+  }
+
+  // Determine target directory
+  let skillsDir: string
+  if (source === 'project') {
+    if (!workspaceRoot) {
+      throw new Error('workspaceRoot is required for project skills')
+    }
+    skillsDir = join(workspaceRoot, '.agents', 'skills')
+  }
+  else {
+    skillsDir = getSkillsDataDir()
+  }
+
+  const skillDir = join(skillsDir, name)
+  const skillFilePath = join(skillDir, SKILL_ENTRY_FILENAME)
+
+  if (existsSync(skillDir)) {
+    throw new Error(`Skill "${name}" already exists at ${skillDir}`)
+  }
+
+  // Create directory structure
+  await mkdir(skillDir, { recursive: true })
+
+  // Create SKILL.md with basic frontmatter
+  const desc = description || `${name} skill`
+  const content = `---
+name: ${name}
+description: >
+  ${desc}
+---
+
+# ${name}
+
+<!-- Write your skill instructions here -->
+`
+  await writeFile(skillFilePath, content, 'utf-8')
+
+  // Re-discover and return the new skill
+  const discovered = await discoverSkills({ workspaceRoot })
+  const newSkill = discovered.skills.find(s => s.name === name && s.source === source)
+  if (!newSkill) {
+    throw new Error('Skill was created but could not be found in discovery')
+  }
+
+  return newSkill
+}
+
+function inferLanguageFromPath(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+  const langMap: Record<string, string> = {
+    md: 'markdown',
+    markdown: 'markdown',
+    ts: 'typescript',
+    tsx: 'typescriptreact',
+    js: 'javascript',
+    jsx: 'javascriptreact',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'toml',
+    py: 'python',
+    sh: 'shell',
+    bash: 'shell',
+    css: 'css',
+    html: 'html',
+    xml: 'xml',
+    sql: 'sql',
+    rs: 'rust',
+    go: 'go',
+    rb: 'ruby',
+    txt: 'plaintext',
+  }
+  return langMap[ext] ?? 'plaintext'
+}
+
+export async function readSkillFile(
+  skillRootDir: string,
+  relativeFilePath: string,
+): Promise<{ content: string, language: string }> {
+  // Security: ensure the path doesn't escape the skill directory
+  const resolved = join(skillRootDir, relativeFilePath)
+  const normalizedResolved = resolved.split('\\').join('/')
+  const normalizedRoot = skillRootDir.split('\\').join('/')
+  if (!normalizedResolved.startsWith(normalizedRoot)) {
+    throw new Error('Path traversal detected')
+  }
+
+  if (!existsSync(resolved)) {
+    throw new Error(`File not found: ${relativeFilePath}`)
+  }
+
+  const content = await readFile(resolved, 'utf-8')
+  const language = inferLanguageFromPath(relativeFilePath)
+  return { content, language }
+}
+
+export async function writeSkillFile(
+  skillRootDir: string,
+  relativeFilePath: string,
+  content: string,
+): Promise<void> {
+  // Security: ensure the path doesn't escape the skill directory
+  const resolved = join(skillRootDir, relativeFilePath)
+  const normalizedResolved = resolved.split('\\').join('/')
+  const normalizedRoot = skillRootDir.split('\\').join('/')
+  if (!normalizedResolved.startsWith(normalizedRoot)) {
+    throw new Error('Path traversal detected')
+  }
+
+  // Ensure parent directory exists
+  const parentDir = dirname(resolved)
+  if (!existsSync(parentDir)) {
+    await mkdir(parentDir, { recursive: true })
+  }
+
+  await writeFile(resolved, content, 'utf-8')
 }
 
 export async function activateSkillForAgent(name: string, workspaceRoot?: string): Promise<string> {

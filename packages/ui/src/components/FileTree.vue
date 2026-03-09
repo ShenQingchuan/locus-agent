@@ -37,6 +37,11 @@ const emit = defineEmits<{
   toggle: [node: FileTreeNode, expanded: boolean]
 }>()
 
+defineSlots<{
+  /** Custom render for each file tree node */
+  default: (props: { node: TreeNode, depth: number, hasChildren: boolean, expanded: boolean }) => any
+}>()
+
 function onSelect(node: TreeNode) {
   emit('select', node as FileTreeNode)
 }
@@ -57,15 +62,17 @@ function onToggle(node: TreeNode, expanded: boolean) {
     @select="onSelect"
     @toggle="onToggle"
   >
-    <template #default="{ node }">
-      <div
-        class="flex items-center gap-1.5 min-w-0 py-0.5 px-1 rounded text-sm transition-colors"
-        :class="props.selectedId === node.id
-          ? 'bg-accent text-accent-foreground font-medium'
-          : 'text-foreground/90 hover:text-foreground'"
-      >
-        <span class="truncate font-mono">{{ node.label }}</span>
-      </div>
+    <template #default="slotProps">
+      <slot v-bind="slotProps">
+        <div
+          class="flex items-center gap-1.5 min-w-0 py-0.5 px-1 rounded text-sm transition-colors"
+          :class="props.selectedId === slotProps.node.id
+            ? 'bg-accent text-accent-foreground font-medium'
+            : 'text-foreground/90 hover:text-foreground'"
+        >
+          <span class="truncate font-mono">{{ slotProps.node.label }}</span>
+        </div>
+      </slot>
     </template>
   </Tree>
 </template>

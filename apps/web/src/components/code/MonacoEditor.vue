@@ -61,6 +61,10 @@ onMounted(async () => {
     ...props.options,
   })
 
+  // modern-monaco init() is a singleton — defaultTheme only applies on first call.
+  // Explicitly set the correct theme after each editor creation.
+  monaco.editor.setTheme(currentTheme)
+
   const model = monaco.editor.createModel(props.modelValue, props.language)
   editor.setModel(model)
 

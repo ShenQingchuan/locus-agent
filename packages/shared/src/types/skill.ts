@@ -53,3 +53,44 @@ export interface SkillPreferenceUpdateResponse {
   success: boolean
   skill?: SkillSummary
 }
+
+export interface SkillFileNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: SkillFileNode[]
+}
+
+export interface SkillFilesResponse {
+  rootDir: string
+  files: SkillFileNode[]
+}
+
+export interface SkillCreateRequest {
+  name: string
+  source: SkillSource
+  workspaceRoot?: string
+  description?: string
+}
+
+export interface SkillCreateResponse {
+  success: boolean
+  skill?: SkillSummary
+}
+
+export interface SkillFileContentResponse {
+  path: string
+  content: string
+  language: string
+}
+
+export interface SkillFileSaveRequest {
+  skillId: string
+  filePath: string
+  content: string
+  workspaceRoot?: string
+}
+
+export interface SkillFileSaveResponse {
+  success: boolean
+}
