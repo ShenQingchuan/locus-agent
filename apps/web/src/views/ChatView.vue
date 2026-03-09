@@ -35,7 +35,7 @@ provideMarkConversationDirty((conversationId: string) => {
 })
 
 // Pinia Colada 查询：缓存会话消息数据
-const { data: conversationData } = useConversationQuery(
+const { data: conversationData, isPending: isLoadingConversation } = useConversationQuery(
   () => chatStore.currentConversationId,
 )
 
@@ -318,6 +318,7 @@ async function handleGenerateTitle() {
           :messages="chatStore.visibleMessages"
           :is-loading="chatStore.isLoading"
           :is-streaming="chatStore.isStreaming"
+          :is-loading-conversation="!!chatStore.currentConversationId && isLoadingConversation"
         />
       </main>
 

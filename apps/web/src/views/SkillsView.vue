@@ -373,7 +373,7 @@ onMounted(() => {
                 {{ selectedSkill.name }}
               </h3>
               <button
-                class="h-6 min-w-[52px] px-2 inline-flex gap-2 items-center justify-center rounded text-[10px] font-medium transition-colors disabled:opacity-50"
+                class="h-6 min-w-[52px] px-2 inline-flex gap-2 items-center justify-center rounded text-[10px] font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
                 :class="selectedSkill.enabled
                   ? 'border border-border text-muted-foreground hover:bg-muted'
                   : 'bg-primary text-primary-foreground hover:bg-primary/90'"

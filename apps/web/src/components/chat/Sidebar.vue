@@ -201,8 +201,10 @@ async function handleDeleteConversation(id: string) {
       <!-- Footer -->
       <div class="flex-shrink-0 p-3 border-t border-sidebar-border">
         <div class="flex items-center text-xs text-muted-foreground/70">
-          <span class="font-bold font-mono">Locus Agent</span>
-          <span class="ml-1 font-mono text-muted-foreground/60">v{{ appVersion }}</span>
+          <div class="flex flex-col gap-0.5">
+            <span class="font-bold font-mono">Locus Agent</span>
+            <span class="font-mono text-muted-foreground/60">v{{ appVersion }}</span>
+          </div>
           <Dropdown class="ml-auto" :items="menuItems" placement="top-end" trigger="hover" @select="handleMenuSelect">
             <template #trigger>
               <button

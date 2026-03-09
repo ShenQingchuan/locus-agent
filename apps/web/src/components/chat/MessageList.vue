@@ -7,8 +7,10 @@ const props = withDefaults(defineProps<{
   messages: Message[]
   isLoading: boolean
   isStreaming: boolean
+  isLoadingConversation?: boolean
   scrollButtonRight?: string
 }>(), {
+  isLoadingConversation: false,
   scrollButtonRight: 'calc((100% - min(100%, 48rem)) / 2 - 3.5rem)',
 })
 
@@ -146,8 +148,19 @@ defineExpose({ scrollToBottom })
       @scroll.passive="onScroll"
     >
       <div class="max-w-3xl mx-auto">
+        <!-- Loading conversation -->
+        <div
+          v-if="messages.length === 0 && isLoadingConversation"
+          class="flex-col-center h-full py-20 text-muted-foreground"
+        >
+          <div class="i-svg-spinners:ring-resize h-10 w-10 mb-4 opacity-70" />
+          <p class="text-base font-medium">
+            加载会话中...
+          </p>
+        </div>
+
         <!-- Empty state -->
-        <div v-if="messages.length === 0">
+        <div v-else-if="messages.length === 0">
           <slot name="empty">
             <div class="flex-col-center h-full py-20 text-muted-foreground">
               <div class="i-carbon-chat-bot h-10 w-10 mb-4 opacity-50" />
