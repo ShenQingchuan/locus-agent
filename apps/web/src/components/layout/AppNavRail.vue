@@ -36,12 +36,12 @@ const navItems: NavItem[] = [
   },
   {
     key: 'coding',
-    icon: 'i-streamline-ultimate:programming-user-chat-bold',
+    icon: 'i-octicon:copilot-24',
     title: '编程',
   },
   {
     key: 'skills',
-    icon: 'i-material-symbols:skillet',
+    icon: 'i-streamline-ultimate:kitchenware-spatula-1-bold',
     title: '技能',
   },
   {
