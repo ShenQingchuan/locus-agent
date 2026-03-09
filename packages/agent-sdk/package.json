@@ -1,5 +1,5 @@
 {
-  "name": "@locus-agent/shared",
+  "name": "@locus-agent/agent-sdk",
   "type": "module",
   "version": "1.0.0",
   "private": true,

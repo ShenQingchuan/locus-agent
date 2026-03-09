@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Task } from '@locus-agent/shared'
+import type { Task } from '@locus-agent/agent-sdk'
 import type { DropdownItem } from '@locus-agent/ui'
 import { Dropdown } from '@locus-agent/ui'
 import { computed } from 'vue'

@@ -1,4 +1,4 @@
-import type { EditorState, Folder } from '@locus-agent/shared'
+import type { EditorState, Folder } from '@locus-agent/agent-sdk'
 import { useDebounceFn } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'

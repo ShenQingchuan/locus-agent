@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Conversation } from '@locus-agent/shared'
+import type { Conversation } from '@locus-agent/agent-sdk'
 import { computed } from 'vue'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 

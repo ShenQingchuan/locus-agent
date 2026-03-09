@@ -1,4 +1,4 @@
-import type { MessageImageAttachment } from '@locus-agent/shared'
+import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
 import type { ImageAttachmentStripItem } from '@locus-agent/ui'
 import { useToast } from '@locus-agent/ui'
 import { computed, ref } from 'vue'

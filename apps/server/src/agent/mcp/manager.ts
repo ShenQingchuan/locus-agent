@@ -1,5 +1,5 @@
 import type { MCPClient } from '@ai-sdk/mcp'
-import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/shared'
+import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/agent-sdk'
 import type { Tool } from 'ai'
 import EventEmitter from 'node:events'
 import process from 'node:process'

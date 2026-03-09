@@ -1,4 +1,4 @@
-import type { WorkspaceDirectoryEntry } from '@locus-agent/shared'
+import type { WorkspaceDirectoryEntry } from '@locus-agent/agent-sdk'
 import { useToast } from '@locus-agent/ui'
 import { ref } from 'vue'
 import * as workspaceApi from '@/api/workspace'

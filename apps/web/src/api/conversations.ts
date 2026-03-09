@@ -1,4 +1,4 @@
-import type { Conversation, ListConversationsResponse, Message } from '@locus-agent/shared'
+import type { Conversation, ListConversationsResponse, Message } from '@locus-agent/agent-sdk'
 
 export async function fetchConversations(scope?: {
   space?: 'chat' | 'coding'

@@ -3,8 +3,8 @@
  * session 级别（关联会话，存 DB）和 global 级别（存 DB，无会话关联）
  */
 
-import type { WhitelistRule } from '@locus-agent/shared'
-import { getRiskLevel } from '@locus-agent/shared'
+import type { WhitelistRule } from '@locus-agent/agent-sdk'
+import { getRiskLevel } from '@locus-agent/agent-sdk'
 import { eq } from 'drizzle-orm'
 import { db, whitelistRules } from '../db/index.js'
 

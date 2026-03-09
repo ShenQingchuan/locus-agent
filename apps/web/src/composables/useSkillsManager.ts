@@ -1,4 +1,4 @@
-import type { SkillDetail, SkillFileNode, SkillSummary } from '@locus-agent/shared'
+import type { SkillDetail, SkillFileNode, SkillSummary } from '@locus-agent/agent-sdk'
 import type { FileTreeNode } from '@locus-agent/ui'
 import { useToast } from '@locus-agent/ui'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'

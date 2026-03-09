@@ -1,4 +1,4 @@
-import type { SkillPreferenceUpdateRequest, SkillSource } from '@locus-agent/shared'
+import type { SkillPreferenceUpdateRequest, SkillSource } from '@locus-agent/agent-sdk'
 import { watch as fsWatch } from 'node:fs'
 import { join } from 'node:path'
 import { Hono } from 'hono'

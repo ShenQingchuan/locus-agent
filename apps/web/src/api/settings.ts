@@ -1,4 +1,4 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
 
 export interface SettingsConfigResponse {
   setupCompleted: boolean

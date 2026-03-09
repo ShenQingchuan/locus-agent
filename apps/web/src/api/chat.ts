@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload } from '@locus-agent/shared'
+import type { AddToWhitelistPayload } from '@locus-agent/agent-sdk'
 import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer, SSEEvent } from './chat-types.js'
 
 export type { ChatStreamOptions, ConversationPlansResponse, DelegateDeltaEvent, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
@@ -27,8 +27,8 @@ function dispatchEvent(
   handlers: {
     onReasoningDelta?: (delta: string) => void
     onTextDelta?: (delta: string) => void
-    onToolCallStart?: (c: import('@locus-agent/shared').ToolCall) => void
-    onToolCallResult?: (r: import('@locus-agent/shared').ToolResult) => void
+    onToolCallStart?: (c: import('@locus-agent/agent-sdk').ToolCall) => void
+    onToolCallResult?: (r: import('@locus-agent/agent-sdk').ToolResult) => void
     onToolPendingApproval?: (a: import('./chat-types.js').PendingApproval) => void
     onQuestionPending?: (q: import('./chat-types.js').PendingQuestion) => void
     onToolOutputDelta?: (id: string, stream: 'stdout' | 'stderr', delta: string) => void

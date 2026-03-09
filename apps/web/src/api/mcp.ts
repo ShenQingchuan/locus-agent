@@ -1,4 +1,4 @@
-import type { MCPServersConfig, MCPServerStatus } from '@locus-agent/shared'
+import type { MCPServersConfig, MCPServerStatus } from '@locus-agent/agent-sdk'
 
 export interface MCPStatusChangeEvent {
   name: string

@@ -1,4 +1,4 @@
-import type { Conversation } from '@locus-agent/shared'
+import type { Conversation } from '@locus-agent/agent-sdk'
 import type { CommandItem } from '@locus-agent/ui'
 import { useDebounceFn } from '@vueuse/core'
 import { ref, watch } from 'vue'

@@ -45,7 +45,7 @@
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
-    "@locus-agent/shared": "workspace:*",
+    "@locus-agent/agent-sdk": "workspace:*",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "ai": "catalog:ai-sdk",
     "consola": "catalog:cli-tools",

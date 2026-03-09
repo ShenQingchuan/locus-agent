@@ -1,5 +1,5 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import { DEFAULT_MODELS } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import { DEFAULT_MODELS } from '@locus-agent/agent-sdk'
 
 export type { CustomProviderMode, LLMProviderType }
 

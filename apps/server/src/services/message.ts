@@ -1,4 +1,4 @@
-import type { MessageImageAttachment, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { MessageImageAttachment, ToolCall, ToolResult } from '@locus-agent/agent-sdk'
 import type { Message, NewMessage } from '../db/schema.js'
 import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db, messages } from '../db/index.js'

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { MessageImageAttachment } from '@locus-agent/shared'
+import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
 import type { DropdownItem } from '@locus-agent/ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { getCodingProviderForParent } from '@locus-agent/shared'
+import { getCodingProviderForParent } from '@locus-agent/agent-sdk'
 import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@locus-agent/ui'
 import { useTextareaAutosize } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'

@@ -1,4 +1,4 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
 import { eq } from 'drizzle-orm'
 import { db, settings as settingsTable } from '../db/index.js'
 

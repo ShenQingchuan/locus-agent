@@ -1,5 +1,5 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import { DEFAULT_MODELS, LLM_PROVIDERS, normalizeModelForProvider } from '@locus-agent/agent-sdk'
 import { useToast } from '@locus-agent/ui'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'

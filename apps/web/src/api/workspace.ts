@@ -9,7 +9,7 @@ import type {
   WorkspaceListResponse,
   WorkspaceRootsResponse,
   WorkspaceTreeResponse,
-} from '@locus-agent/shared'
+} from '@locus-agent/agent-sdk'
 
 const API_BASE = '/api'
 

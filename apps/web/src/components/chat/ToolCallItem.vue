@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RiskLevel } from '@locus-agent/shared'
+import type { RiskLevel } from '@locus-agent/agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
 import type { ToolCallState } from '@/composables/useAssistantRuntime'
 import { onClickOutside } from '@vueuse/core'

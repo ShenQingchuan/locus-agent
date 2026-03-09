@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@ai-sdk/vue": "catalog:vue-family",
-    "@locus-agent/shared": "workspace:*",
+    "@locus-agent/agent-sdk": "workspace:*",
     "@locus-agent/ui": "workspace:*",
     "@pierre/diffs": "catalog:vue-family",
     "@pinia/colada": "catalog:vue-family",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@locus-agent/shared'
+import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@locus-agent/agent-sdk'
 import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'

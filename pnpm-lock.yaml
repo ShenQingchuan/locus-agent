@@ -195,12 +195,12 @@ importers:
       '@clack/prompts':
         specifier: catalog:cli-tools
         version: 0.10.1
+      '@locus-agent/agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/agent-sdk
       '@locus-agent/server':
         specifier: workspace:*
         version: link:../server
-      '@locus-agent/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       hono:
         specifier: catalog:hono-family
         version: 4.11.7
@@ -232,9 +232,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: catalog:ai-sdk
         version: 2.0.27(zod@4.3.6)
-      '@locus-agent/shared':
+      '@locus-agent/agent-sdk':
         specifier: workspace:*
-        version: link:../../packages/shared
+        version: link:../../packages/agent-sdk
       '@openrouter/ai-sdk-provider':
         specifier: catalog:ai-sdk
         version: 2.1.1(ai@6.0.73(zod@4.3.6))(zod@4.3.6)
@@ -278,9 +278,9 @@ importers:
       '@ai-sdk/vue':
         specifier: catalog:vue-family
         version: 3.0.73(vue@3.5.27(typescript@5.9.3))(zod@4.3.6)
-      '@locus-agent/shared':
+      '@locus-agent/agent-sdk':
         specifier: workspace:*
-        version: link:../../packages/shared
+        version: link:../../packages/agent-sdk
       '@locus-agent/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -367,7 +367,7 @@ importers:
         specifier: catalog:vue-family
         version: 3.2.4(typescript@5.9.3)
 
-  packages/shared:
+  packages/agent-sdk:
     devDependencies:
       typescript:
         specifier: catalog:dev-tools

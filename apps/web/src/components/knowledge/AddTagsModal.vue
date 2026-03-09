@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Tag, TagWithCount } from '@locus-agent/shared'
+import type { Tag, TagWithCount } from '@locus-agent/agent-sdk'
 import type { TreeNode } from '@locus-agent/ui'
 import type { TagTreeData } from '@/utils/tagTree'
 import { Modal, Tree } from '@locus-agent/ui'

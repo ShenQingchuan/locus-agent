@@ -1,4 +1,4 @@
-import type { MessageImageAttachment } from '@locus-agent/shared'
+import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
 import { relations } from 'drizzle-orm'
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 

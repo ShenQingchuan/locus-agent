@@ -4,7 +4,7 @@ import type {
   ReorderTaskInput,
   Task,
   UpdateTaskInput,
-} from '@locus-agent/shared'
+} from '@locus-agent/agent-sdk'
 
 const API_BASE = '/api'
 

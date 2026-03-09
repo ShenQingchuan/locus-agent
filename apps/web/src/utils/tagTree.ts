@@ -1,4 +1,4 @@
-import type { TagWithCount } from '@locus-agent/shared'
+import type { TagWithCount } from '@locus-agent/agent-sdk'
 import type { TreeNode } from '@locus-agent/ui'
 
 /**

@@ -2,7 +2,7 @@
 import type { ImageAttachmentStripItem } from '@locus-agent/ui'
 import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
-import { DEFAULT_MODELS } from '@locus-agent/shared'
+import { DEFAULT_MODELS } from '@locus-agent/agent-sdk'
 import { ImageAttachmentStrip, Tooltip } from '@locus-agent/ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'

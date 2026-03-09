@@ -1,4 +1,4 @@
-import type { ConversationSpace } from '@locus-agent/shared'
+import type { ConversationSpace } from '@locus-agent/agent-sdk'
 import { ref } from 'vue'
 
 export interface ConversationScope {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MessageImageAttachment } from '@locus-agent/shared'
+import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
 import { useQueryCache } from '@pinia/colada'
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

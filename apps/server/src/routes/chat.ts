@@ -6,13 +6,13 @@ import type {
   ToolCall,
   ToolResult,
   WhitelistRule,
-} from '@locus-agent/shared'
+} from '@locus-agent/agent-sdk'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/shared'
+import { CODING_PROVIDERS, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import {

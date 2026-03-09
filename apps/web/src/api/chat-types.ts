@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding, RiskLevel, SSEEvent, ToolCall, ToolResult } from '@locus-agent/shared'
+import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding, RiskLevel, SSEEvent, ToolCall, ToolResult } from '@locus-agent/agent-sdk'
 
 export interface PendingApproval {
   toolCallId: string

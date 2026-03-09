@@ -1,4 +1,4 @@
-import type { MCPServersConfig } from '@locus-agent/shared'
+import type { MCPServersConfig } from '@locus-agent/agent-sdk'
 import { eq } from 'drizzle-orm'
 import { db, settings as settingsTable } from '../../db/index.js'
 

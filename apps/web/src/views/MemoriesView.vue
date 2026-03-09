@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { NoteWithTags } from '@locus-agent/shared'
+import type { NoteWithTags } from '@locus-agent/agent-sdk'
 import type { TreeNode } from '@locus-agent/ui'
 import type { TagTreeData } from '@/utils/tagTree'
 import { useToast } from '@locus-agent/ui'

@@ -1,4 +1,4 @@
-import type { GitStatusResponse } from '@locus-agent/shared'
+import type { GitStatusResponse } from '@locus-agent/agent-sdk'
 import type { Ref } from 'vue'
 import { useQuery, useQueryCache } from '@pinia/colada'
 import { computed, onScopeDispose, ref, watch } from 'vue'

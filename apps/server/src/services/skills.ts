@@ -5,7 +5,7 @@ import type {
   SkillResource,
   SkillSource,
   SkillSummary,
-} from '@locus-agent/shared'
+} from '@locus-agent/agent-sdk'
 import { Buffer } from 'node:buffer'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'

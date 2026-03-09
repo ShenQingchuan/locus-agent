@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { NoteWithTags } from '@locus-agent/shared'
-import { formatNotePreview, formatRelativeDateShort } from '@locus-agent/shared'
+import type { NoteWithTags } from '@locus-agent/agent-sdk'
+import { formatNotePreview, formatRelativeDateShort } from '@locus-agent/agent-sdk'
 
 defineProps<{
   note: NoteWithTags

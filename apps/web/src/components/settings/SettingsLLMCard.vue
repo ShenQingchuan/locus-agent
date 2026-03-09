@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/shared'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS } from '@locus-agent/shared'
+import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS } from '@locus-agent/agent-sdk'
 import { computed, ref, watch } from 'vue'
 
 export interface ProviderConfig {

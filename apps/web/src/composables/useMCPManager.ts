@@ -1,4 +1,4 @@
-import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/shared'
+import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@locus-agent/agent-sdk'
 import { useToast } from '@locus-agent/ui'
 import { onMounted, onUnmounted, ref } from 'vue'
 import {

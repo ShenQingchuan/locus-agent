@@ -1,6 +1,6 @@
-import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@locus-agent/shared'
+import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@locus-agent/agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent } from '@locus-agent/shared'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent } from '@locus-agent/agent-sdk'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
