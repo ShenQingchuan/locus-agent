@@ -39,7 +39,6 @@ const emit = defineEmits<{
 }>()
 
 const providerConfigs = defineModel<ProviderConfigs>('providerConfigs', { required: true })
-const port = defineModel<number>('port', { required: true })
 
 // Active tab state
 const activeTab = ref<LLMProviderType>(props.activeProvider)
@@ -370,36 +369,4 @@ function saveKimiCode() {
     </p>
   </form>
 
-  <!-- Server -->
-  <section class="card p-4">
-    <div>
-      <h2 class="text-sm font-medium text-foreground">
-        服务端
-      </h2>
-      <p class="text-xs text-muted-foreground mt-1">
-        端口修改需重启生效
-      </p>
-    </div>
-
-    <div class="mt-4 grid gap-4">
-      <div class="grid gap-1.5">
-        <label class="text-xs text-muted-foreground">端口</label>
-        <input
-          v-model.number="port"
-          class="input-field"
-          type="number"
-          min="1"
-          max="65535"
-          placeholder="3000"
-        >
-      </div>
-
-      <div
-        v-if="requiresRestart"
-        class="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
-      >
-        端口已保存，重启服务后生效。
-      </div>
-    </div>
-  </section>
 </template>

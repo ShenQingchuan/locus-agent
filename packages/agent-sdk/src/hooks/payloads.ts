@@ -1,5 +1,6 @@
 import type { TokenUsage } from '../runtime/agent-loop.js'
 import type { ToolCategory } from '../runtime/tool-policy.js'
+import { HookEvent } from './events.js'
 
 // ── Session ──────────────────────────────────────────────────
 
@@ -120,20 +121,20 @@ export interface RunErrorPayload {
 // ── Payload map for type-safe dispatch ───────────────────────
 
 export interface HookPayloadMap {
-  'session:start': SessionStartPayload
-  'session:end': SessionEndPayload
-  'message:user_received': MessageUserReceivedPayload
-  'context:resolve': ContextResolvePayload
-  'prompt:assemble': PromptAssemblePayload
-  'model:before_call': ModelBeforeCallPayload
-  'model:after_call': ModelAfterCallPayload
-  'tool:before_execute': ToolBeforeExecutePayload
-  'tool:approval_required': ToolApprovalRequiredPayload
-  'tool:after_execute': ToolAfterExecutePayload
-  'delegate:before_run': DelegateBeforeRunPayload
-  'delegate:after_run': DelegateAfterRunPayload
-  'artifact:plan_written': ArtifactPlanWrittenPayload
-  'artifact:file_change_detected': ArtifactFileChangeDetectedPayload
-  'run:finish': RunFinishPayload
-  'run:error': RunErrorPayload
+  [HookEvent.SessionStart]: SessionStartPayload
+  [HookEvent.SessionEnd]: SessionEndPayload
+  [HookEvent.MessageUserReceived]: MessageUserReceivedPayload
+  [HookEvent.ContextResolve]: ContextResolvePayload
+  [HookEvent.PromptAssemble]: PromptAssemblePayload
+  [HookEvent.ModelBeforeCall]: ModelBeforeCallPayload
+  [HookEvent.ModelAfterCall]: ModelAfterCallPayload
+  [HookEvent.ToolBeforeExecute]: ToolBeforeExecutePayload
+  [HookEvent.ToolApprovalRequired]: ToolApprovalRequiredPayload
+  [HookEvent.ToolAfterExecute]: ToolAfterExecutePayload
+  [HookEvent.DelegateBeforeRun]: DelegateBeforeRunPayload
+  [HookEvent.DelegateAfterRun]: DelegateAfterRunPayload
+  [HookEvent.ArtifactPlanWritten]: ArtifactPlanWrittenPayload
+  [HookEvent.ArtifactFileChangeDetected]: ArtifactFileChangeDetectedPayload
+  [HookEvent.RunFinish]: RunFinishPayload
+  [HookEvent.RunError]: RunErrorPayload
 }

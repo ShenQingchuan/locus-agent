@@ -2,6 +2,7 @@
  * 工具调用白名单管理
  * session 级别（关联会话，存 DB）和 global 级别（存 DB，无会话关联）
  */
+import { BuiltinTool } from '@locus-agent/agent-sdk'
 
 import type { WhitelistRule } from '@locus-agent/agent-sdk'
 import { getRiskLevel } from '@locus-agent/agent-sdk'
@@ -104,7 +105,7 @@ function matchesRule(rule: WhitelistRule, toolName: string, args: unknown): bool
     return false
 
   // 非 bash 工具：仅按工具名匹配
-  if (toolName !== 'bash')
+  if (toolName !== BuiltinTool.Bash)
     return true
 
   // bash 工具：需要匹配命令前缀

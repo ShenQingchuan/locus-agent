@@ -1,0 +1,27 @@
+{
+  "name": "@locus-agent/plugin-kit",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "dev": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@locus-agent/agent-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:dev-tools"
+  }
+}

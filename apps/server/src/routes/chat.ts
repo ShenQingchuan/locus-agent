@@ -13,7 +13,7 @@ import type { AddMessageInput } from '../services/message.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
+import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import {
@@ -387,7 +387,7 @@ function extractLatestPlanFromDbMessages(
 
     for (let j = toolCalls.length - 1; j >= 0; j--) {
       const item = toolCalls[j] as { toolName?: unknown, args?: unknown }
-      if (item?.toolName !== 'write_plan')
+      if (item?.toolName !== BuiltinTool.WritePlan)
         continue
       const args = item.args as { filename?: unknown }
       const filename = typeof args?.filename === 'string' ? args.filename.trim() : ''

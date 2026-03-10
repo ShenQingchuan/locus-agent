@@ -1,3 +1,4 @@
+import { BuiltinTool } from '@locus-agent/agent-sdk'
 import { askQuestionTool } from './ask_question.js'
 import { bashTool } from './bash.js'
 import { delegateTool } from './delegate.js'
@@ -15,23 +16,23 @@ import { treeTool } from './tree.js'
 import { writeFileTool } from './write.js'
 
 export const tools = {
-  bash: bashTool,
-  read_file: readFileTool,
-  glob: globTool,
-  grep: grepTool,
-  tree: treeTool,
-  str_replace: strReplaceTool,
-  write_file: writeFileTool,
-  ask_question: askQuestionTool,
-  delegate: delegateTool,
-  save_memory: saveMemoryTool,
-  search_memories: searchMemoriesTool,
-  skill: skillTool,
-  manage_todos: manageTodosTool,
-  manage_kanban: manageKanbanTool,
-  write_plan: writePlanTool,
-  read_plan: readPlanTool,
-  plan_exit: planExitTool,
+  [BuiltinTool.Bash]: bashTool,
+  [BuiltinTool.ReadFile]: readFileTool,
+  [BuiltinTool.Glob]: globTool,
+  [BuiltinTool.Grep]: grepTool,
+  [BuiltinTool.Tree]: treeTool,
+  [BuiltinTool.StrReplace]: strReplaceTool,
+  [BuiltinTool.WriteFile]: writeFileTool,
+  [BuiltinTool.AskQuestion]: askQuestionTool,
+  [BuiltinTool.Delegate]: delegateTool,
+  [BuiltinTool.SaveMemory]: saveMemoryTool,
+  [BuiltinTool.SearchMemories]: searchMemoriesTool,
+  [BuiltinTool.Skill]: skillTool,
+  [BuiltinTool.ManageTodos]: manageTodosTool,
+  [BuiltinTool.ManageKanban]: manageKanbanTool,
+  [BuiltinTool.WritePlan]: writePlanTool,
+  [BuiltinTool.ReadPlan]: readPlanTool,
+  [BuiltinTool.PlanExit]: planExitTool,
 }
 
 export type ToolName = keyof typeof tools

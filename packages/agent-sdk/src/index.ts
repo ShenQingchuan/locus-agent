@@ -12,7 +12,7 @@ export {
 } from './context/index.js'
 // Hook event model
 export type * from './hooks/index.js'
-export { HOOK_CATEGORIES } from './hooks/index.js'
+export { HOOK_CATEGORIES, HookEvent, HookKind } from './hooks/index.js'
 
 // Plugin contracts
 export type * from './plugins/index.js'
@@ -24,7 +24,7 @@ export { createPromptBuilder } from './prompt/index.js'
 
 // Runtime contracts
 export type * from './runtime/index.js'
-export { classifyTool } from './runtime/index.js'
+export { BuiltinTool, classifyTool } from './runtime/index.js'
 
 // SSE protocol
 export type * from './sse/index.js'

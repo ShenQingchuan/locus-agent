@@ -1,5 +1,5 @@
 export type { HookCategory, HookEventName } from './events.js'
-export { HOOK_CATEGORIES } from './events.js'
+export { HookKind, HookEvent, HOOK_CATEGORIES } from './events.js'
 
 export type { HookBus, HookHandler } from './hook-bus.js'
 

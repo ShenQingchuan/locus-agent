@@ -46,6 +46,7 @@
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
     "@locus-agent/agent-sdk": "workspace:*",
+    "@locus-agent/plugin-kit": "workspace:*",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "ai": "catalog:ai-sdk",
     "consola": "catalog:cli-tools",

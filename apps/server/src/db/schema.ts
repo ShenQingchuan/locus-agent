@@ -329,6 +329,33 @@ export const taskConversationsRelations = relations(taskConversations, ({ one })
   }),
 }))
 
+// ==================== Plugins ====================
+
+/** Installed plugin records */
+export const plugins = sqliteTable('plugins', {
+  id: text('id').primaryKey(),
+  /** npm package name OR local file path */
+  source: text('source').notNull(),
+  sourceType: text('source_type', { enum: ['npm', 'local'] }).notNull(),
+  version: text('version').notNull(),
+  scope: text('scope', { enum: ['global', 'workspace', 'project', 'conversation'] })
+    .notNull().default('global'),
+  scopeQualifier: text('scope_qualifier'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  grantedPermissions: text('granted_permissions', { mode: 'json' })
+    .$type<string[]>().notNull(),
+  config: text('config'),
+  installedAt: integer('installed_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_plugins_enabled').on(t.enabled),
+  index('idx_plugins_scope').on(t.scope),
+])
+
 // ==================== Types ====================
 
 export type Conversation = typeof conversations.$inferSelect
@@ -349,3 +376,5 @@ export type Tag = typeof tags.$inferSelect
 export type NewTag = typeof tags.$inferInsert
 export type Task = typeof tasks.$inferSelect
 export type NewTask = typeof tasks.$inferInsert
+export type PluginRow = typeof plugins.$inferSelect
+export type NewPluginRow = typeof plugins.$inferInsert

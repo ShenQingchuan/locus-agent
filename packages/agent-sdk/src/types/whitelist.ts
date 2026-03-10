@@ -2,6 +2,7 @@
  * 工具调用白名单类型定义
  * 用于在确认模式下自动放行匹配的工具调用
  */
+import { BuiltinTool } from '../runtime/tool.js'
 
 /**
  * 风险等级
@@ -104,12 +105,12 @@ export const MULTI_WORD_COMMANDS: string[] = [
  * 工具级别的默认风险映射
  */
 export const TOOL_DEFAULT_RISK: Record<string, RiskLevel> = {
-  read_file: 'safe',
-  glob: 'safe',
-  grep: 'safe',
-  str_replace: 'moderate',
-  write_file: 'moderate',
-  bash: 'moderate', // bash 需要进一步看 pattern
+  [BuiltinTool.ReadFile]: 'safe',
+  [BuiltinTool.Glob]: 'safe',
+  [BuiltinTool.Grep]: 'safe',
+  [BuiltinTool.StrReplace]: 'moderate',
+  [BuiltinTool.WriteFile]: 'moderate',
+  [BuiltinTool.Bash]: 'moderate', // bash 需要进一步看 pattern
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +159,7 @@ export function getCommandRiskLevel(command: string): RiskLevel {
  * @param pattern 匹配模式（仅 bash）
  */
 export function getRiskLevel(toolName: string, pattern?: string): RiskLevel {
-  if (toolName === 'bash' && pattern) {
+  if (toolName === BuiltinTool.Bash && pattern) {
     return getCommandRiskLevel(pattern)
   }
   return TOOL_DEFAULT_RISK[toolName] ?? 'moderate'
@@ -172,7 +173,7 @@ export function getRiskLevel(toolName: string, pattern?: string): RiskLevel {
  * - 其余取第一个词
  */
 export function extractDefaultPattern(toolName: string, args: Record<string, unknown>): string | undefined {
-  if (toolName !== 'bash')
+  if (toolName !== BuiltinTool.Bash)
     return undefined
 
   const command = String(args.command ?? '').trim()

@@ -1,7 +1,10 @@
 import type { PendingToolCall } from '@locus-agent/agent-sdk'
 import type { ModelMessage } from 'ai'
 import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult } from './types.js'
+import { BuiltinTool, HookEvent } from '@locus-agent/agent-sdk'
+import { processDecisions } from '@locus-agent/plugin-kit'
 import { streamText } from 'ai'
+import { hookBus } from '../plugins/index.js'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
 import {
@@ -23,9 +26,9 @@ import { executePendingToolCall } from './tool-call-pipeline.js'
  * 需要串行执行的写入类工具（可能产生文件系统冲突）
  */
 const SERIAL_TOOLS = new Set<string>([
-  'str_replace',
-  'write_file',
-  'bash',
+  BuiltinTool.StrReplace,
+  BuiltinTool.WriteFile,
+  BuiltinTool.Bash,
 ])
 
 /**
@@ -93,6 +96,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     }
   }
 
+  const hookScope = {
+    space: (codingMode ? 'coding' : 'chat') as 'chat' | 'coding',
+    workspaceRoot,
+    projectKey,
+  }
+  let totalToolCallCount = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let iterations = 0
@@ -120,6 +129,28 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     const tools = getMergedToolsForMode(codingMode, toolAllowlist)
     if (!hasAvailableSkills) {
       delete tools.skill
+    }
+
+    // Hook: model:before_call (guard — can block or patch prompt)
+    if (hookBus.hasHandlers(HookEvent.ModelBeforeCall)) {
+      const decisions = await hookBus.emit(HookEvent.ModelBeforeCall, {
+        systemPrompt: effectiveSystemPrompt,
+        messageCount: messages.length,
+        iteration: iterations,
+        toolCount: Object.keys(tools).length,
+      }, hookScope)
+      const processed = processDecisions(decisions)
+      if (processed.blocked) {
+        throw new Error(`Blocked by plugin: ${processed.blocked.reason}`)
+      }
+      for (const patch of processed.promptPatches) {
+        if (patch.action === 'append' && patch.content) {
+          effectiveSystemPrompt += `\n${patch.content}`
+        }
+        else if (patch.action === 'prepend' && patch.content) {
+          effectiveSystemPrompt = `${patch.content}\n${effectiveSystemPrompt}`
+        }
+      }
     }
 
     while (retryCount <= maxRetries) {
@@ -177,10 +208,21 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       onToolCallStart,
     })
     finishReason = streamResult.finishReason
+    totalToolCallCount += streamResult.pendingToolCalls.length
 
     const usage = await response.usage
     totalInputTokens += usage.inputTokens ?? 0
     totalOutputTokens += usage.outputTokens ?? 0
+
+    // Hook: model:after_call (enrich)
+    if (hookBus.hasHandlers(HookEvent.ModelAfterCall)) {
+      await hookBus.emit(HookEvent.ModelAfterCall, {
+        finishReason,
+        usage: { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0, totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) },
+        toolCallCount: streamResult.pendingToolCalls.length,
+        textLength: streamResult.iterationText.length,
+      }, hookScope)
+    }
 
     // Auto compaction: 上下文接近上限时自动压缩
     const lastInputTokens = usage.inputTokens ?? 0
@@ -275,12 +317,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         messages.push(msg)
         generatedMessages.push(msg)
 
-        if (tc.toolName === 'plan_exit' && !pipelineResult.isError) {
+        if (tc.toolName === BuiltinTool.PlanExit && !pipelineResult.isError) {
           finishReason = 'end_turn'
           break
         }
 
-        if (codingMode === 'plan' && tc.toolName === 'write_plan' && !pipelineResult.isError) {
+        if (codingMode === 'plan' && tc.toolName === BuiltinTool.WritePlan && !pipelineResult.isError) {
           finishReason = 'end_turn'
           break
         }
@@ -300,6 +342,16 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       break
     }
     break
+  }
+
+  // Hook: run:finish (observe)
+  if (hookBus.hasHandlers(HookEvent.RunFinish)) {
+    await hookBus.emit(HookEvent.RunFinish, {
+      finishReason,
+      usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens },
+      iterations,
+      toolCallCount: totalToolCallCount,
+    }, hookScope)
   }
 
   if (onFinish) {

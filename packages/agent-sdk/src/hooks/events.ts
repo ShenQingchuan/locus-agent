@@ -1,41 +1,41 @@
 /**
- * All lifecycle hook event names in the Agent Runtime Pipeline.
+ * Canonical enum-like objects for hook event names and categories.
  *
- * Grouped by domain:
- *   session  – conversation-level lifecycle
- *   message  – user input
- *   context  – context resolution & prompt assembly
- *   model    – LLM call boundaries
- *   tool     – tool execution boundaries
- *   delegate – sub-agent boundaries
- *   artifact – plan / file-change observations
- *   run      – agent loop lifecycle
+ * Use `HookEvent.ToolBeforeExecute` instead of `'tool:before_execute'`.
  */
-export type HookEventName
+
+// ── Hook Event Names ────────────────────────────────────────
+
+export const HookEvent = {
   // Session lifecycle
-  = | 'session:start'
-    | 'session:end'
+  SessionStart: 'session:start',
+  SessionEnd: 'session:end',
   // Message
-    | 'message:user_received'
+  MessageUserReceived: 'message:user_received',
   // Context & Prompt
-    | 'context:resolve'
-    | 'prompt:assemble'
+  ContextResolve: 'context:resolve',
+  PromptAssemble: 'prompt:assemble',
   // Model
-    | 'model:before_call'
-    | 'model:after_call'
+  ModelBeforeCall: 'model:before_call',
+  ModelAfterCall: 'model:after_call',
   // Tool
-    | 'tool:before_execute'
-    | 'tool:approval_required'
-    | 'tool:after_execute'
+  ToolBeforeExecute: 'tool:before_execute',
+  ToolApprovalRequired: 'tool:approval_required',
+  ToolAfterExecute: 'tool:after_execute',
   // Delegate
-    | 'delegate:before_run'
-    | 'delegate:after_run'
+  DelegateBeforeRun: 'delegate:before_run',
+  DelegateAfterRun: 'delegate:after_run',
   // Artifact
-    | 'artifact:plan_written'
-    | 'artifact:file_change_detected'
+  ArtifactPlanWritten: 'artifact:plan_written',
+  ArtifactFileChangeDetected: 'artifact:file_change_detected',
   // Run
-    | 'run:finish'
-    | 'run:error'
+  RunFinish: 'run:finish',
+  RunError: 'run:error',
+} as const
+
+export type HookEventName = typeof HookEvent[keyof typeof HookEvent]
+
+// ── Hook Category ───────────────────────────────────────────
 
 /**
  * Hook capability category.
@@ -44,23 +44,31 @@ export type HookEventName
  * - enrich:  may append context, tags, suggestions, metadata
  * - guard:   may block, require confirmation, downgrade, or replace strategy
  */
-export type HookCategory = 'observe' | 'enrich' | 'guard'
+export const HookKind = {
+  Observe: 'observe',
+  Enrich: 'enrich',
+  Guard: 'guard',
+} as const
+
+export type HookCategory = typeof HookKind[keyof typeof HookKind]
+
+// ── Category mapping ────────────────────────────────────────
 
 export const HOOK_CATEGORIES: Record<HookEventName, HookCategory> = {
-  'session:start': 'observe',
-  'session:end': 'observe',
-  'message:user_received': 'observe',
-  'context:resolve': 'enrich',
-  'prompt:assemble': 'enrich',
-  'model:before_call': 'guard',
-  'model:after_call': 'enrich',
-  'tool:before_execute': 'guard',
-  'tool:approval_required': 'observe',
-  'tool:after_execute': 'enrich',
-  'delegate:before_run': 'guard',
-  'delegate:after_run': 'enrich',
-  'artifact:plan_written': 'observe',
-  'artifact:file_change_detected': 'observe',
-  'run:finish': 'observe',
-  'run:error': 'observe',
+  [HookEvent.SessionStart]: HookKind.Observe,
+  [HookEvent.SessionEnd]: HookKind.Observe,
+  [HookEvent.MessageUserReceived]: HookKind.Observe,
+  [HookEvent.ContextResolve]: HookKind.Enrich,
+  [HookEvent.PromptAssemble]: HookKind.Enrich,
+  [HookEvent.ModelBeforeCall]: HookKind.Guard,
+  [HookEvent.ModelAfterCall]: HookKind.Enrich,
+  [HookEvent.ToolBeforeExecute]: HookKind.Guard,
+  [HookEvent.ToolApprovalRequired]: HookKind.Observe,
+  [HookEvent.ToolAfterExecute]: HookKind.Enrich,
+  [HookEvent.DelegateBeforeRun]: HookKind.Guard,
+  [HookEvent.DelegateAfterRun]: HookKind.Enrich,
+  [HookEvent.ArtifactPlanWritten]: HookKind.Observe,
+  [HookEvent.ArtifactFileChangeDetected]: HookKind.Observe,
+  [HookEvent.RunFinish]: HookKind.Observe,
+  [HookEvent.RunError]: HookKind.Observe,
 }

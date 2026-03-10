@@ -1,6 +1,9 @@
-import type { DelegateArgs, DelegateResult } from '@locus-agent/agent-sdk'
+import type { DelegateArgs, DelegateResult, ToolCategory } from '@locus-agent/agent-sdk'
 import type { QuestionItem } from '../tools/ask_question.js'
 import type { ExecuteToolPipelineOptions, ExecuteToolPipelineResult } from './types.js'
+import { BuiltinTool, classifyTool } from '@locus-agent/agent-sdk'
+import { processDecisions } from '@locus-agent/plugin-kit'
+import { hookBus } from '../plugins/index.js'
 import { formatQuestionAnswers } from '../tools/ask_question.js'
 import { executeDelegate, formatDelegateResult } from '../tools/delegate.js'
 import { executeManageTodos, formatManageTodosResult } from '../tools/manage_todos.js'
@@ -42,7 +45,7 @@ export async function executePendingToolCall(
     }
 
     if (interactiveTools.has(tc.toolName)) {
-      if (tc.toolName === 'ask_question' && getQuestionAnswer) {
+      if (tc.toolName === BuiltinTool.AskQuestion && getQuestionAnswer) {
         const args = tc.args as { questions: QuestionItem[] }
         const questions = args.questions || []
 
@@ -53,7 +56,7 @@ export async function executePendingToolCall(
         const answers = await getQuestionAnswer(tc.toolCallId, questions)
         result = formatQuestionAnswers(answers)
       }
-      else if (tc.toolName === 'delegate') {
+      else if (tc.toolName === BuiltinTool.Delegate) {
         const args = tc.args as DelegateArgs
         const delegateDeltas: Array<{ type: string, content: string, toolName?: string, isError?: boolean }> = []
 
@@ -120,7 +123,7 @@ export async function executePendingToolCall(
         throw new Error(`Interactive tool "${tc.toolName}" has no handler configured`)
       }
     }
-    else if (tc.toolName === 'manage_todos') {
+    else if (tc.toolName === BuiltinTool.ManageTodos) {
       const manageResult = await executeManageTodos(
         tc.args as Parameters<typeof executeManageTodos>[0],
         conversationId,

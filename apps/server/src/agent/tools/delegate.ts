@@ -1,4 +1,5 @@
 import type { DelegateArgs, DelegateCallbacks, DelegateResult, SubAgentConfig } from '@locus-agent/agent-sdk'
+import { BuiltinTool } from '@locus-agent/agent-sdk'
 import type { LanguageModel, ModelMessage } from 'ai'
 import type { AgentLoopResult } from '../loop.js'
 import { tool } from 'ai'
@@ -29,7 +30,7 @@ function getPresetByAgentType(agentType: string): { systemPrompt?: string, tools
       systemPrompt: `You are an explore sub-agent specialized in codebase discovery.
 Focus on searching, reading, and analysis. Prefer read-only actions.
 For implementation requests, provide findings and actionable recommendations.`,
-      tools: ['read_file', 'glob', 'grep', 'bash', 'search_memories', 'read_plan', 'ask_question'],
+      tools: [BuiltinTool.ReadFile, BuiltinTool.Glob, BuiltinTool.Grep, BuiltinTool.Bash, BuiltinTool.SearchMemories, BuiltinTool.ReadPlan, BuiltinTool.AskQuestion],
     }
   }
 

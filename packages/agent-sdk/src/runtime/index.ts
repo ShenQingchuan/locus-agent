@@ -21,7 +21,9 @@ export type {
 } from './tool-policy.js'
 
 export { classifyTool } from './tool-policy.js'
+export { BuiltinTool } from './tool.js'
 export type {
+  BuiltinToolName,
   StreamingToolExecutor,
   ToolExecutionContext,
   ToolExecutor,

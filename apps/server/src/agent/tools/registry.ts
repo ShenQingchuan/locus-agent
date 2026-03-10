@@ -1,5 +1,6 @@
 import type { ToolExecutionContext, ToolOutputCallbacks } from '@locus-agent/agent-sdk'
 import type { Tool } from 'ai'
+import { BuiltinTool } from '@locus-agent/agent-sdk'
 import { mcpManager } from '../mcp/manager.js'
 import { tools } from './tool-definitions.js'
 import { getBuiltinFormattedExecutor, getBuiltinRawExecutor, hasBuiltinFormattedExecutor } from './tool-executors.js'
@@ -57,17 +58,17 @@ export function getMergedTools(): Record<string, Tool> {
  * Plan 模式下允许的内置工具（只读 + 计划管理）
  */
 const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
-  'read_file',
-  'glob',
-  'grep',
-  'tree',
-  'search_memories',
-  'skill',
-  'write_plan',
-  'read_plan',
-  'ask_question',
-  'manage_todos',
-  'delegate',
+  BuiltinTool.ReadFile,
+  BuiltinTool.Glob,
+  BuiltinTool.Grep,
+  BuiltinTool.Tree,
+  BuiltinTool.SearchMemories,
+  BuiltinTool.Skill,
+  BuiltinTool.WritePlan,
+  BuiltinTool.ReadPlan,
+  BuiltinTool.AskQuestion,
+  BuiltinTool.ManageTodos,
+  BuiltinTool.Delegate,
 ])
 
 const MCP_WRITE_KEYWORDS = [

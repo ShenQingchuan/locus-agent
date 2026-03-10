@@ -1,17 +1,19 @@
+import { BuiltinTool } from '@locus-agent/agent-sdk'
+
 export const interactiveTools = new Set<string>([
-  'ask_question',
-  'delegate',
+  BuiltinTool.AskQuestion,
+  BuiltinTool.Delegate,
 ])
 
 export const trustedBuiltinTools = new Set<string>([
-  'save_memory',
-  'search_memories',
-  'skill',
-  'manage_todos',
-  'manage_kanban',
-  'write_plan',
-  'read_plan',
-  'plan_exit',
+  BuiltinTool.SaveMemory,
+  BuiltinTool.SearchMemories,
+  BuiltinTool.Skill,
+  BuiltinTool.ManageTodos,
+  BuiltinTool.ManageKanban,
+  BuiltinTool.WritePlan,
+  BuiltinTool.ReadPlan,
+  BuiltinTool.PlanExit,
 ])
 
 export function isTrustedBuiltinTool(toolName: string): boolean {

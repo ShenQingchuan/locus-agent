@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { mcpManager } from './agent/mcp/manager.js'
+import { pluginManager } from './agent/plugins/index.js'
 import { setLLMConfig } from './agent/providers/index.js'
 import { setServerConfig } from './config.js'
 import { initDB } from './db/index.js'
@@ -15,6 +16,7 @@ import { settingsRoutes } from './routes/settings.js'
 import { skillsRoutes } from './routes/skills.js'
 import { tagsRoutes } from './routes/tags.js'
 import { tasksRoutes } from './routes/tasks.js'
+import { pluginRoutes } from './routes/plugins.js'
 import { workspaceRoutes } from './routes/workspace.js'
 import {
   ensureDataDir,
@@ -58,6 +60,7 @@ export function createApp(): Hono {
   app.route('/api/mcp', mcpRoutes)
   app.route('/api/tasks', tasksRoutes)
   app.route('/api/workspace', workspaceRoutes)
+  app.route('/api/plugins', pluginRoutes)
 
   return app
 }
@@ -90,6 +93,11 @@ function startDev() {
   // 4. Initialize MCP servers (non-blocking — errors are logged, not thrown)
   mcpManager.initialize().catch((err) => {
     console.error('MCP initialization failed:', err)
+  })
+
+  // 4.5. Initialize plugins (non-blocking)
+  pluginManager.initialize().catch((err) => {
+    console.error('Plugin initialization failed:', err)
   })
 
   // 5. Create app
