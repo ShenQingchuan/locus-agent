@@ -99,11 +99,11 @@ onMounted(() => {
             :class="wlRiskLabel(rule).text === '危险' ? 'text-red-500 dark:text-red-400' : 'text-foreground'"
           >{{ rule.toolName }}<span v-if="rule.pattern" class="text-muted-foreground ml-1">{{ rule.pattern }}</span></code>
           <button
-            class="h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+            class="h-4 w-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
             title="删除"
             @click="onDeleteWhitelistRule(rule.id)"
           >
-            <div class="i-carbon-close h-2.5 w-2.5" />
+            <div class="i-carbon-close " />
           </button>
         </div>
       </div>

@@ -230,9 +230,9 @@ function fileName(filePath: string): string {
               >{{ statusLabel(file.status) }}</span>
               <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
               <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
-                  <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
-                  <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden font-mono">
+                  <span v-if="file.additions !== null" class="text-green-500 ">+{{ file.additions }}</span>
+                  <span v-if="file.deletions !== null" class="text-red-500 transform-translate-y-0.1">-{{ file.deletions }}</span>
                 </span>
                 <button
                   class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -289,9 +289,9 @@ function fileName(filePath: string): string {
               >{{ statusLabel(file.status) }}</span>
               <span class="truncate min-w-0 font-mono text-foreground">{{ fileName(file.filePath) }}</span>
               <div class="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden">
+                <span class="flex items-center gap-1 text-[10px] group-hover/file:hidden font-mono">
                   <span v-if="file.additions !== null" class="text-green-500">+{{ file.additions }}</span>
-                  <span v-if="file.deletions !== null" class="text-red-500">-{{ file.deletions }}</span>
+                  <span v-if="file.deletions !== null" class="text-red-500 transform-translate-y-0.05">-{{ file.deletions }}</span>
                 </span>
                 <button
                   class="hidden group-hover/file:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -312,8 +312,8 @@ function fileName(filePath: string): string {
       v-if="files.length > 0"
       class="px-2.5 py-1.5 border-t border-border text-2xs text-muted-foreground flex items-center gap-2"
     >
-      <span class="text-green-500">+{{ summary.totalAdditions }}</span>
-      <span class="text-red-500">-{{ summary.totalDeletions }}</span>
+      <span class="text-green-500 font-mono">+{{ summary.totalAdditions }}</span>
+      <span class="text-red-500 font-mono transform-translate-y-0.05">-{{ summary.totalDeletions }}</span>
     </div>
   </div>
 </template>

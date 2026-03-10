@@ -2,11 +2,11 @@
 import type {
   EmbeddingProvider,
   EmbeddingStatus,
-  ModelFileProgress,
 } from '@/api/embedding'
 import { useToast } from '@locus-agent/ui'
 import { useThrottleFn } from '@vueuse/core'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useEmbeddingTasks } from '@/composables/useEmbeddingTasks'
 
 const toast = useToast()
 
@@ -35,22 +35,27 @@ const embeddingProgress = ref<{
 const embeddingBusy = ref(false)
 const providerSwitching = ref(false)
 
-// --- Runtime deps state ---
-const runtimeInstalling = ref(false)
-const runtimeInstallOutput = ref('')
 const runtimeUninstalling = ref(false)
-
-// --- Model download state ---
-const modelDownloading = ref(false)
 const modelDeleting = ref(false)
+const installOutputEl = ref<HTMLPreElement | null>(null)
 
-/** Per-file download progress, keyed by file name */
-const downloadFiles = reactive<Record<string, {
-  status: 'initiate' | 'download' | 'progress' | 'done'
-  progress: number
-  loaded: number
-  total: number
-}>>({})
+const {
+  runtimeInstalling,
+  runtimeInstallOutput,
+  modelDownloading,
+  downloadFileList,
+  runtimeInstallCompletedAt,
+  modelDownloadCompletedAt,
+  startRuntimeInstall,
+  startModelDownload,
+} = useEmbeddingTasks()
+
+function scrollInstallOutputToBottom() {
+  nextTick(() => {
+    if (installOutputEl.value)
+      installOutputEl.value.scrollTop = installOutputEl.value.scrollHeight
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -83,13 +88,6 @@ const embeddingStatusLabel = computed(() => {
     case 'error': return '错误'
     default: return '未知'
   }
-})
-
-const downloadFileList = computed(() => {
-  return Object.entries(downloadFiles).map(([name, info]) => ({
-    name,
-    ...info,
-  }))
 })
 
 // ---------------------------------------------------------------------------
@@ -138,47 +136,6 @@ async function switchProvider(provider: EmbeddingProvider) {
   }
 }
 
-async function startDownload() {
-  if (modelDownloading.value)
-    return
-
-  modelDownloading.value = true
-  Object.keys(downloadFiles).forEach(k => delete downloadFiles[k])
-
-  const { startModelDownload } = await import('@/api/embedding')
-  startModelDownload(
-    (data: ModelFileProgress) => {
-      const existing = downloadFiles[data.file]
-      if (data.status === 'initiate') {
-        downloadFiles[data.file] = {
-          status: 'initiate',
-          progress: 0,
-          loaded: 0,
-          total: 0,
-        }
-      }
-      else if (existing) {
-        existing.status = data.status
-        if (data.progress != null)
-          existing.progress = data.progress
-        if (data.loaded != null)
-          existing.loaded = data.loaded
-        if (data.total != null)
-          existing.total = data.total
-      }
-    },
-    () => {
-      modelDownloading.value = false
-      toast.success('模型下载完成')
-      loadEmbeddingStatus()
-    },
-    (msg) => {
-      modelDownloading.value = false
-      toast.error(`下载失败: ${msg}`)
-    },
-  )
-}
-
 async function handleDeleteModel() {
   if (modelDeleting.value)
     return
@@ -188,7 +145,6 @@ async function handleDeleteModel() {
     const { deleteModel } = await import('@/api/embedding')
     await deleteModel()
     toast.success('模型已删除')
-    Object.keys(downloadFiles).forEach(k => delete downloadFiles[k])
     await loadEmbeddingStatus()
   }
   catch (err) {
@@ -197,31 +153,6 @@ async function handleDeleteModel() {
   finally {
     modelDeleting.value = false
   }
-}
-
-async function startRuntimeInstall() {
-  if (runtimeInstalling.value)
-    return
-
-  runtimeInstalling.value = true
-  runtimeInstallOutput.value = ''
-
-  const { startRuntimeInstall: doInstall } = await import('@/api/embedding')
-  doInstall(
-    (output) => {
-      runtimeInstallOutput.value += output
-    },
-    () => {
-      runtimeInstalling.value = false
-      runtimeInstallOutput.value = ''
-      toast.success('ONNX 运行时安装完成')
-      loadEmbeddingStatus()
-    },
-    (msg) => {
-      runtimeInstalling.value = false
-      toast.error(`安装失败: ${msg}`)
-    },
-  )
 }
 
 async function handleUninstallRuntime() {
@@ -284,8 +215,24 @@ async function onDismissError() {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+watch(runtimeInstallOutput, () => {
+  if (runtimeInstalling.value)
+    scrollInstallOutputToBottom()
+})
+
+watch(runtimeInstallCompletedAt, (value, oldValue) => {
+  if (value && value !== oldValue)
+    void loadEmbeddingStatus()
+})
+
+watch(modelDownloadCompletedAt, (value, oldValue) => {
+  if (value && value !== oldValue)
+    void loadEmbeddingStatus()
+})
+
 onMounted(() => {
   loadEmbeddingStatus()
+  scrollInstallOutputToBottom()
 })
 </script>
 
@@ -394,14 +341,14 @@ onMounted(() => {
 
           <!-- Runtime installing -->
           <div v-if="runtimeInstalling" class="space-y-2">
-            <div class="flex items-center gap-2 py-1 text-xs text-muted-foreground">
-              <div class="i-carbon-circle-dash h-4 w-4 animate-spin" />
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <div class="i-carbon-circle-dash h-4 w-4 animate-spin flex-shrink-0" />
               <span>正在安装 ONNX 运行时...</span>
             </div>
             <pre
-              v-if="runtimeInstallOutput"
-              class="rounded-lg border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground max-h-32 overflow-auto font-mono whitespace-pre-wrap"
-            >{{ runtimeInstallOutput }}</pre>
+              ref="installOutputEl"
+              class="rounded-lg border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground h-36 overflow-y-auto font-mono whitespace-pre-wrap"
+            >{{ runtimeInstallOutput || ' ' }}</pre>
           </div>
 
           <!-- Model not downloaded (runtime installed) -->
@@ -412,7 +359,7 @@ onMounted(() => {
             </div>
             <button
               class="btn-primary btn-sm"
-              @click="startDownload"
+              @click="startModelDownload"
             >
               <div class="i-carbon-download h-3.5 w-3.5 mr-1" />
               下载模型

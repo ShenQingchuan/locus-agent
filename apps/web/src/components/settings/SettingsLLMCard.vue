@@ -153,29 +153,30 @@ function saveKimiCode() {
 </script>
 
 <template>
-  <!-- LLM Multi-Provider Configuration with Tabs -->
-  <form class="card p-4" @submit.prevent="emit('submit')">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-sm font-medium text-foreground">
-          模型配置
-        </h2>
-        <p class="text-xs text-muted-foreground mt-1">
-          保存后立即生效
-        </p>
-      </div>
-      <div
-        v-if="runtimeInfo"
-        class="text-xs text-gray-400 text-right hidden sm:block"
-      >
+  <!-- LLM Multi-Provider Configuration with Tabs (one form per action to satisfy a11y / DOM best practices) -->
+  <div class="card p-4">
+    <form @submit.prevent="emit('submit')">
+      <div class="flex items-center justify-between">
         <div>
-          <span class="font-mono">{{ runtimeInfo.provider }}</span>
+          <h2 class="text-sm font-medium text-foreground">
+            模型配置
+          </h2>
+          <p class="text-xs text-muted-foreground mt-1">
+            保存后立即生效
+          </p>
         </div>
-        <div class="truncate max-w-[120px]">
-          {{ runtimeInfo.model }}
+        <div
+          v-if="runtimeInfo"
+          class="text-xs text-gray-400 text-right hidden sm:block"
+        >
+          <div>
+            <span class="font-mono">{{ runtimeInfo.provider }}</span>
+          </div>
+          <div class="truncate max-w-[120px]">
+            {{ runtimeInfo.model }}
+          </div>
         </div>
       </div>
-    </div>
 
     <!-- Provider Tabs -->
     <div class="mt-4 border-b border-border">
@@ -294,78 +295,76 @@ function saveKimiCode() {
         </div>
       </div>
 
-      <!-- ============================================================ -->
-      <!-- Coding Provider Section (Kimi Code under Moonshot) -->
-      <!-- ============================================================ -->
-      <template v-if="codingProviderForTab">
-        <div class="border-t border-border pt-4 mt-2">
-          <h3 class="text-xs font-medium text-foreground mb-3 flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
-              <span class="i-custom:moonshot h-3.5 w-3.5" />
-              {{ codingProviderForTab.label }} 编码
-            </span>
-            <span
-              v-if="codingKimi.hasApiKey"
-              class="text-xs text-green-600 dark:text-green-400 font-normal flex items-center gap-1"
-            >
-              <span class="i-carbon-checkmark-filled h-3 w-3" />
-              已配置
-            </span>
-          </h3>
-
-          <div class="grid gap-3">
-            <p class="text-xs text-muted-foreground">
-              采用 Anthropic API 格式，独立配置 API Key 和端点。
-            </p>
-
-            <!-- Kimi Code API Key -->
-            <div class="grid gap-1.5">
-              <label class="text-xs text-muted-foreground">Kimi Code API Key</label>
-              <input
-                v-model="kimiApiKey"
-                class="input-field font-mono"
-                type="password"
-                autocomplete="new-password"
-                :placeholder="codingKimi.apiKeyMasked || '请输入 Kimi Code API Key (sk-kimi-...)'"
-              >
-            </div>
-
-            <!-- Kimi Code API Base -->
-            <div class="grid gap-1.5">
-              <label class="text-xs text-muted-foreground">API 端点</label>
-              <input
-                v-model="kimiApiBase"
-                class="input-field"
-                type="text"
-                placeholder="https://api.kimi.com/coding/v1"
-              >
-            </div>
-
-            <!-- Kimi Code Model -->
-            <div class="grid gap-1.5">
-              <label class="text-xs text-muted-foreground">模型名称</label>
-              <input
-                v-model="kimiModel"
-                class="input-field font-mono"
-                type="text"
-                placeholder="kimi-k2.5"
-              >
-            </div>
-
-            <button
-              type="button"
-              class="btn-outline btn-sm"
-              @click="saveKimiCode"
-            >
-              保存 Kimi Code 配置
-            </button>
-          </div>
-        </div>
-      </template>
     </div>
 
     <p class="mt-3 text-xs text-muted-foreground/60">
       模型名称可在对话界面底部直接切换。点击上方标签切换不同提供商进行配置。
     </p>
-  </form>
+    </form>
+
+    <!-- Coding Provider Section (Kimi Code) - separate form for single action -->
+    <form
+      v-if="codingProviderForTab"
+      class="border-t border-border pt-4 mt-2"
+      @submit.prevent="saveKimiCode"
+    >
+      <h3 class="text-xs font-medium text-foreground mb-3 flex items-center justify-between">
+        <span class="flex items-center gap-1.5">
+          <span class="i-custom:moonshot h-3.5 w-3.5" />
+          {{ codingProviderForTab.label }} 编码
+        </span>
+        <span
+          v-if="codingKimi.hasApiKey"
+          class="text-xs text-green-600 dark:text-green-400 font-normal flex items-center gap-1"
+        >
+          <span class="i-carbon-checkmark-filled h-3 w-3" />
+          已配置
+        </span>
+      </h3>
+
+      <div class="grid gap-3">
+        <p class="text-xs text-muted-foreground">
+          采用 Anthropic API 格式，独立配置 API Key 和端点。
+        </p>
+
+        <!-- Kimi Code API Key -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">Kimi Code API Key</label>
+          <input
+            v-model="kimiApiKey"
+            class="input-field font-mono"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="codingKimi.apiKeyMasked || '请输入 Kimi Code API Key (sk-kimi-...)'"
+          >
+        </div>
+
+        <!-- Kimi Code API Base -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">API 端点</label>
+          <input
+            v-model="kimiApiBase"
+            class="input-field"
+            type="text"
+            placeholder="https://api.kimi.com/coding/v1"
+          >
+        </div>
+
+        <!-- Kimi Code Model -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">模型名称</label>
+          <input
+            v-model="kimiModel"
+            class="input-field font-mono"
+            type="text"
+            placeholder="kimi-k2.5"
+          >
+        </div>
+
+        <button type="submit" class="btn-outline btn-sm">
+          保存 Kimi Code 配置
+        </button>
+      </div>
+    </form>
+  </div>
 </template>
