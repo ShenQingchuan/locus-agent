@@ -4,6 +4,7 @@ import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
 import { executeGrep, formatGrepResult } from './grep.js'
 import { executeManageKanban, formatManageKanbanResult } from './manage_kanban.js'
+import { executeManageMemory, formatManageMemoryResult } from './manage_memory.js'
 import {
   executePlanExit,
   executeReadPlan,
@@ -14,8 +15,6 @@ import {
 } from './manage_plans.js'
 import { executeManageTodos, formatManageTodosResult } from './manage_todos.js'
 import { executeReadFile, formatReadResult } from './read.js'
-import { executeSaveMemory, formatSaveMemoryResult } from './save_memory.js'
-import { executeSearchMemories, formatSearchMemoriesResult } from './search_memories.js'
 import { executeSkill, formatSkillResult } from './skill.js'
 import { executeStrReplace, formatStrReplaceResult } from './str-replace.js'
 import { executeTree, formatTreeResult } from './tree.js'
@@ -69,13 +68,9 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     const result = await executeWriteFile(args as Parameters<typeof executeWriteFile>[0])
     return formatWriteResult(result)
   },
-  save_memory: async (args, _callbacks, context) => {
-    const result = await executeSaveMemory(args as Parameters<typeof executeSaveMemory>[0], context?.conversationId)
-    return formatSaveMemoryResult(result)
-  },
-  search_memories: async (args) => {
-    const result = await executeSearchMemories(args as Parameters<typeof executeSearchMemories>[0])
-    return formatSearchMemoriesResult(result)
+  manage_memory: async (args, _callbacks, context) => {
+    const result = await executeManageMemory(args as Parameters<typeof executeManageMemory>[0], context?.conversationId)
+    return formatManageMemoryResult(result)
   },
   skill: async (args, _callbacks, context) => {
     const result = await executeSkill(args as Parameters<typeof executeSkill>[0], context?.skillsWorkspaceRoot)
@@ -120,8 +115,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   tree: executeTree as ToolExecutor,
   str_replace: executeStrReplace as ToolExecutor,
   write_file: executeWriteFile as ToolExecutor,
-  save_memory: executeSaveMemory as ToolExecutor,
-  search_memories: executeSearchMemories as ToolExecutor,
+  manage_memory: executeManageMemory as ToolExecutor,
   skill: executeSkill as ToolExecutor,
   manage_todos: executeManageTodos as ToolExecutor,
   manage_kanban: executeManageKanban as ToolExecutor,

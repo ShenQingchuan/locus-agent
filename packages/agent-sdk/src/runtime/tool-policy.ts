@@ -3,7 +3,7 @@ export type ToolCategory = 'interactive' | 'trusted' | 'serial' | 'normal'
 export interface ToolPolicyConfig {
   /** Tools requiring special flow (e.g. ask_question, delegate) */
   interactive: ReadonlySet<string>
-  /** Tools that can bypass approval (e.g. save_memory, manage_todos) */
+  /** Tools that can bypass approval (e.g. manage_memory, manage_todos) */
   trusted: ReadonlySet<string>
   /** Tools that must execute sequentially (e.g. str_replace, write_file, bash) */
   serial: ReadonlySet<string>

@@ -178,128 +178,127 @@ function saveKimiCode() {
         </div>
       </div>
 
-    <!-- Provider Tabs -->
-    <div class="mt-4 border-b border-border">
-      <div class="flex flex-wrap gap-1">
-        <button
-          v-for="tab in providerTabs"
-          :key="tab.value"
-          type="button"
-          class="px-3 py-2 text-xs font-medium rounded-t-lg transition-colors relative border-none outline-none"
-          :class="[
-            activeTab === tab.value
-              ? 'text-foreground bg-muted border-t border-x border-border'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-          ]"
-          @click="activeTab = tab.value"
-        >
-          <div class="flex items-center gap-1.5">
-            <span :class="tab.icon" class="h-3.5 w-3.5" />
-            <span>{{ tab.label }}</span>
-            <!-- Active indicator (runtime) -->
-            <span
-              v-if="isActiveProvider(tab.value)"
-              class="ml-1 h-1.5 w-1.5 rounded-full bg-green-500"
-              title="当前正在使用"
-            />
-            <!-- Configured indicator -->
-            <span
-              v-else-if="hasApiKey(tab.value)"
-              class="ml-1 h-1.5 w-1.5 rounded-full bg-blue-400"
-              title="已配置 API Key"
-            />
+      <!-- Provider Tabs -->
+      <div class="mt-4 border-b border-border">
+        <div class="flex flex-wrap gap-1">
+          <button
+            v-for="tab in providerTabs"
+            :key="tab.value"
+            type="button"
+            class="px-3 py-2 text-xs font-medium rounded-t-lg transition-colors relative border-none outline-none"
+            :class="[
+              activeTab === tab.value
+                ? 'text-foreground bg-muted border-t border-x border-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            ]"
+            @click="activeTab = tab.value"
+          >
+            <div class="flex items-center gap-1.5">
+              <span :class="tab.icon" class="h-3.5 w-3.5" />
+              <span>{{ tab.label }}</span>
+              <!-- Active indicator (runtime) -->
+              <span
+                v-if="isActiveProvider(tab.value)"
+                class="ml-1 h-1.5 w-1.5 rounded-full bg-green-500"
+                title="当前正在使用"
+              />
+              <!-- Configured indicator -->
+              <span
+                v-else-if="hasApiKey(tab.value)"
+                class="ml-1 h-1.5 w-1.5 rounded-full bg-blue-400"
+                title="已配置 API Key"
+              />
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="mt-4 grid gap-4">
+        <!-- Custom Provider Mode Selection -->
+        <div v-if="isCustomProvider" class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">兼容模式</label>
+          <div class="relative">
+            <select v-model="currentConfig.customMode" class="select-field">
+              <option value="openai-compatible">
+                OpenAI 兼容
+              </option>
+              <option value="anthropic-compatible">
+                Anthropic 兼容
+              </option>
+            </select>
+            <div class="i-ic:twotone-keyboard-arrow-down absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
-        </button>
-      </div>
-    </div>
-
-    <!-- Tab Content -->
-    <div class="mt-4 grid gap-4">
-      <!-- Custom Provider Mode Selection -->
-      <div v-if="isCustomProvider" class="grid gap-1.5">
-        <label class="text-xs text-muted-foreground">兼容模式</label>
-        <div class="relative">
-          <select v-model="currentConfig.customMode" class="select-field">
-            <option value="openai-compatible">
-              OpenAI 兼容
-            </option>
-            <option value="anthropic-compatible">
-              Anthropic 兼容
-            </option>
-          </select>
-          <div class="i-ic:twotone-keyboard-arrow-down absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <p class="text-xs text-muted-foreground">
+            选择与你自定义服务 API 格式兼容的模式
+          </p>
         </div>
-        <p class="text-xs text-muted-foreground">
-          选择与你自定义服务 API 格式兼容的模式
-        </p>
-      </div>
 
-      <!-- Hidden username field for password manager accessibility -->
-      <input
-        type="text"
-        :value="activeTab"
-        autocomplete="username"
-        class="hidden"
-        aria-hidden="true"
-        tabindex="-1"
-      >
-
-      <!-- API Key -->
-      <div class="grid gap-1.5">
-        <label class="text-xs text-muted-foreground">API Key</label>
+        <!-- Hidden username field for password manager accessibility -->
         <input
-          v-model="currentConfig.apiKey"
-          class="input-field font-mono"
-          type="password"
-          autocomplete="new-password"
-          :placeholder="getApiKeyPlaceholder(activeTab)"
-        >
-        <p v-if="getApiKeyHelperText(activeTab)" class="text-xs text-muted-foreground">
-          {{ getApiKeyHelperText(activeTab) }}
-        </p>
-      </div>
-
-      <!-- API Base URL -->
-      <div class="grid gap-1.5">
-        <label class="text-xs text-muted-foreground">API Base URL</label>
-        <input
-          v-model="currentConfig.apiBase"
-          class="input-field"
           type="text"
-          :placeholder="getApiBasePlaceholder(activeTab)"
+          :value="activeTab"
+          autocomplete="username"
+          class="hidden"
+          aria-hidden="true"
+          tabindex="-1"
         >
-      </div>
 
-      <!-- Model Name -->
-      <div class="grid gap-1.5">
-        <label class="text-xs text-muted-foreground">模型名称</label>
-        <input
-          v-model="currentConfig.model"
-          class="input-field font-mono"
-          type="text"
-          :placeholder="DEFAULT_MODELS[activeTab] || '输入模型名称'"
+        <!-- API Key -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">API Key</label>
+          <input
+            v-model="currentConfig.apiKey"
+            class="input-field font-mono"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="getApiKeyPlaceholder(activeTab)"
+          >
+          <p v-if="getApiKeyHelperText(activeTab)" class="text-xs text-muted-foreground">
+            {{ getApiKeyHelperText(activeTab) }}
+          </p>
+        </div>
+
+        <!-- API Base URL -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">API Base URL</label>
+          <input
+            v-model="currentConfig.apiBase"
+            class="input-field"
+            type="text"
+            :placeholder="getApiBasePlaceholder(activeTab)"
+          >
+        </div>
+
+        <!-- Model Name -->
+        <div class="grid gap-1.5">
+          <label class="text-xs text-muted-foreground">模型名称</label>
+          <input
+            v-model="currentConfig.model"
+            class="input-field font-mono"
+            type="text"
+            :placeholder="DEFAULT_MODELS[activeTab] || '输入模型名称'"
+          >
+          <p class="text-xs text-muted-foreground">
+            留空将使用默认值: {{ DEFAULT_MODELS[activeTab] || '无' }}
+          </p>
+        </div>
+
+        <!-- Current Provider Indicator -->
+        <div
+          v-if="isActiveProvider(activeTab)"
+          class="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-xs text-green-600 dark:text-green-400"
         >
-        <p class="text-xs text-muted-foreground">
-          留空将使用默认值: {{ DEFAULT_MODELS[activeTab] || '无' }}
-        </p>
-      </div>
-
-      <!-- Current Provider Indicator -->
-      <div
-        v-if="isActiveProvider(activeTab)"
-        class="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-xs text-green-600 dark:text-green-400"
-      >
-        <div class="flex items-center gap-2">
-          <span class="i-carbon-checkmark-filled h-4 w-4" />
-          <span>当前正在使用此提供商</span>
+          <div class="flex items-center gap-2">
+            <span class="i-carbon-checkmark-filled h-4 w-4" />
+            <span>当前正在使用此提供商</span>
+          </div>
         </div>
       </div>
 
-    </div>
-
-    <p class="mt-3 text-xs text-muted-foreground/60">
-      模型名称可在对话界面底部直接切换。点击上方标签切换不同提供商进行配置。
-    </p>
+      <p class="mt-3 text-xs text-muted-foreground/60">
+        模型名称可在对话界面底部直接切换。点击上方标签切换不同提供商进行配置。
+      </p>
     </form>
 
     <!-- Coding Provider Section (Kimi Code) - separate form for single action -->

@@ -29,26 +29,21 @@ Use the \`grep\` tool to search file contents by regex pattern. This is much fas
 
 ## Memory System
 
-You have access to a persistent memory system via save_memory and search_memories tools.
+Use the \`manage_memory\` tool with action: create | read | update | delete.
 
-**When to save memories (save_memory):**
-- User states a preference (coding style, language, tools, conventions)
-- Important project decisions or architecture choices are made
-- You learn a lesson from a debugging session or mistake
-- The user explicitly asks you to remember something
-- Key facts about the user's environment or workflow
+**create** — Save new memories (preferences, project details, lessons). Use when the user states a preference, makes an important decision, or asks you to remember something.
 
-**When to search memories (search_memories):**
-- At the start of a new task, if the topic might relate to saved preferences or past decisions
-- When the user references something you discussed before
-- When you need context about the user's project or preferences
-- When the user asks "do you remember..." or similar
+**read** — Search by natural language query and/or tags. Use at the start of a task when context might help, or when the user says "do you remember...". At least one of \`query\` or \`tags\` is required.
+
+**update** — Change a memory's content and/or tags (pass \`memory_id\` from a prior read). Use when the user wants to correct or refine a memory; \`tags\` replaces all existing tags.
+
+**delete** — Remove memories by ID (from a prior read). Use when the user asks to forget something or revoke outdated information.
 
 **Guidelines:**
 - Each memory should be concise (1-3 sentences), specific, and factual
 - Use multi-level tags like "preference/code-style", "project/my-app", "lesson/debugging"
-- Do NOT search memories on every single turn — only when relevant context would help
-- Do NOT save trivial or ephemeral information (e.g. "user said hello")
+- Do NOT read memories on every turn — only when relevant context would help
+- Do NOT create trivial or ephemeral information (e.g. "user said hello")
 
 ## Todo Tracking
 

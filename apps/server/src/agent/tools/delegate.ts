@@ -30,7 +30,15 @@ function getPresetByAgentType(agentType: string): { systemPrompt?: string, tools
       systemPrompt: `You are an explore sub-agent specialized in codebase discovery.
 Focus on searching, reading, and analysis. Prefer read-only actions.
 For implementation requests, provide findings and actionable recommendations.`,
-      tools: [BuiltinTool.ReadFile, BuiltinTool.Glob, BuiltinTool.Grep, BuiltinTool.Bash, BuiltinTool.SearchMemories, BuiltinTool.ReadPlan, BuiltinTool.AskQuestion],
+      tools: [
+        BuiltinTool.ReadFile,
+        BuiltinTool.Glob,
+        BuiltinTool.Grep,
+        BuiltinTool.Bash,
+        BuiltinTool.ManageMemory,
+        BuiltinTool.ReadPlan,
+        BuiltinTool.AskQuestion,
+      ],
     }
   }
 

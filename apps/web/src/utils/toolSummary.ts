@@ -26,6 +26,33 @@ export const toolSummaryResolvers: Record<string, (args: Record<string, unknown>
     const task = String(args.task ?? '')
     return `${agentName}: ${task.slice(0, 40)}${task.length > 40 ? '...' : ''}`
   },
+  manage_memory: (args) => {
+    const action = String(args.action ?? '')
+    if (action === 'create') {
+      const memories = (args.memories as Array<{ content?: string }>) ?? []
+      return memories.length > 0 ? `保存 ${memories.length} 条记忆` : '保存记忆'
+    }
+    if (action === 'read') {
+      const q = typeof args.query === 'string' ? args.query : ''
+      const tags = (args.tags as string[] | undefined) ?? []
+      if (q && tags.length)
+        return `搜索记忆: "${q.slice(0, 20)}..." + ${tags.length} 个标签`
+      if (q)
+        return `搜索记忆: "${q.slice(0, 30)}${q.length > 30 ? '...' : ''}"`
+      if (tags.length)
+        return `按标签搜索记忆: ${tags.join(', ')}`
+      return '搜索记忆'
+    }
+    if (action === 'update') {
+      const id = String(args.memory_id ?? '')
+      return id ? `更新记忆 ${id.slice(0, 8)}...` : '更新记忆'
+    }
+    if (action === 'delete') {
+      const ids = (args.memory_ids as string[] | undefined) ?? []
+      return ids.length > 0 ? `删除 ${ids.length} 条记忆` : '删除记忆'
+    }
+    return '管理记忆'
+  },
   manage_todos: (args) => {
     const action = String(args.action ?? '')
     const content = typeof args.content === 'string' ? args.content.trim() : ''

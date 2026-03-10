@@ -62,7 +62,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   BuiltinTool.Glob,
   BuiltinTool.Grep,
   BuiltinTool.Tree,
-  BuiltinTool.SearchMemories,
+  BuiltinTool.ManageMemory,
   BuiltinTool.Skill,
   BuiltinTool.WritePlan,
   BuiltinTool.ReadPlan,

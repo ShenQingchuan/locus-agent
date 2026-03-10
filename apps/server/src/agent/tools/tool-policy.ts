@@ -6,8 +6,7 @@ export const interactiveTools = new Set<string>([
 ])
 
 export const trustedBuiltinTools = new Set<string>([
-  BuiltinTool.SaveMemory,
-  BuiltinTool.SearchMemories,
+  BuiltinTool.ManageMemory,
   BuiltinTool.Skill,
   BuiltinTool.ManageTodos,
   BuiltinTool.ManageKanban,

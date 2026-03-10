@@ -5,11 +5,10 @@ import { delegateTool } from './delegate.js'
 import { globTool } from './glob.js'
 import { grepTool } from './grep.js'
 import { manageKanbanTool } from './manage_kanban.js'
+import { manageMemoryTool } from './manage_memory.js'
 import { planExitTool, readPlanTool, writePlanTool } from './manage_plans.js'
 import { manageTodosTool } from './manage_todos.js'
 import { readFileTool } from './read.js'
-import { saveMemoryTool } from './save_memory.js'
-import { searchMemoriesTool } from './search_memories.js'
 import { skillTool } from './skill.js'
 import { strReplaceTool } from './str-replace.js'
 import { treeTool } from './tree.js'
@@ -25,8 +24,7 @@ export const tools = {
   [BuiltinTool.WriteFile]: writeFileTool,
   [BuiltinTool.AskQuestion]: askQuestionTool,
   [BuiltinTool.Delegate]: delegateTool,
-  [BuiltinTool.SaveMemory]: saveMemoryTool,
-  [BuiltinTool.SearchMemories]: searchMemoriesTool,
+  [BuiltinTool.ManageMemory]: manageMemoryTool,
   [BuiltinTool.Skill]: skillTool,
   [BuiltinTool.ManageTodos]: manageTodosTool,
   [BuiltinTool.ManageKanban]: manageKanbanTool,
