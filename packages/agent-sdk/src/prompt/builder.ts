@@ -62,7 +62,7 @@ export function createPromptBuilder(): PromptBuilder {
     },
 
     getSections() {
-      return [...sections.values()].sort((a, b) => a.priority - b.priority)
+      return [...sections.values()].toSorted((a, b) => a.priority - b.priority)
     },
 
     build() {

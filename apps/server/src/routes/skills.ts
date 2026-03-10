@@ -225,7 +225,7 @@ skillsRoutes.get('/watch', async (c) => {
         function notify() {
           if (debounceTimer)
             clearTimeout(debounceTimer)
-          debounceTimer = setTimeout(() => send('changed'), 300)
+          debounceTimer = setTimeout(send, 300, 'changed')
         }
 
         const watchers: ReturnType<typeof fsWatch>[] = []
@@ -241,7 +241,7 @@ skillsRoutes.get('/watch', async (c) => {
         }
 
         // Keepalive to prevent proxy/browser timeout
-        const keepalive = setInterval(() => send('keepalive'), 30_000)
+        const keepalive = setInterval(send, 30_000, 'keepalive')
 
         function cleanup() {
           for (const w of watchers) w.close()

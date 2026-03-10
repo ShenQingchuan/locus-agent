@@ -172,7 +172,7 @@ class MCPManager extends EventEmitter {
   }
 
   getStatus(): MCPServerStatus[] {
-    return Array.from(this.servers.entries()).map(([name, entry]) => ({
+    return Array.from(this.servers.entries(), ([name, entry]) => ({
       name,
       status: entry.status,
       error: entry.error,
@@ -188,7 +188,7 @@ class MCPManager extends EventEmitter {
 
   async closeAll(): Promise<void> {
     await Promise.allSettled(
-      Array.from(this.servers.keys()).map(name => this.disconnectServer(name, { preserveEntry: false, reason: 'close-all' })),
+      Array.from(this.servers.keys(), name => this.disconnectServer(name, { preserveEntry: false, reason: 'close-all' })),
     )
     this.serverConfigs.clear()
   }

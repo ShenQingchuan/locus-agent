@@ -1,22 +1,35 @@
 import { embed, embedMany } from 'ai'
 import { createZhipu } from 'zhipu-ai-provider'
-import { getSetting } from '../settings/index.js'
+import { getSetting, setSetting } from '../settings/index.js'
+import {
+  embedBatchLocal,
+  embedTextLocal,
+  isLocalModelReady,
+} from './localEmbedding.js'
+
+// ==================== Constants ====================
 
 /**
- * Zhipu embedding-3 — 1024 dimensions
- * Requires a Zhipu API key stored in settings DB (llm.api_key.zhipu)
+ * Both Zhipu embedding-3 and Qwen3-Embedding-0.6B output 1024 dimensions
  */
 export const EMBEDDING_DIM = 1024
 
-function getZhipuApiKey(): string | undefined {
-  return getSetting('llm.api_key.zhipu') || undefined
+export type EmbeddingProvider = 'zhipu' | 'local'
+
+// ==================== Provider settings ====================
+
+export function getEmbeddingProvider(): EmbeddingProvider {
+  return (getSetting('embedding.provider') as EmbeddingProvider) || 'zhipu'
 }
 
-/**
- * Whether embedding is configured (Zhipu API key available)
- */
-export function isEmbeddingConfigured(): boolean {
-  return !!getZhipuApiKey()
+export function setEmbeddingProvider(provider: EmbeddingProvider): void {
+  setSetting('embedding.provider', provider)
+}
+
+// ==================== Zhipu ====================
+
+function getZhipuApiKey(): string | undefined {
+  return getSetting('llm.api_key.zhipu') || undefined
 }
 
 function createEmbeddingModel() {
@@ -32,35 +45,51 @@ function createEmbeddingModel() {
   return zhipu.textEmbeddingModel('embedding-3', { dimensions: EMBEDDING_DIM })
 }
 
+// ==================== Unified API ====================
+
 /**
- * Embed a single text and return the vector as Float32Array
+ * Whether the currently-selected embedding provider is ready to use
+ */
+export function isEmbeddingConfigured(): boolean {
+  const provider = getEmbeddingProvider()
+  if (provider === 'local')
+    return isLocalModelReady()
+  return !!getZhipuApiKey()
+}
+
+/**
+ * Embed a single text using the active provider
  */
 export async function embedText(text: string): Promise<Float32Array> {
+  const provider = getEmbeddingProvider()
+
+  if (provider === 'local')
+    return embedTextLocal(text)
+
   const model = createEmbeddingModel()
   const { embedding } = await embed({ model, value: text })
   return new Float32Array(embedding)
 }
 
-/**
- * Alias for embedText — used when embedding note content for storage
- */
+/** Alias for storage */
 export const embedPassage = embedText
-
-/**
- * Alias for embedText — used when embedding search queries
- * (Zhipu embedding-3 does not require query/passage prefixes)
- */
+/** Alias for search queries */
 export const embedQuery = embedText
 
 /**
- * Batch embed multiple texts, returning Float32Array per text
+ * Batch embed texts using the active provider
  */
 export async function embedBatch(
   texts: string[],
   onProgress?: (done: number, total: number) => void,
 ): Promise<Float32Array[]> {
-  const model = createEmbeddingModel()
+  const provider = getEmbeddingProvider()
 
+  if (provider === 'local')
+    return embedBatchLocal(texts, onProgress)
+
+  // Zhipu API path
+  const model = createEmbeddingModel()
   const CHUNK_SIZE = 64
   const results: Float32Array[] = []
 

@@ -24,7 +24,7 @@ export async function getAllowedRoots(): Promise<string[]> {
     }
   }))
 
-  return Array.from(new Set(resolved.filter((path): path is string => !!path)))
+  return [...new Set(resolved.filter((path): path is string => !!path))]
 }
 
 export async function resolveAllowedDirectory(inputPath: string | undefined): Promise<string> {

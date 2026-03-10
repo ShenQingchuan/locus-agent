@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { resolveToolPath } from './resolve-path.js'
 import { getWorkspaceRoot } from './workspace-root.js'
 
+const RE_RG_MATCH_LINE = /^(.+?):(\d+):(.*)$/
+const RE_RG_CONTEXT_LINE = /^(.+?)-(\d+)-(.*)$/
+const RE_GLOB_BRACES = /\{([^}]+)\}/g
+
 /**
  * Maximum number of matching lines returned by default.
  * Prevents token explosion when the pattern matches thousands of lines.
@@ -169,8 +173,8 @@ export async function executeGrep(args: {
           continue
 
         // Context lines use '-' separator, match lines use ':'
-        const matchResult = line.match(/^(.+?):(\d+):(.*)$/)
-        const contextResult = line.match(/^(.+?)-(\d+)-(.*)$/)
+        const matchResult = line.match(RE_RG_MATCH_LINE)
+        const contextResult = line.match(RE_RG_CONTEXT_LINE)
 
         if (matchResult) {
           // This is a match line
@@ -214,7 +218,7 @@ export async function executeGrep(args: {
       for (const line of lines) {
         if (!line)
           continue
-        const match = line.match(/^(.+?):(\d+):(.*)$/)
+        const match = line.match(RE_RG_MATCH_LINE)
         if (match) {
           matches.push({
             file: match[1],
@@ -257,7 +261,7 @@ async function executeGrepFallback(
 
   if (include) {
     // Convert glob to grep --include format
-    const patterns = include.replace(/\{([^}]+)\}/g, (_m, p1: string) => {
+    const patterns = include.replace(RE_GLOB_BRACES, (_m, p1: string) => {
       return p1.split(',').join('|')
     })
     for (const p of patterns.split('|')) {
@@ -281,7 +285,7 @@ async function executeGrepFallback(
   for (const line of stdout.split('\n')) {
     if (!line)
       continue
-    const match = line.match(/^(.+?):(\d+):(.*)$/)
+    const match = line.match(RE_RG_MATCH_LINE)
     if (match) {
       matches.push({
         file: match[1],

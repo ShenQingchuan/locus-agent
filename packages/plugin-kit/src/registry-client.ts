@@ -9,21 +9,21 @@ import type { PluginPermissions } from '@locus-agent/agent-sdk'
  */
 export interface RegistryClient {
   /** Search the registry for plugins matching a query */
-  search(query: string, options?: {
+  search: (query: string, options?: {
     limit?: number
     offset?: number
     category?: string
-  }): Promise<RegistrySearchResult>
+  }) => Promise<RegistrySearchResult>
 
   /** Get full metadata for a specific plugin by registry ID */
-  getPlugin(registryId: string): Promise<RegistryPluginInfo | null>
+  getPlugin: (registryId: string) => Promise<RegistryPluginInfo | null>
 
   /**
    * Resolve the npm package name + version for a registry plugin.
    * Used by PluginManager.install() to convert a registry ID
    * into an installable npm source.
    */
-  resolve(registryId: string, versionRange?: string): Promise<RegistryResolveResult>
+  resolve: (registryId: string, versionRange?: string) => Promise<RegistryResolveResult>
 }
 
 export interface RegistrySearchResult {

@@ -133,7 +133,7 @@ async function open() {
 
 function handleInputChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const files = input.files ? Array.from(input.files) : []
+  const files = input.files ? [...input.files] : []
 
   if (!files.length) {
     return

@@ -11,6 +11,8 @@ const props = defineProps<{
   /** Display style: split (side-by-side) or unified (stacked) */
   diffStyle?: 'split' | 'unified'
 }>()
+const RE_MINUS_FILE_HEADER = /^---\s/m
+const RE_PLUS_FILE_HEADER = /^\+\+\+\s/m
 
 const isDark = useDark()
 
@@ -27,7 +29,7 @@ let instance: FileDiff | null = null
 function normalizePatch(raw: string, filePath?: string): string {
   const trimmed = raw.trim()
   // Already has file headers → use as-is
-  if (/^---\s/m.test(trimmed) && /^\+\+\+\s/m.test(trimmed))
+  if (RE_MINUS_FILE_HEADER.test(trimmed) && RE_PLUS_FILE_HEADER.test(trimmed))
     return trimmed
 
   // Prepend synthetic --- / +++ headers

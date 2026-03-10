@@ -8,7 +8,7 @@ import type {
   HookScope,
   PermissionScope,
 } from '@locus-agent/agent-sdk'
-import { HookKind, HOOK_CATEGORIES } from '@locus-agent/agent-sdk'
+import { HOOK_CATEGORIES, HookKind } from '@locus-agent/agent-sdk'
 
 interface SubscribedHandler {
   pluginId: string
@@ -166,8 +166,9 @@ function deriveCapabilities(category: HookCategory): string[] {
     case HookKind.Enrich:
       return ['read', 'append_context', 'patch_prompt', 'suggest', 'emit_artifact']
     case HookKind.Guard:
-      return ['read', 'append_context', 'patch_prompt', 'suggest',
-        'emit_artifact', 'require_confirmation', 'block']
+      return ['read', 'append_context', 'patch_prompt', 'suggest', 'emit_artifact', 'require_confirmation', 'block']
+    default:
+      return []
   }
 }
 

@@ -84,10 +84,11 @@ async function handleDaemon(): Promise<void> {
   const dbPath = getSettingsDbPath()
   initDB({ dbPath, migrationsFolder: getMigrationsFolder() })
 
-  const llmSettings = getLLMSettings()
-  if (!llmSettings) {
-    console.error('Error: LLM settings not found. Run `locus-agent config` to set up.')
-    process.exit(1)
+  const llmSettings = getLLMSettings() ?? {
+    provider: 'openai' as const,
+    apiKey: '',
+    apiBase: undefined,
+    model: undefined,
   }
 
   const port = portFlag ?? getServerPort()
@@ -111,12 +112,10 @@ async function handleStart(): Promise<void> {
   const dbPath = getSettingsDbPath()
   initDB({ dbPath, migrationsFolder: getMigrationsFolder() })
 
-  // 首次运行：交互式配置
+  // 首次运行：写入空默认配置，跳过交互式 setup
   if (!isSetupComplete()) {
-    const existingPort = getServerPort()
-    const settings = await runSetup(null, existingPort)
-    saveLLMSettings(settings)
-    setSetting('server.port', String(settings.port))
+    setSetting('setup.completed', 'true')
+    setSetting('server.port', String(portFlag ?? 3000))
   }
 
   // 检查是否已在运行

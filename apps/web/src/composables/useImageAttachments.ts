@@ -66,7 +66,7 @@ export function useImageAttachments() {
 
   async function handleImageFilesSelected(event: Event) {
     const target = event.target as HTMLInputElement | null
-    const files = Array.from(target?.files ?? [])
+    const files = [...target?.files ?? []]
     if (files.length === 0)
       return
 

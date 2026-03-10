@@ -339,11 +339,13 @@ export const plugins = sqliteTable('plugins', {
   sourceType: text('source_type', { enum: ['npm', 'local'] }).notNull(),
   version: text('version').notNull(),
   scope: text('scope', { enum: ['global', 'workspace', 'project', 'conversation'] })
-    .notNull().default('global'),
+    .notNull()
+    .default('global'),
   scopeQualifier: text('scope_qualifier'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   grantedPermissions: text('granted_permissions', { mode: 'json' })
-    .$type<string[]>().notNull(),
+    .$type<string[]>()
+    .notNull(),
   config: text('config'),
   installedAt: integer('installed_at', { mode: 'timestamp' })
     .notNull()

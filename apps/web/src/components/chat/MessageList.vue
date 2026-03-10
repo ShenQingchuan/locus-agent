@@ -121,7 +121,7 @@ watch(
       // First load / session switch: instant scroll with retries for lazy DOM
       scrollToBottom(true)
       // Retry for images / code blocks that render async
-      ;[50, 150, 300].forEach(delay => setTimeout(() => scrollToBottom(true), delay))
+      ;[50, 150, 300].forEach(delay => setTimeout(scrollToBottom, delay, true))
     }
     else {
       // Streaming or new message: coalesce to one scroll per frame

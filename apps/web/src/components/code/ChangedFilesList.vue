@@ -117,7 +117,7 @@ function statusLabel(status: GitFileStatus): string {
 
 function fileName(filePath: string): string {
   const parts = filePath.split('/')
-  return parts[parts.length - 1] || filePath
+  return parts.at(-1) || filePath
 }
 </script>
 

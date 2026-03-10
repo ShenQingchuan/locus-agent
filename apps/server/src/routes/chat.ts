@@ -39,6 +39,11 @@ import { conversationExists, createScopedConversation, getConversation, touchCon
 import { addMessage, addMessages, getLastNMessages, getMessages } from '../services/message.js'
 import { resolveAllowedDirectory } from '../services/workspace-access.js'
 
+const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
+const RE_NON_WORD_OR_HYPHEN = /[^\w-]/g
+const RE_PLAN_TAG = /<plan\b[^>]*>[\s\S]*?<\/plan>/gi
+const RE_PLAN_REF_TAG = /<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi
+
 export const chatRoutes = new Hono()
 
 /**
@@ -66,7 +71,7 @@ export function updateActiveConfirmMode(conversationId: string, confirmMode: boo
 const createSSEEvent = createSSEEventPayload
 
 function toModelImagePayload(attachment: MessageImageAttachment): string | Uint8Array {
-  const match = attachment.dataUrl.match(/^data:.*?;base64,(.+)$/)
+  const match = attachment.dataUrl.match(RE_BASE64_DATA_URL)
   if (!match?.[1])
     return attachment.dataUrl
   return Uint8Array.from(Buffer.from(match[1], 'base64'))
@@ -365,7 +370,7 @@ function normalizeProjectKey(projectKey?: string): string | null {
   const key = projectKey?.trim()
   if (!key)
     return null
-  const safe = key.replace(/[^\w-]/g, '_')
+  const safe = key.replace(RE_NON_WORD_OR_HYPHEN, '_')
   return safe.length > 0 ? safe : null
 }
 
@@ -415,8 +420,8 @@ function resolvePlanSnapshot(
 
 function buildPlanInjectedMessage(message: string, plan: PlanSnapshot): string {
   const stripped = message
-    .replace(/<plan\b[^>]*>[\s\S]*?<\/plan>/gi, '')
-    .replace(/<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi, '')
+    .replace(RE_PLAN_TAG, '')
+    .replace(RE_PLAN_REF_TAG, '')
     .trim()
   return `${stripped}\n\n<plan_ref>\nfilename: ${plan.filename}\npath: ${plan.filePath}\nread_with: read_plan(action=\"read\", filename=\"${plan.filename}\")\n</plan_ref>`
 }

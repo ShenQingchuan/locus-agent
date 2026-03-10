@@ -1,5 +1,7 @@
 import { getProviderConfigOrNull } from './config-store.js'
 
+const RE_TRAILING_DOT_DIGITS = /\.\d+$/
+
 const DEFAULT_CONTEXT_WINDOW = 128_000
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
 const OPENROUTER_CONTEXT_CACHE_TTL_MS = 6 * 60 * 60 * 1000
@@ -61,7 +63,7 @@ function buildLookupCandidates(modelId: string): string[] {
   for (const candidate of [...candidates]) {
     let current = candidate
     while (true) {
-      const relaxed = current.replace(/\.\d+$/, '')
+      const relaxed = current.replace(RE_TRAILING_DOT_DIGITS, '')
       if (!relaxed || relaxed === current)
         break
       candidates.add(relaxed)
@@ -72,7 +74,7 @@ function buildLookupCandidates(modelId: string): string[] {
   for (const candidate of [...candidates]) {
     const segments = candidate.split('/').filter(Boolean)
     if (segments.length > 1) {
-      const slug = segments[segments.length - 1]
+      const slug = segments.at(-1)!
       const authorAndSlug = segments.slice(-2).join('/')
       candidates.add(slug)
       candidates.add(authorAndSlug)

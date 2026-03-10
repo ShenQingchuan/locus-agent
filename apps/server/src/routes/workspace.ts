@@ -13,6 +13,9 @@ import { getAllowedRoots, resolveAllowedDirectory } from '../services/workspace-
 
 export const workspaceRoutes = new Hono()
 
+const RE_CURLY_BRACES = /[{}]/g
+const RE_COMMIT_HASH = /\[[\w/.-]+\s+([a-f0-9]+)\]/
+
 const MAX_LIST_ENTRIES = 1200
 const MAX_TREE_NODES = 8000
 const MAX_TREE_DEPTH = 12
@@ -246,7 +249,7 @@ function parseNumstat(output: string): Map<string, { additions: number | null, d
     const arrowIndex = filePath.indexOf(' => ')
     if (arrowIndex >= 0) {
       // Simplification: take the part after =>
-      filePath = filePath.slice(arrowIndex + 4).replace(/[{}]/g, '')
+      filePath = filePath.slice(arrowIndex + 4).replace(RE_CURLY_BRACES, '')
     }
 
     const additions = addStr === '-' ? null : Number.parseInt(addStr!, 10)
@@ -458,7 +461,7 @@ workspaceRoutes.post('/git/commit', async (c) => {
     }
 
     // Extract commit hash from output (e.g., "[main abc1234] message")
-    const hashMatch = commitResult.stdout.match(/\[[\w/.-]+\s+([a-f0-9]+)\]/)
+    const hashMatch = commitResult.stdout.match(RE_COMMIT_HASH)
     return c.json({
       success: true,
       commitHash: hashMatch?.[1],
@@ -501,7 +504,7 @@ workspaceRoutes.get('/git/watch', async (c) => {
         function notify() {
           if (debounceTimer)
             clearTimeout(debounceTimer)
-          debounceTimer = setTimeout(() => send('changed'), 300)
+          debounceTimer = setTimeout(send, 300, 'changed')
         }
 
         // Watch .git/ directory for index/HEAD changes (staging, commit, branch switch)
@@ -534,7 +537,7 @@ workspaceRoutes.get('/git/watch', async (c) => {
         catch { /* recursive watch not supported, fallback to no auto-refresh */ }
 
         // Keepalive to prevent proxy/browser timeout
-        const keepalive = setInterval(() => send('keepalive'), 30_000)
+        const keepalive = setInterval(send, 30_000, 'keepalive')
 
         function cleanup() {
           gitWatcher?.close()

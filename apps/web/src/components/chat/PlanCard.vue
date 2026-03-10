@@ -7,12 +7,15 @@ const props = defineProps<{
   content: string
   status: 'pending' | 'completed' | 'error'
 }>()
+const RE_HEADING = /^#\s+(\S.*)$/m
+const RE_MD_EXTENSION = /\.md$/
+const RE_LEADING_MARKDOWN_CHARS = /^[-*>\s]+/
 
 const chatStore = useChatStore()
 
 const planTitle = computed(() => {
-  const match = props.content.match(/^#\s+(\S.*)$/m)
-  return match?.[1]?.trim() || props.filename.replace(/\.md$/, '')
+  const match = props.content.match(RE_HEADING)
+  return match?.[1]?.trim() || props.filename.replace(RE_MD_EXTENSION, '')
 })
 
 const planSummary = computed(() => {
@@ -25,7 +28,7 @@ const planSummary = computed(() => {
       continue
     }
     if (pastHeading && trimmed && !trimmed.startsWith('#')) {
-      const text = trimmed.replace(/^[-*>\s]+/, '')
+      const text = trimmed.replace(RE_LEADING_MARKDOWN_CHARS, '')
       return text.length > 80 ? `${text.slice(0, 80)}...` : text
     }
   }

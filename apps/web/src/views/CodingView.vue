@@ -509,8 +509,7 @@ const currentProjectConversations = computed<Conversation[]>(() => chatStore.con
 const recentConversations = computed(() => {
   if (!canUseAssistant.value)
     return []
-  return [...currentProjectConversations.value]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  return currentProjectConversations.value.toSorted((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 3)
 })
 

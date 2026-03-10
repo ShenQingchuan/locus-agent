@@ -11,6 +11,8 @@ import type { ComputedRef, Ref } from 'vue'
 import type { PendingApproval, PendingQuestion } from '@/api/chat'
 import { computed, ref } from 'vue'
 
+const RE_TODO_LINE = /^\d+\.\s+\[(?:completed|in_progress)\]/
+
 export interface ToolCallState {
   toolCall: ToolCall
   result?: ToolResult
@@ -116,7 +118,7 @@ export function parseManageTodosResult(result: unknown): TodoTask[] | null {
   const lines = result.split('\n')
   const todoLines = lines.filter((line) => {
     const normalized = line.trim()
-    return /^\d+\.\s+\[(?:completed|in_progress)\]/.test(normalized) && normalized.includes(') ')
+    return RE_TODO_LINE.test(normalized) && normalized.includes(') ')
   })
   if (todoLines.length === 0) {
     if (result.includes('Current todos: (empty)'))
@@ -423,7 +425,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
       return
 
     const parts = [...(message.parts || [])]
-    const lastPart = parts[parts.length - 1]
+    const lastPart = parts.at(-1)
 
     if (lastPart && lastPart.type === 'text') {
       parts[parts.length - 1] = { type: 'text', content: lastPart.content + content }
@@ -451,7 +453,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
       return
 
     const parts = [...(message.parts || [])]
-    const lastPart = parts[parts.length - 1]
+    const lastPart = parts.at(-1)
 
     if (lastPart && lastPart.type === 'reasoning') {
       parts[parts.length - 1] = { type: 'reasoning', content: lastPart.content + content }

@@ -32,7 +32,7 @@
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build": "bun build src/index.ts --outdir dist --target bun --external onnxruntime-node",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -45,6 +45,7 @@
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
+    "@huggingface/transformers": "catalog:embedding",
     "@locus-agent/agent-sdk": "workspace:*",
     "@locus-agent/plugin-kit": "workspace:*",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
@@ -56,6 +57,9 @@
     "sqlite-vec": "catalog:embedding",
     "zhipu-ai-provider": "catalog:ai-sdk",
     "zod": "catalog:ai-sdk"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "catalog:embedding"
   },
   "devDependencies": {
     "@types/bun": "catalog:bun-family",

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { settings as settingsTable } from '../db/schema.js'
 
-export { ensureDataDir, getDataDir, getSettingsDbPath, getSkillsDataDir } from './paths.js'
+export { ensureDataDir, getDataDir, getModelsDir, getSettingsDbPath, getSkillsDataDir } from './paths.js'
 
 export function getSetting(key: string): string | undefined {
   const rows = db

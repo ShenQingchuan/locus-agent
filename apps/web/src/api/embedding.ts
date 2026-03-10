@@ -8,12 +8,19 @@ export type EmbeddingStatusType
     | 'ready'
     | 'error'
 
+export type EmbeddingProvider = 'zhipu' | 'local'
+
 export interface EmbeddingStatus {
   status: EmbeddingStatusType
   error?: string
   indexedCount: number
+  /** Which provider built the current index (null = never indexed) */
+  indexedWith: EmbeddingProvider | null
   vecAvailable: boolean
   embeddingConfigured: boolean
+  provider: EmbeddingProvider
+  localModelReady: boolean
+  localModelFiles: { name: string, size: number }[]
 }
 
 export interface EmbeddingProgressEvent {
@@ -24,7 +31,15 @@ export interface EmbeddingProgressEvent {
   message?: string
 }
 
-// ==================== API ====================
+export interface ModelFileProgress {
+  file: string
+  status: 'initiate' | 'download' | 'progress' | 'done'
+  progress?: number
+  loaded?: number
+  total?: number
+}
+
+// ==================== Helpers ====================
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -41,29 +56,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-/**
- * Fetch current embedding status
- */
-export function fetchEmbeddingStatus(): Promise<EmbeddingStatus> {
-  return request<EmbeddingStatus>('/status')
-}
-
-/**
- * Start re-indexing all notes (returns SSE stream controller)
- */
-export function startReindex(
-  onProgress: (data: EmbeddingProgressEvent) => void,
-  onComplete: () => void,
-  onError: (msg: string) => void,
+function consumeSSE(
+  url: string,
+  method: 'POST' | 'GET',
+  handlers: Record<string, (data: any) => void>,
 ): { close: () => void } {
   const controller = new AbortController()
 
-  fetch(`${API_BASE}/reindex`, {
-    method: 'POST',
-    signal: controller.signal,
-  }).then(async (res) => {
+  fetch(url, { method, signal: controller.signal }).then(async (res) => {
     if (!res.ok || !res.body) {
-      onError('重新索引请求失败')
+      handlers.error?.({ message: '请求失败' })
       return
     }
 
@@ -77,7 +79,6 @@ export function startReindex(
         break
 
       buffer += decoder.decode(value, { stream: true })
-
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
 
@@ -89,38 +90,82 @@ export function startReindex(
         else if (line.startsWith('data:')) {
           const data = line.slice(5).trim()
           try {
-            const parsed = JSON.parse(data) as EmbeddingProgressEvent
-
-            if (currentEvent === 'progress') {
-              onProgress(parsed)
-            }
-            else if (currentEvent === 'complete') {
-              onComplete()
-            }
-            else if (currentEvent === 'error') {
-              onError(parsed.message || '未知错误')
+            const parsed = JSON.parse(data)
+            const handler = currentEvent ? handlers[currentEvent] : undefined
+            if (handler) {
+              handler(parsed)
             }
           }
-          catch {
-            // ignore
-          }
+          catch { /* ignore */ }
         }
       }
     }
   }).catch((err) => {
     if (err.name !== 'AbortError') {
-      onError(err.message || '网络错误')
+      handlers.error?.({ message: err.message || '网络错误' })
     }
   })
 
-  return {
-    close: () => controller.abort(),
-  }
+  return { close: () => controller.abort() }
 }
 
-/**
- * Clear error state
- */
+// ==================== Status ====================
+
+export function fetchEmbeddingStatus(): Promise<EmbeddingStatus> {
+  return request<EmbeddingStatus>('/status')
+}
+
+// ==================== Provider ====================
+
+export function setEmbeddingProvider(provider: EmbeddingProvider): Promise<EmbeddingStatus & { success: boolean }> {
+  return request<EmbeddingStatus & { success: boolean }>('/provider', {
+    method: 'POST',
+    body: JSON.stringify({ provider }),
+  })
+}
+
+// ==================== Model management ====================
+
+export function fetchModelStatus(): Promise<{
+  ready: boolean
+  downloading: boolean
+  files: { name: string, size: number }[]
+}> {
+  return request('/model/status')
+}
+
+export function startModelDownload(
+  onFileProgress: (data: ModelFileProgress) => void,
+  onComplete: (data: { ready: boolean, files: { name: string, size: number }[] }) => void,
+  onError: (msg: string) => void,
+): { close: () => void } {
+  return consumeSSE(`${API_BASE}/model/download`, 'POST', {
+    'file-progress': onFileProgress,
+    'complete': onComplete,
+    'error': (data: { message: string }) => onError(data.message || '下载失败'),
+  })
+}
+
+export function deleteModel(): Promise<{ success: boolean }> {
+  return request('/model', { method: 'DELETE' })
+}
+
+// ==================== Reindex ====================
+
+export function startReindex(
+  onProgress: (data: EmbeddingProgressEvent) => void,
+  onComplete: () => void,
+  onError: (msg: string) => void,
+): { close: () => void } {
+  return consumeSSE(`${API_BASE}/reindex`, 'POST', {
+    progress: onProgress,
+    complete: () => onComplete(),
+    error: (data: { message?: string }) => onError(data.message || '未知错误'),
+  })
+}
+
+// ==================== Error ====================
+
 export function clearEmbeddingError(): Promise<EmbeddingStatus & { success: boolean }> {
   return request<EmbeddingStatus & { success: boolean }>('/clear-error', { method: 'POST' })
 }

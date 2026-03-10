@@ -8,15 +8,15 @@ import type { PluginRecord } from './types.js'
  */
 export interface PluginStore {
   /** List all plugin records */
-  listAll(): PluginRecord[]
+  listAll: () => PluginRecord[]
   /** List only enabled plugin records */
-  listEnabled(): PluginRecord[]
+  listEnabled: () => PluginRecord[]
   /** Get a specific plugin record by ID */
-  get(pluginId: string): PluginRecord | undefined
+  get: (pluginId: string) => PluginRecord | undefined
   /** Insert or update a plugin record */
-  upsert(record: PluginRecord): void
+  upsert: (record: PluginRecord) => void
   /** Remove a plugin record by ID */
-  remove(pluginId: string): void
+  remove: (pluginId: string) => void
   /** Update the enabled state of a plugin */
-  setEnabled(pluginId: string, enabled: boolean): void
+  setEnabled: (pluginId: string, enabled: boolean) => void
 }

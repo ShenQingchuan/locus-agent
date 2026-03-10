@@ -4,6 +4,8 @@ import { useToast } from '@locus-agent/ui'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createSkill, fetchSkillDetail, fetchSkillFileContent, fetchSkillFiles, fetchSkills, saveSkillFileContent, updateSkillPreference, watchSkillFiles } from '@/api/skills'
 
+const RE_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
+
 type SourceFilter = 'all' | 'system' | 'project'
 
 export interface UseSkillsManagerOptions {
@@ -20,7 +22,7 @@ function parseFrontmatter(raw: string): { frontmatter: string, body: string } {
   if (!raw.startsWith('---\n') && !raw.startsWith('---\r\n'))
     return { frontmatter: '', body: raw }
 
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
+  const match = raw.match(RE_FRONTMATTER)
   if (!match)
     return { frontmatter: '', body: raw }
 

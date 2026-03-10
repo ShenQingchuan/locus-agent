@@ -32,7 +32,7 @@ const isMultiSelectMode = computed(() => selectedIds.value.size > 0)
  */
 const modelValue = computed(() => {
   if (isMultiSelectMode.value) {
-    return Array.from(selectedIds.value)
+    return [...selectedIds.value]
   }
   // Single select: highlight currentId
   return props.currentId ? [props.currentId] : []
@@ -95,7 +95,7 @@ async function deleteSelected() {
   })
 
   if (confirmed) {
-    const ids = Array.from(selectedIds.value)
+    const ids = [...selectedIds.value]
     for (const id of ids) {
       emit('delete', id)
     }

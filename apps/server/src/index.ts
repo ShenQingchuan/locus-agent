@@ -12,11 +12,11 @@ import { embeddingRoutes } from './routes/embedding.js'
 import { foldersRoutes } from './routes/folders.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
+import { pluginRoutes } from './routes/plugins.js'
 import { settingsRoutes } from './routes/settings.js'
 import { skillsRoutes } from './routes/skills.js'
 import { tagsRoutes } from './routes/tags.js'
 import { tasksRoutes } from './routes/tasks.js'
-import { pluginRoutes } from './routes/plugins.js'
 import { workspaceRoutes } from './routes/workspace.js'
 import {
   ensureDataDir,

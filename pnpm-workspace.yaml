@@ -30,6 +30,8 @@ catalogs:
     eslint: ^10.0.3
     typescript: ^5.9.3
   embedding:
+    '@huggingface/transformers': ^3.8.1
+    onnxruntime-node: ^1.21.0
     sqlite-vec: ^0.1.6
   fs-utils:
     ignore: ^7.0.5
@@ -74,6 +76,7 @@ catalogs:
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild
+  - onnxruntime-node
   - protobufjs
   - sharp
   - sqlite-vec-darwin-arm64

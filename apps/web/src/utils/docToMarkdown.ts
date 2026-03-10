@@ -1,6 +1,13 @@
 import type { Node } from 'prosemirror-model'
 import { MarkdownSerializer } from 'prosemirror-markdown'
 
+const RE_TRIPLE_BACKTICKS = /`{3,}/g
+const RE_PARENS = /[()]/g
+const RE_DOUBLE_QUOTE = /"/g
+const RE_LINK_SPECIAL = /[()"/]/g
+const RE_BACKTICK_RUN = /`+/g
+const RE_PROTOCOL_PREFIX = /^\w+:/
+
 /**
  * ProseKit (camelCase) 节点和 mark 名称到 Markdown 的序列化器。
  *
@@ -13,7 +20,7 @@ const serializer = new MarkdownSerializer(
       state.wrapBlock('> ', null, node, () => state.renderContent(node))
     },
     codeBlock(state, node) {
-      const backticks = node.textContent.match(/`{3,}/g)
+      const backticks = node.textContent.match(RE_TRIPLE_BACKTICKS)
       const fence = backticks ? `${backticks.sort().slice(-1)[0]}\`` : '```'
       state.write(`${fence}${node.attrs.language || ''}\n`)
       state.text(node.textContent, false)
@@ -59,8 +66,8 @@ const serializer = new MarkdownSerializer(
     image(state, node) {
       state.write(
         `![${state.esc(node.attrs.alt || '')}](${
-          node.attrs.src.replace(/[()]/g, '\\$&')
-        }${node.attrs.title ? ` "${node.attrs.title.replace(/"/g, '\\"')}"` : ''})`,
+          node.attrs.src.replace(RE_PARENS, '\\$&')
+        }${node.attrs.title ? ` "${node.attrs.title.replace(RE_DOUBLE_QUOTE, '\\"')}"` : ''})`,
       )
     },
     hardBreak(state, node, parent, index) {
@@ -95,8 +102,8 @@ const serializer = new MarkdownSerializer(
         ;(state as any).inAutolink = undefined
         if (inAutolink)
           return '>'
-        return `](${mark.attrs.href.replace(/[()"/]/g, '\\$&')}${
-          mark.attrs.title ? ` "${mark.attrs.title.replace(/"/g, '\\"')}"` : ''
+        return `](${mark.attrs.href.replace(RE_LINK_SPECIAL, '\\$&')}${
+          mark.attrs.title ? ` "${mark.attrs.title.replace(RE_DOUBLE_QUOTE, '\\"')}"` : ''
         })`
       },
       mixable: true,
@@ -126,12 +133,12 @@ function computeOrderedNumber(parent: Node, index: number): number {
 }
 
 function backticksFor(node: Node, side: number) {
-  const ticks = /`+/g
   let m: RegExpExecArray | null
   let len = 0
   if (node.isText) {
+    RE_BACKTICK_RUN.lastIndex = 0
     // eslint-disable-next-line no-cond-assign
-    while (m = ticks.exec(node.text!))
+    while (m = RE_BACKTICK_RUN.exec(node.text!))
       len = Math.max(len, m[0].length)
   }
   let result = len > 0 && side > 0 ? ' `' : '`'
@@ -142,10 +149,10 @@ function backticksFor(node: Node, side: number) {
 }
 
 function isPlainURL(link: any, parent: Node, index: number) {
-  if (link.attrs.title || !/^\w+:/.test(link.attrs.href))
+  if (link.attrs.title || !RE_PROTOCOL_PREFIX.test(link.attrs.href))
     return false
   const content = parent.child(index)
-  if (!content.isText || content.text !== link.attrs.href || content.marks[content.marks.length - 1] !== link)
+  if (!content.isText || content.text !== link.attrs.href || content.marks.at(-1) !== link)
     return false
   return index === parent.childCount - 1 || !link.isInSet(parent.child(index + 1).marks)
 }

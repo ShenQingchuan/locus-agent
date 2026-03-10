@@ -10,6 +10,8 @@ import {
   updateMCPConfig,
 } from '@/api/mcp'
 
+const RE_WHITESPACE = /\s+/
+
 // ---------------------------------------------------------------------------
 // Helpers (pure functions)
 // ---------------------------------------------------------------------------
@@ -270,7 +272,7 @@ export function useMCPManager() {
       }
       cfg.command = newServer.value.command.trim()
       if (newServer.value.args.trim())
-        cfg.args = newServer.value.args.trim().split(/\s+/)
+        cfg.args = newServer.value.args.trim().split(RE_WHITESPACE)
     }
     else {
       if (!newServer.value.url.trim()) {

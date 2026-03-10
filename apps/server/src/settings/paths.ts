@@ -22,6 +22,13 @@ export function getSettingsDbPath(): string {
 }
 
 /**
+ * Local models cache directory path
+ */
+export function getModelsDir(): string {
+  return join(getDataDir(), 'models')
+}
+
+/**
  * Locus-managed skills directory path
  */
 export function getSkillsDataDir(): string {
@@ -40,5 +47,10 @@ export function ensureDataDir(): void {
   const skillsDir = getSkillsDataDir()
   if (!existsSync(skillsDir)) {
     mkdirSync(skillsDir, { recursive: true })
+  }
+
+  const modelsDir = getModelsDir()
+  if (!existsSync(modelsDir)) {
+    mkdirSync(modelsDir, { recursive: true })
   }
 }

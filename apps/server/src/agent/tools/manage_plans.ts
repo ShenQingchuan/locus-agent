@@ -4,13 +4,15 @@ import { join } from 'node:path'
 import { tool } from 'ai'
 import { z } from 'zod'
 
+const RE_NON_WORD_OR_HYPHEN = /[^\w-]/g
+
 const PLANS_BASE_DIR = join(homedir(), '.local', 'share', 'locus-agent', 'coding-plans')
 
 function normalizeProjectKey(projectKey?: string): string | null {
   const key = projectKey?.trim()
   if (!key)
     return null
-  const safe = key.replace(/[^\w-]/g, '_')
+  const safe = key.replace(RE_NON_WORD_OR_HYPHEN, '_')
   return safe.length > 0 ? safe : null
 }
 

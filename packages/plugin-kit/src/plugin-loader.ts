@@ -1,5 +1,5 @@
-import { resolve } from 'node:path'
 import type { PluginDefinition } from './types.js'
+import { resolve } from 'node:path'
 
 /**
  * Resolves and dynamically imports a plugin module.

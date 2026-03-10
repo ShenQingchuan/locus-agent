@@ -7,6 +7,8 @@ export const DEFAULT_HOT_TAIL_COUNT = 2
 /** Prefix marker for already-cached results. */
 export const CACHED_MARKER = '[CACHED:'
 
+const RE_NEWLINE = /\n/g
+
 export interface CacheEntry {
   toolCallId: string
   toolName: string
@@ -96,7 +98,7 @@ export function compactToolResults(
       const key = `${part.toolCallId}.txt`
       options.storage.write(key, value)
 
-      const preview = value.slice(0, 200).replace(/\n/g, ' ')
+      const preview = value.slice(0, 200).replace(RE_NEWLINE, ' ')
       part.output!.value = `${CACHED_MARKER} ${key}]\nPreview: ${preview}...\n(Full output: ${value.length} chars, cached to disk)`
 
       entries.push({

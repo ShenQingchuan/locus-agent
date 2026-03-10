@@ -1,6 +1,6 @@
 import type { TokenUsage } from '../runtime/agent-loop.js'
 import type { ToolCategory } from '../runtime/tool-policy.js'
-import { HookEvent } from './events.js'
+import type { HookEvent } from './events.js'
 
 // ── Session ──────────────────────────────────────────────────
 

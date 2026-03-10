@@ -96,7 +96,7 @@ function handleItemClick(item: any, event: MouseEvent) {
     else {
       current.add(key)
     }
-    emit('update:modelValue', Array.from(current))
+    emit('update:modelValue', [...current])
   }
   else {
     // Single select mode
@@ -119,7 +119,7 @@ function handleSelect(key: string | undefined, selected: boolean) {
     else {
       current.delete(key)
     }
-    emit('update:modelValue', Array.from(current))
+    emit('update:modelValue', [...current])
   }
 }
 

@@ -18,6 +18,18 @@ import { getSkillsDataDir } from '../settings/index.js'
 const SETTINGS_KEY = 'skills.preferences.v1'
 const SKILL_ENTRY_FILENAME = 'SKILL.md'
 
+const RE_NUMERIC_VALUE = /^-?\d+(?:\.\d+)?$/
+const RE_NEWLINE = /\r?\n/
+const RE_TAB = /\t/g
+const RE_TOP_LEVEL_KEY = /^([\w-]+):(.*)$/
+const RE_WHITESPACE_RUN = /\s+/g
+const RE_LEADING_INDENT = /^\s{2}/
+const RE_NESTED_KEY = /^\s{2}([\w-]+):(.*)$/
+const RE_FRONTMATTER_BLOCK = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
+const RE_DOUBLE_NEWLINE = /\r?\n\r?\n/
+const RE_HEADING_PREFIX = /^#+\s*/
+const RE_SKILL_NAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+
 interface SkillPreferenceOverrides {
   enabled?: boolean
   modelInvocable?: boolean
@@ -67,24 +79,24 @@ function decodeScalarValue(rawValue: string): unknown {
     return false
   if (value === 'null')
     return null
-  if (/^-?\d+(?:\.\d+)?$/.test(value))
+  if (RE_NUMERIC_VALUE.test(value))
     return Number(value)
   return value
 }
 
 function parseFrontmatterBlock(rawFrontmatter: string): Record<string, unknown> {
   const result: Record<string, unknown> = {}
-  const lines = rawFrontmatter.split(/\r?\n/)
+  const lines = rawFrontmatter.split(RE_NEWLINE)
 
   let index = 0
   while (index < lines.length) {
-    const line = lines[index]!.replace(/\t/g, '  ')
+    const line = lines[index]!.replace(RE_TAB, '  ')
     if (!line.trim() || line.trim().startsWith('#')) {
       index += 1
       continue
     }
 
-    const topLevelMatch = line.match(/^([\w-]+):(.*)$/)
+    const topLevelMatch = line.match(RE_TOP_LEVEL_KEY)
     if (!topLevelMatch) {
       index += 1
       continue
@@ -100,11 +112,11 @@ function parseFrontmatterBlock(rawFrontmatter: string): Record<string, unknown> 
         const nextLine = lines[index]!
         if (!nextLine.startsWith(' '))
           break
-        blockLines.push(nextLine.replace(/^\s{2}/, ''))
+        blockLines.push(nextLine.replace(RE_LEADING_INDENT, ''))
         index += 1
       }
       result[key] = inlineValue === '>'
-        ? blockLines.join(' ').replace(/\s+/g, ' ').trim()
+        ? blockLines.join(' ').replace(RE_WHITESPACE_RUN, ' ').trim()
         : blockLines.join('\n').trim()
       continue
     }
@@ -116,7 +128,7 @@ function parseFrontmatterBlock(rawFrontmatter: string): Record<string, unknown> 
         const nextLine = lines[index]!
         if (!nextLine.startsWith('  '))
           break
-        const nestedMatch = nextLine.match(/^\s{2}([\w-]+):(.*)$/)
+        const nestedMatch = nextLine.match(RE_NESTED_KEY)
         if (nestedMatch) {
           const [, nestedKey, nestedValue = ''] = nestedMatch
           nestedEntries[nestedKey] = decodeScalarValue(nestedValue.trimStart())
@@ -143,7 +155,7 @@ function parseSkillFileContent(rawContent: string): ParsedSkillFile {
     }
   }
 
-  const closingMatch = rawContent.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
+  const closingMatch = rawContent.match(RE_FRONTMATTER_BLOCK)
   if (!closingMatch) {
     return {
       frontmatter: {},
@@ -164,10 +176,10 @@ function parseSkillFileContent(rawContent: string): ParsedSkillFile {
 
 function inferDescription(content: string): string {
   return content
-    .split(/\r?\n\r?\n/)
+    .split(RE_DOUBLE_NEWLINE)
     .map(item => item.trim())
     .find(Boolean)
-    ?.replace(/^#+\s*/, '')
+    ?.replace(RE_HEADING_PREFIX, '')
     .slice(0, 1024) || 'No description provided.'
 }
 
@@ -442,7 +454,7 @@ export async function getSkillFileTree(skillRootDir: string): Promise<SkillFileN
     const nodes: SkillFileNode[] = []
 
     // Sort: directories first, then files, alphabetically within each group
-    const sorted = entries.slice().sort((a, b) => {
+    const sorted = entries.toSorted((a, b) => {
       if (a.isDirectory() !== b.isDirectory())
         return a.isDirectory() ? -1 : 1
       return a.name.localeCompare(b.name)
@@ -485,7 +497,7 @@ export async function createSkill(options: {
   const { name, source, workspaceRoot, description } = options
 
   // Validate name (alphanumeric + hyphens only)
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name)) {
+  if (!RE_SKILL_NAME.test(name)) {
     throw new Error('Skill name must be lowercase alphanumeric with optional hyphens, and cannot start or end with a hyphen')
   }
 

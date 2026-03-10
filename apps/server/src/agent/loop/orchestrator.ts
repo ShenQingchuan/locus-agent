@@ -4,9 +4,9 @@ import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult } fro
 import { BuiltinTool, HookEvent } from '@locus-agent/agent-sdk'
 import { processDecisions } from '@locus-agent/plugin-kit'
 import { streamText } from 'ai'
-import { hookBus } from '../plugins/index.js'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
+import { hookBus } from '../plugins/index.js'
 import {
   BUILD_WITH_PLAN_PROMPT,
   buildRuntimeContextPrompt,

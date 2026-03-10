@@ -15,6 +15,8 @@ const emit = defineEmits<{
   switchConversation: [conversationId: string]
 }>()
 
+const RE_MARKDOWN_CHARS = /[#*`>\-[\]]/g
+
 const priorityConfig = {
   1: { label: '低', class: 'bg-blue-500/15 text-blue-600' },
   2: { label: '中', class: 'bg-amber-500/15 text-amber-600' },
@@ -29,7 +31,7 @@ const priority = computed(() => {
 const specPreview = computed(() => {
   if (!props.task.spec)
     return ''
-  return props.task.spec.replace(/[#*`>\-[\]]/g, '').slice(0, 100)
+  return props.task.spec.replace(RE_MARKDOWN_CHARS, '').slice(0, 100)
 })
 
 const moveItems = computed<DropdownItem[]>(() => {

@@ -67,7 +67,7 @@ const hasPendingToolCall = computed(() => {
   if (props.status === 'completed' || props.status === 'error')
     return false
   // 检查最后一个 delta
-  const lastDelta = props.deltas[props.deltas.length - 1]
+  const lastDelta = props.deltas.at(-1)
   if (!lastDelta)
     return false
   // 如果最后一个是 tool_start，说明有正在进行的调用

@@ -11,6 +11,8 @@ import {
 } from '../../services/task.js'
 import { replaceUniqueString } from './string-replace.js'
 
+const RE_MARKDOWN_FORMATTING = /[\n#*`>\-[\]]/g
+
 const statusSchema = z.enum(['backlog', 'in_progress', 'done'])
 const actionSchema = z.enum([
   'create',
@@ -344,7 +346,7 @@ export function formatManageKanbanResult(result: ManageKanbanResult): string {
     }
     else {
       for (const t of result.tasks) {
-        const specPreview = t.spec ? ` — ${t.spec.replace(/[\n#*`>\-[\]]/g, '').slice(0, 60)}` : ''
+        const specPreview = t.spec ? ` — ${t.spec.replace(RE_MARKDOWN_FORMATTING, '').slice(0, 60)}` : ''
         lines.push(`  [${statusLabels[t.status] || t.status}] ${t.title} (${t.id})${specPreview}`)
       }
     }

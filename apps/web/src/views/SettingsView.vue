@@ -371,7 +371,6 @@ async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, 
               <div class="space-y-4 lg:space-y-6">
                 <SettingsLLMCard
                   v-model:provider-configs="providerConfigs"
-                  v-model:port="port"
                   v-model:active-provider="activeProvider"
                   :runtime-info="runtimeInfo"
                   :requires-restart="requiresRestart"
@@ -385,6 +384,39 @@ async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, 
 
               <!-- Right column -->
               <div class="space-y-4 lg:space-y-6">
+                <!-- Server Port -->
+                <section class="card p-4">
+                  <div>
+                    <h2 class="text-sm font-medium text-foreground">
+                      服务端
+                    </h2>
+                    <p class="text-xs text-muted-foreground mt-1">
+                      端口修改需重启生效
+                    </p>
+                  </div>
+
+                  <div class="mt-4 grid gap-4">
+                    <div class="grid gap-1.5">
+                      <label class="text-xs text-muted-foreground">端口</label>
+                      <input
+                        v-model.number="port"
+                        class="input-field"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        placeholder="3000"
+                      >
+                    </div>
+
+                    <div
+                      v-if="requiresRestart"
+                      class="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
+                    >
+                      端口已保存，重启服务后生效。
+                    </div>
+                  </div>
+                </section>
+
                 <SettingsWhitelistCard />
                 <SettingsEmbeddingCard />
                 <SettingsMCPCard />

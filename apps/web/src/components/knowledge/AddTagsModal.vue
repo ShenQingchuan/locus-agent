@@ -58,7 +58,7 @@ const hasChanges = computed(() => {
 
 const customTagNames = computed(() => {
   const allNames = new Set(props.allTags.map(t => t.name))
-  return Array.from(selected.value).filter(name => !allNames.has(name))
+  return [...selected.value].filter(name => !allNames.has(name))
 })
 
 function toggleByName(name: string) {
@@ -93,7 +93,7 @@ function addNew() {
 }
 
 function handleSave() {
-  emit('save', Array.from(selected.value))
+  emit('save', [...selected.value])
   emit('close')
 }
 

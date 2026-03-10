@@ -19,7 +19,7 @@ function normalizeModelHint(modelHint?: string): string | undefined {
     return undefined
 
   const parts = trimmed.split('/')
-  return parts[parts.length - 1]
+  return parts.at(-1)
 }
 
 function getEncoder(modelHint?: string): Tiktoken | null {

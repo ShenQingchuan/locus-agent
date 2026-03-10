@@ -13,6 +13,8 @@ import {
 import { addMessage, getMessages, truncateMessages } from '../services/message.js'
 import { updateActiveConfirmMode } from './chat.js'
 
+const RE_SURROUNDING_QUOTES = /^["']|["']$/g
+
 export const conversationsRoutes = new Hono()
 
 // GET /api/conversations - List all conversations
@@ -141,7 +143,7 @@ conversationsRoutes.post('/:id/generate-title', async (c) => {
       ],
     })
 
-    const title = text.trim().replace(/^["']|["']$/g, '').slice(0, 24)
+    const title = text.trim().replace(RE_SURROUNDING_QUOTES, '').slice(0, 24)
 
     const updated = await updateConversation(conversationId, { title }, { touch: false })
     return c.json({ success: true, title: updated?.title ?? title, model: `${modelInfo.provider}/${modelInfo.model}` })

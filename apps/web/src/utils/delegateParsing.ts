@@ -1,3 +1,6 @@
+const RE_ITERATIONS = /Iterations:\s*(\d+)/
+const RE_TOKENS = /Tokens:\s*(\d+)\D*in:\s*(\d+)\D*out:\s*(\d+)/
+
 export interface DelegateMeta {
   taskId: string
   iterations: number
@@ -62,12 +65,12 @@ export function parseDelegateMeta(raw: unknown): DelegateMeta | null {
         success = line.includes('true')
       }
       if (line.startsWith('Iterations:')) {
-        const match = line.match(/Iterations:\s*(\d+)/)
+        const match = line.match(RE_ITERATIONS)
         if (match)
           iterations = Number.parseInt(match[1]!, 10)
       }
       if (line.startsWith('Tokens:')) {
-        const match = line.match(/Tokens:\s*(\d+)\D*in:\s*(\d+)\D*out:\s*(\d+)/)
+        const match = line.match(RE_TOKENS)
         if (match) {
           totalTokens = Number.parseInt(match[1]!, 10)
           inputTokens = Number.parseInt(match[2]!, 10)

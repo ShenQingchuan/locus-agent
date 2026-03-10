@@ -6,14 +6,15 @@ const props = defineProps<{
   filename: string
   content: string
 }>()
-
 const emit = defineEmits<{
   close: []
 }>()
+const RE_HEADING = /^#\s+(\S.*)$/m
+const RE_MD_EXTENSION = /\.md$/
 
 const planTitle = computed(() => {
-  const match = props.content.match(/^#\s+(\S.*)$/m)
-  return match?.[1]?.trim() || props.filename.replace(/\.md$/, '')
+  const match = props.content.match(RE_HEADING)
+  return match?.[1]?.trim() || props.filename.replace(RE_MD_EXTENSION, '')
 })
 </script>
 

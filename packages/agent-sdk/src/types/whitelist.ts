@@ -36,6 +36,14 @@ export interface AddToWhitelistPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Static regex constants
+// ---------------------------------------------------------------------------
+
+const RE_DANGEROUS_REDIRECT = /(?<![>|])>[^>]/
+const RE_PIPE_OR_CHAIN = /\s*[|;&]\s*/
+const RE_WHITESPACE = /\s+/
+
+// ---------------------------------------------------------------------------
 // 风险分级常量
 // ---------------------------------------------------------------------------
 
@@ -124,7 +132,7 @@ export const TOOL_DEFAULT_RISK: Record<string, RiskLevel> = {
 function matchesAnyPrefix(command: string, prefixes: string[]): boolean {
   const trimmed = command.trim()
   // 按长度降序排列以优先匹配最长前缀
-  const sorted = [...prefixes].sort((a, b) => b.length - a.length)
+  const sorted = prefixes.toSorted((a, b) => b.length - a.length)
   return sorted.some(prefix =>
     trimmed === prefix || trimmed.startsWith(`${prefix} `),
   )
@@ -140,7 +148,7 @@ export function getCommandRiskLevel(command: string): RiskLevel {
 
   // 检查是否包含危险的重定向覆盖（> file, 不含 >>）
   // 简单检测：命令中出现 '>' 且前面不是 '>'
-  if (/(?<![>|])>[^>]/.test(trimmed)) {
+  if (RE_DANGEROUS_REDIRECT.test(trimmed)) {
     return 'moderate'
   }
 
@@ -181,9 +189,9 @@ export function extractDefaultPattern(toolName: string, args: Record<string, unk
     return undefined
 
   // 去除管道和链式命令，只取第一段
-  const firstSegment = command.split(/\s*[|;&]\s*/)[0]?.trim() ?? command
+  const firstSegment = command.split(RE_PIPE_OR_CHAIN)[0]?.trim() ?? command
 
-  const words = firstSegment.split(/\s+/)
+  const words = firstSegment.split(RE_WHITESPACE)
   if (words.length === 0)
     return undefined
 

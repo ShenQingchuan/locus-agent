@@ -136,7 +136,7 @@ export class PluginManager {
   }
 
   listPlugins(): PluginInstance[] {
-    return Array.from(this.plugins.values())
+    return [...this.plugins.values()]
   }
 
   listRecords(): PluginRecord[] {

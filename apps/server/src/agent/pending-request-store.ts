@@ -42,7 +42,7 @@ export function createPendingRequestStore<TPayload, TResult>(
   }
 
   function getAll(): PendingRequestEntry<TPayload, TResult>[] {
-    return Array.from(pending.values())
+    return [...pending.values()]
   }
 
   function clear(requestId: string): void {

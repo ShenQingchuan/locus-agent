@@ -26,10 +26,14 @@ const props = defineProps<{
   /** Plain text content (fallback when no editorState) */
   content?: string
 }>()
-
 const emit = defineEmits<{
   change: [data: NoteEditorChange]
 }>()
+const RE_LANGUAGE_CLASS = /language-(\S+)/
+const RE_NEWLINE = /\n/g
+const RE_AMPERSAND = /&/g
+const RE_LESS_THAN = /</g
+const RE_GREATER_THAN = />/g
 
 // ==================== Editor Setup ====================
 
@@ -129,7 +133,7 @@ function defineCodeBlockSpecWithDisplayName() {
       getAttrs: (node) => {
         const el = node as HTMLElement
         const code = el.querySelector('code')
-        const raw = el.getAttribute('data-language') ?? code?.className?.match(/language-(\S+)/)?.[1] ?? ''
+        const raw = el.getAttribute('data-language') ?? code?.className?.match(RE_LANGUAGE_CLASS)?.[1] ?? ''
         return { language: normalizeCodeBlockLanguage(raw) }
       },
     }],
@@ -221,7 +225,7 @@ function getDefaultContent(): NodeJSON | string | undefined {
   if (props.content) {
     const html = props.content
       .split('\n\n')
-      .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .map(p => `<p>${escapeHtml(p).replace(RE_NEWLINE, '<br>')}</p>`)
       .join('')
     return html || undefined
   }
@@ -258,9 +262,9 @@ useDocChange((doc) => {
 
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(RE_AMPERSAND, '&amp;')
+    .replace(RE_LESS_THAN, '&lt;')
+    .replace(RE_GREATER_THAN, '&gt;')
 }
 
 /**

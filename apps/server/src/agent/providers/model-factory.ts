@@ -23,6 +23,9 @@ export function createLLMModel(
   thinkingMode?: boolean,
 ): LanguageModel {
   const cfg = getProviderConfig()
+  if (!cfg.apiKey?.trim()) {
+    throw new Error('LLM 未配置。请运行 `locus-agent config` 或在设置中配置 API Key。')
+  }
   const baseURL = cfg.apiBase || PROVIDER_DEFAULT_BASE_URLS[cfg.provider]
   let effectiveModelId = normalizeModelForProvider(modelId, cfg.provider)
 

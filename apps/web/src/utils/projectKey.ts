@@ -1,10 +1,14 @@
+const RE_BACKSLASHES = /\\+/g
+const RE_TRAILING_SLASHES = /\/+$/g
+const RE_WINDOWS_DRIVE = /^[A-Z]:/
+
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
 }
 
 export function normalizeWorkspacePath(path: string): string {
-  const normalized = path.replace(/\\+/g, '/').replace(/\/+$/g, '')
-  if (/^[A-Z]:/.test(normalized)) {
+  const normalized = path.replace(RE_BACKSLASHES, '/').replace(RE_TRAILING_SLASHES, '')
+  if (RE_WINDOWS_DRIVE.test(normalized)) {
     return `${normalized[0]!.toLowerCase()}${normalized.slice(1)}`
   }
   return normalized

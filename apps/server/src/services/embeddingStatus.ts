@@ -1,6 +1,9 @@
+import type { EmbeddingProvider } from './embedding.js'
+import type { ModelFileInfo } from './localEmbedding.js'
 import { isVecAvailable } from '../db/index.js'
 import { getSetting, setSetting } from '../settings/index.js'
-import { isEmbeddingConfigured } from './embedding.js'
+import { getEmbeddingProvider, isEmbeddingConfigured } from './embedding.js'
+import { getLocalModelFiles, isLocalModelReady } from './localEmbedding.js'
 import { getEmbeddingCount } from './vectorStore.js'
 
 // ==================== Types ====================
@@ -15,30 +18,42 @@ export interface EmbeddingStatus {
   status: EmbeddingStatusType
   error?: string
   indexedCount: number
+  /** Which provider was used to build the current index (null = never indexed) */
+  indexedWith: EmbeddingProvider | null
   vecAvailable: boolean
   embeddingConfigured: boolean
+  provider: EmbeddingProvider
+  localModelReady: boolean
+  localModelFiles: ModelFileInfo[]
 }
 
 // ==================== Settings KV ====================
-// KV only persists transient states: indexing / error
-// not_configured and ready are derived from runtime checks
 
 const KEY_TRANSIENT = 'embedding.transient_status'
 const KEY_ERROR = 'embedding.error'
+const KEY_INDEXED_WITH = 'embedding.indexed_with'
 
 // ==================== Public API ====================
 
-/**
- * Derive the current embedding status from runtime state and KV.
- *
- * Priority:
- * 1. KV has indexing → use it (operation in progress)
- * 2. KV has error → use it
- * 3. Otherwise derive ready / not_configured from config checks
- */
+export function getIndexedWith(): EmbeddingProvider | null {
+  const val = getSetting(KEY_INDEXED_WITH)
+  if (val === 'zhipu' || val === 'local')
+    return val
+  return null
+}
+
+export function setIndexedWith(provider: EmbeddingProvider): void {
+  setSetting(KEY_INDEXED_WITH, provider)
+}
+
+export function clearIndexedWith(): void {
+  setSetting(KEY_INDEXED_WITH, '')
+}
+
 export function getEmbeddingStatus(): EmbeddingStatus {
   const vecAvailable = isVecAvailable()
   const configured = isEmbeddingConfigured()
+  const provider = getEmbeddingProvider()
 
   const transient = getSetting(KEY_TRANSIENT) as 'indexing' | 'error' | undefined
   const error = getSetting(KEY_ERROR) || undefined
@@ -58,18 +73,21 @@ export function getEmbeddingStatus(): EmbeddingStatus {
     status = 'not_configured'
   }
 
+  const indexedCount = vecAvailable ? getEmbeddingCount() : 0
+
   return {
     status,
     error: status === 'error' ? error : undefined,
-    indexedCount: vecAvailable ? getEmbeddingCount() : 0,
+    indexedCount,
+    indexedWith: indexedCount > 0 ? getIndexedWith() : null,
     vecAvailable,
     embeddingConfigured: configured,
+    provider,
+    localModelReady: isLocalModelReady(),
+    localModelFiles: getLocalModelFiles(),
   }
 }
 
-/**
- * Mark a transient operation (indexing / error)
- */
 export function setTransientStatus(status: 'indexing' | 'error', error?: string): void {
   setSetting(KEY_TRANSIENT, status)
   if (error) {
@@ -80,9 +98,6 @@ export function setTransientStatus(status: 'indexing' | 'error', error?: string)
   }
 }
 
-/**
- * Clear transient markers (call after operation completes, status auto-derives)
- */
 export function clearTransientStatus(): void {
   setSetting(KEY_TRANSIENT, '')
   setSetting(KEY_ERROR, '')

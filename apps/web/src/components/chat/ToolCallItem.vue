@@ -25,7 +25,6 @@ const props = defineProps<{
     questions: Array<{ question: string, options: string[], multiple?: boolean }>
   }
 }>()
-
 const emit = defineEmits<{
   approve: [toolCallId: string]
   reject: [toolCallId: string]
@@ -33,7 +32,6 @@ const emit = defineEmits<{
   questionAnswer: [toolCallId: string, answers: QuestionAnswer[]]
   delegateResume: [payload: { taskId: string, agentType: string, agentName: string }]
 }>()
-
 defineSlots<{
   summary?: (props: {
     tool: ToolCallState
@@ -44,6 +42,8 @@ defineSlots<{
     isError?: boolean
   }) => any
 }>()
+const RE_DOUBLE_NEWLINE = /\n\n/
+const RE_QUESTION_ANSWER_BLOCK = /^- ([^\n：]+)：\n([\s\S]*)$/
 
 const modalOpen = ref(false)
 const whitelistOpen = ref(false)
@@ -226,9 +226,9 @@ const questionResultPairs = computed<Array<{ question: string, answer: string }>
     return null
   // 解析 "- 问题：\n回答" 格式
   const pairs: Array<{ question: string, answer: string }> = []
-  const blocks = raw.split(/\n\n/).filter(Boolean)
+  const blocks = raw.split(RE_DOUBLE_NEWLINE).filter(Boolean)
   for (const block of blocks) {
-    const match = block.match(/^- ([^\n：]+)：\n([\s\S]*)$/)
+    const match = block.match(RE_QUESTION_ANSWER_BLOCK)
     if (match) {
       pairs.push({ question: match[1]!, answer: match[2]!.trim() })
     }

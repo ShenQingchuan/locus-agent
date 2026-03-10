@@ -1,18 +1,30 @@
+import type { EmbeddingProvider } from '../services/embedding.js'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { db } from '../db/index.js'
 import { notes } from '../db/schema.js'
-import { embedBatch } from '../services/embedding.js'
+import { embedBatch, getEmbeddingProvider, setEmbeddingProvider } from '../services/embedding.js'
 import {
   clearTransientStatus,
   getEmbeddingStatus,
+  setIndexedWith,
   setTransientStatus,
 } from '../services/embeddingStatus.js'
+import {
+  deleteLocalModel,
+  downloadModel,
+  getLocalModelFiles,
+  isLocalModelReady,
+  resetPipeline,
+} from '../services/localEmbedding.js'
 import { clearAllEmbeddings, getEmbeddingCount, upsertNoteEmbedding } from '../services/vectorStore.js'
 
 export const embeddingRoutes = new Hono()
 
 let reindexing = false
+let downloading = false
+
+// ==================== Status ====================
 
 /**
  * GET /api/embedding/status
@@ -21,9 +33,111 @@ embeddingRoutes.get('/status', (c) => {
   return c.json(getEmbeddingStatus())
 })
 
+// ==================== Provider ====================
+
+/**
+ * GET /api/embedding/provider
+ */
+embeddingRoutes.get('/provider', (c) => {
+  return c.json({ provider: getEmbeddingProvider() })
+})
+
+/**
+ * POST /api/embedding/provider
+ * Body: { provider: 'zhipu' | 'local' }
+ */
+embeddingRoutes.post('/provider', async (c) => {
+  const body = await c.req.json<{ provider: EmbeddingProvider }>()
+  const provider = body.provider
+
+  if (provider !== 'zhipu' && provider !== 'local') {
+    return c.json({ error: 'Invalid provider. Must be "zhipu" or "local".' }, 400)
+  }
+
+  setEmbeddingProvider(provider)
+  resetPipeline()
+
+  return c.json({ success: true, ...getEmbeddingStatus() })
+})
+
+// ==================== Model download ====================
+
+/**
+ * GET /api/embedding/model/status
+ */
+embeddingRoutes.get('/model/status', (c) => {
+  return c.json({
+    ready: isLocalModelReady(),
+    downloading,
+    files: getLocalModelFiles(),
+  })
+})
+
+/**
+ * POST /api/embedding/model/download
+ * Downloads the local ONNX model (SSE progress stream)
+ */
+embeddingRoutes.post('/model/download', (c) => {
+  if (downloading) {
+    return c.json({ error: '模型正在下载中' }, 409)
+  }
+
+  return streamSSE(c, async (stream) => {
+    downloading = true
+
+    try {
+      await downloadModel((data) => {
+        stream.writeSSE({
+          event: 'file-progress',
+          data: JSON.stringify(data),
+        })
+      })
+
+      await stream.writeSSE({
+        event: 'complete',
+        data: JSON.stringify({
+          ready: true,
+          files: getLocalModelFiles(),
+        }),
+      })
+    }
+    catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      await stream.writeSSE({
+        event: 'error',
+        data: JSON.stringify({ message }),
+      })
+    }
+    finally {
+      downloading = false
+    }
+  })
+})
+
+/**
+ * DELETE /api/embedding/model
+ * Delete downloaded model files
+ */
+embeddingRoutes.delete('/model', async (c) => {
+  if (downloading) {
+    return c.json({ error: '模型正在下载中，无法删除' }, 409)
+  }
+
+  try {
+    await deleteLocalModel()
+    return c.json({ success: true })
+  }
+  catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return c.json({ error: message }, 500)
+  }
+})
+
+// ==================== Reindex ====================
+
 /**
  * POST /api/embedding/reindex
- * Re-index all notes via Zhipu embedding-3 API (SSE progress stream)
+ * Re-index all notes via the active embedding provider (SSE progress stream)
  */
 embeddingRoutes.post('/reindex', (c) => {
   const status = getEmbeddingStatus()
@@ -33,7 +147,11 @@ embeddingRoutes.post('/reindex', (c) => {
   }
 
   if (!status.embeddingConfigured) {
-    return c.json({ error: '未配置智谱 API Key，请在 LLM 设置中配置' }, 400)
+    const provider = getEmbeddingProvider()
+    const msg = provider === 'local'
+      ? '本地模型未下载，请先下载模型'
+      : '未配置智谱 API Key，请在 LLM 设置中配置'
+    return c.json({ error: msg }, 400)
   }
 
   if (reindexing) {
@@ -84,6 +202,8 @@ embeddingRoutes.post('/reindex', (c) => {
         upsertNoteEmbedding(allNotes[i].id, embeddings[i])
       }
 
+      // Record which provider built this index
+      setIndexedWith(getEmbeddingProvider())
       clearTransientStatus()
 
       await stream.writeSSE({

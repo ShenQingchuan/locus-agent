@@ -89,7 +89,7 @@ export async function executeStrReplace(args: {
 
   // 提取变更处附近的片段，便于 LLM 确认而不必再读文件
   const lines = newContent.split('\n')
-  if (lines.length > 1 && lines[lines.length - 1] === '')
+  if (lines.length > 1 && lines.at(-1) === '')
     lines.pop()
   const insertIdx = content.indexOf(old_string)
   const insertEnd = insertIdx + new_string.length
