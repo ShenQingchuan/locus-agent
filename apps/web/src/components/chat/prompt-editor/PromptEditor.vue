@@ -189,6 +189,7 @@ defineExpose({
   color: hsl(var(--foreground));
   outline: none;
   cursor: text;
+  white-space: pre-wrap;
 }
 
 .prompt-editor-content [contenteditable] {
