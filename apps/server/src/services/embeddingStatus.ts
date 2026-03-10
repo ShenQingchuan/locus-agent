@@ -3,6 +3,7 @@ import type { ModelFileInfo } from './localEmbedding.js'
 import { isVecAvailable } from '../db/index.js'
 import { getSetting, setSetting } from '../settings/index.js'
 import { getEmbeddingProvider, isEmbeddingConfigured } from './embedding.js'
+import { isLocalDepsInstalled } from './localDeps.js'
 import { getLocalModelFiles, isLocalModelReady } from './localEmbedding.js'
 import { getEmbeddingCount } from './vectorStore.js'
 
@@ -25,6 +26,8 @@ export interface EmbeddingStatus {
   provider: EmbeddingProvider
   localModelReady: boolean
   localModelFiles: ModelFileInfo[]
+  /** Whether ONNX runtime deps are installed in the data directory */
+  localRuntimeInstalled: boolean
 }
 
 // ==================== Settings KV ====================
@@ -85,6 +88,7 @@ export function getEmbeddingStatus(): EmbeddingStatus {
     provider,
     localModelReady: isLocalModelReady(),
     localModelFiles: getLocalModelFiles(),
+    localRuntimeInstalled: isLocalDepsInstalled(),
   }
 }
 

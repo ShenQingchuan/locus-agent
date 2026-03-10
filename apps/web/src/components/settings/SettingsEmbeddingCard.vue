@@ -23,6 +23,7 @@ const embeddingState = ref<EmbeddingStatus>({
   provider: 'zhipu',
   localModelReady: false,
   localModelFiles: [],
+  localRuntimeInstalled: false,
 })
 
 const embeddingProgress = ref<{
@@ -33,6 +34,11 @@ const embeddingProgress = ref<{
 
 const embeddingBusy = ref(false)
 const providerSwitching = ref(false)
+
+// --- Runtime deps state ---
+const runtimeInstalling = ref(false)
+const runtimeInstallOutput = ref('')
+const runtimeUninstalling = ref(false)
 
 // --- Model download state ---
 const modelDownloading = ref(false)
@@ -193,6 +199,50 @@ async function handleDeleteModel() {
   }
 }
 
+async function startRuntimeInstall() {
+  if (runtimeInstalling.value)
+    return
+
+  runtimeInstalling.value = true
+  runtimeInstallOutput.value = ''
+
+  const { startRuntimeInstall: doInstall } = await import('@/api/embedding')
+  doInstall(
+    (output) => {
+      runtimeInstallOutput.value += output
+    },
+    () => {
+      runtimeInstalling.value = false
+      runtimeInstallOutput.value = ''
+      toast.success('ONNX 运行时安装完成')
+      loadEmbeddingStatus()
+    },
+    (msg) => {
+      runtimeInstalling.value = false
+      toast.error(`安装失败: ${msg}`)
+    },
+  )
+}
+
+async function handleUninstallRuntime() {
+  if (runtimeUninstalling.value)
+    return
+
+  runtimeUninstalling.value = true
+  try {
+    const { uninstallRuntime } = await import('@/api/embedding')
+    await uninstallRuntime()
+    toast.success('ONNX 运行时已卸载')
+    await loadEmbeddingStatus()
+  }
+  catch (err) {
+    toast.error(`卸载失败: ${err instanceof Error ? err.message : '未知错误'}`)
+  }
+  finally {
+    runtimeUninstalling.value = false
+  }
+}
+
 const onReindex = useThrottleFn(async () => {
   embeddingBusy.value = true
   embeddingProgress.value = {}
@@ -327,8 +377,35 @@ onMounted(() => {
 
         <!-- ==================== Local provider ==================== -->
         <template v-if="activeProvider === 'local'">
-          <!-- Model not downloaded -->
-          <template v-if="!embeddingState.localModelReady && !modelDownloading">
+          <!-- Runtime not installed -->
+          <template v-if="!embeddingState.localRuntimeInstalled && !runtimeInstalling">
+            <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-start gap-1.5">
+              <div class="i-carbon-information h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <span class="text-muted-foreground">需要安装 ONNX 推理运行时（约 150 MB）</span>
+            </div>
+            <button
+              class="btn-primary btn-sm"
+              @click="startRuntimeInstall"
+            >
+              <div class="i-carbon-download h-3.5 w-3.5 mr-1" />
+              安装运行时
+            </button>
+          </template>
+
+          <!-- Runtime installing -->
+          <div v-if="runtimeInstalling" class="space-y-2">
+            <div class="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+              <div class="i-carbon-circle-dash h-4 w-4 animate-spin" />
+              <span>正在安装 ONNX 运行时...</span>
+            </div>
+            <pre
+              v-if="runtimeInstallOutput"
+              class="rounded-lg border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground max-h-32 overflow-auto font-mono whitespace-pre-wrap"
+            >{{ runtimeInstallOutput }}</pre>
+          </div>
+
+          <!-- Model not downloaded (runtime installed) -->
+          <template v-if="embeddingState.localRuntimeInstalled && !embeddingState.localModelReady && !modelDownloading">
             <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-start gap-1.5">
               <div class="i-carbon-information h-4 w-4 flex-shrink-0 text-muted-foreground" />
               <span class="text-muted-foreground">需要下载模型文件到本地（约 700 MB）</span>
@@ -343,7 +420,7 @@ onMounted(() => {
           </template>
 
           <!-- Model downloading - file table -->
-          <template v-if="modelDownloading && downloadFileList.length > 0">
+          <template v-if="embeddingState.localRuntimeInstalled && modelDownloading && downloadFileList.length > 0">
             <div class="rounded-lg border border-border overflow-hidden">
               <table class="w-full">
                 <thead>
@@ -389,13 +466,13 @@ onMounted(() => {
           </template>
 
           <!-- Model downloading - spinner (no files yet) -->
-          <div v-else-if="modelDownloading" class="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+          <div v-else-if="embeddingState.localRuntimeInstalled && modelDownloading" class="flex items-center gap-2 py-1 text-xs text-muted-foreground">
             <div class="i-carbon-circle-dash h-4 w-4 animate-spin" />
             <span>正在初始化下载...</span>
           </div>
 
           <!-- Model downloaded - file list -->
-          <template v-if="embeddingState.localModelReady && !modelDownloading">
+          <template v-if="embeddingState.localRuntimeInstalled && embeddingState.localModelReady && !modelDownloading">
             <div v-if="embeddingState.localModelFiles.length > 0" class="rounded-lg border border-border overflow-hidden">
               <table class="w-full">
                 <thead>
@@ -495,6 +572,17 @@ onMounted(() => {
 
           <!-- Action buttons -->
           <div class="flex gap-2">
+            <button
+              v-if="activeProvider === 'local' && embeddingState.localRuntimeInstalled && !runtimeInstalling"
+              class="btn-outline btn-sm text-destructive hover:bg-destructive/10"
+              :disabled="runtimeUninstalling || modelDownloading"
+              @click="handleUninstallRuntime"
+            >
+              <div v-if="runtimeUninstalling" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin mr-1" />
+              <div v-else class="i-carbon-trash-can h-3.5 w-3.5 mr-1" />
+              卸载运行时
+            </button>
+
             <button
               v-if="activeProvider === 'local' && embeddingState.localModelReady && !modelDownloading"
               class="btn-outline btn-sm text-destructive hover:bg-destructive/10"

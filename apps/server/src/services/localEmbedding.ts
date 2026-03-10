@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getSetting, setSetting } from '../settings/index.js'
 import { getModelsDir } from '../settings/paths.js'
+import { importTransformersFromDeps, isLocalDepsInstalled } from './localDeps.js'
 
 // ==================== Constants ====================
 
@@ -28,11 +29,11 @@ export interface ModelFileInfo {
 // ==================== Dependency check ====================
 
 const MISSING_DEPS_MSG
-  = '本地 embedding 运行时缺少 onnxruntime-node，请确保 node_modules/onnxruntime-node 存在'
+  = '本地 embedding 运行时未安装，请先在设置中安装 ONNX 运行时'
 
 async function importTransformers() {
   try {
-    return await import('@huggingface/transformers')
+    return await importTransformersFromDeps()
   }
   catch {
     throw new Error(MISSING_DEPS_MSG)
@@ -43,8 +44,10 @@ async function importTransformers() {
  * Check if @huggingface/transformers is installed (non-throwing)
  */
 export async function isTransformersAvailable(): Promise<boolean> {
+  if (!isLocalDepsInstalled())
+    return false
   try {
-    await import('@huggingface/transformers')
+    await importTransformersFromDeps()
     return true
   }
   catch {

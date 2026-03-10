@@ -21,6 +21,7 @@ export interface EmbeddingStatus {
   provider: EmbeddingProvider
   localModelReady: boolean
   localModelFiles: { name: string, size: number }[]
+  localRuntimeInstalled: boolean
 }
 
 export interface EmbeddingProgressEvent {
@@ -162,6 +163,28 @@ export function startReindex(
     complete: () => onComplete(),
     error: (data: { message?: string }) => onError(data.message || '未知错误'),
   })
+}
+
+// ==================== ONNX runtime deps ====================
+
+export function fetchRuntimeStatus(): Promise<{ installed: boolean }> {
+  return request('/runtime/status')
+}
+
+export function startRuntimeInstall(
+  onOutput: (output: string) => void,
+  onComplete: () => void,
+  onError: (msg: string) => void,
+): { close: () => void } {
+  return consumeSSE(`${API_BASE}/runtime/install`, 'POST', {
+    output: (data: { output: string }) => onOutput(data.output),
+    complete: () => onComplete(),
+    error: (data: { message?: string }) => onError(data.message || '安装失败'),
+  })
+}
+
+export function uninstallRuntime(): Promise<{ success: boolean }> {
+  return request('/runtime', { method: 'DELETE' })
 }
 
 // ==================== Error ====================

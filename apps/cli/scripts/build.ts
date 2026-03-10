@@ -18,7 +18,18 @@ if (!existsSync(drizzleSource))
 
 rmSync(distDir, { force: true, recursive: true })
 
-execFileSync('bun', ['build', 'src/index.ts', '--outdir', 'dist', '--target', 'bun'], {
+execFileSync('bun', [
+  'build',
+  'src/index.ts',
+  '--outdir',
+  'dist',
+  '--target',
+  'bun',
+  '--external',
+  '@huggingface/transformers',
+  '--external',
+  'onnxruntime-node',
+], {
   cwd: cliRoot,
   stdio: 'inherit',
 })

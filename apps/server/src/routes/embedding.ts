@@ -10,6 +10,7 @@ import {
   setIndexedWith,
   setTransientStatus,
 } from '../services/embeddingStatus.js'
+import { installLocalDeps, isLocalDepsInstalled, uninstallLocalDeps } from '../services/localDeps.js'
 import {
   deleteLocalModel,
   downloadModel,
@@ -125,6 +126,66 @@ embeddingRoutes.delete('/model', async (c) => {
 
   try {
     await deleteLocalModel()
+    return c.json({ success: true })
+  }
+  catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return c.json({ error: message }, 500)
+  }
+})
+
+// ==================== ONNX runtime deps ====================
+
+let runtimeInstalling = false
+
+embeddingRoutes.get('/runtime/status', (c) => {
+  return c.json({ installed: isLocalDepsInstalled() })
+})
+
+embeddingRoutes.post('/runtime/install', (c) => {
+  if (runtimeInstalling) {
+    return c.json({ error: '正在安装中' }, 409)
+  }
+
+  return streamSSE(c, async (stream) => {
+    runtimeInstalling = true
+    try {
+      const result = await installLocalDeps((output) => {
+        stream.writeSSE({ event: 'output', data: JSON.stringify({ output }) })
+      })
+
+      if (result.success) {
+        await stream.writeSSE({
+          event: 'complete',
+          data: JSON.stringify({ success: true }),
+        })
+      }
+      else {
+        await stream.writeSSE({
+          event: 'error',
+          data: JSON.stringify({ message: result.error }),
+        })
+      }
+    }
+    catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      await stream.writeSSE({
+        event: 'error',
+        data: JSON.stringify({ message }),
+      })
+    }
+    finally {
+      runtimeInstalling = false
+    }
+  })
+})
+
+embeddingRoutes.delete('/runtime', async (c) => {
+  if (runtimeInstalling) {
+    return c.json({ error: '正在安装中，无法卸载' }, 409)
+  }
+  try {
+    uninstallLocalDeps()
     return c.json({ success: true })
   }
   catch (err) {
