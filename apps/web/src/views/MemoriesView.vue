@@ -5,7 +5,8 @@ import type { TagTreeData } from '@/utils/tagTree'
 import { useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
 import { onClickOutside, onKeyStroke } from '@vueuse/core'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import * as api from '@/api/knowledge'
 import AddTagsModal from '@/components/knowledge/AddTagsModal.vue'
 import MemoriesComposer from '@/components/knowledge/MemoriesComposer.vue'
@@ -18,7 +19,6 @@ import {
   useSearchNotesQuery,
   useTagsQuery,
 } from '@/composables/knowledgeQueries'
-import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import { useMemoriesSidebar } from '@/composables/useMemoriesSidebar'
 import { useNoteEditorSave } from '@/composables/useNoteEditorSave'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -26,8 +26,12 @@ import { useKnowledgeStore } from '@/stores/knowledge'
 const store = useKnowledgeStore()
 const toast = useToast()
 const queryCache = useQueryCache()
-const { pendingHighlightNoteId, pendingTagSelection } = useGlobalSearch()
+const route = useRoute()
+const router = useRouter()
 const { sidebarCollapsed, toggleSidebar } = useMemoriesSidebar()
+
+const isSyncingFromUrl = ref(false)
+const isSyncingToUrl = ref(false)
 
 const selectedTagId = computed(() => store.selectedTagId)
 
@@ -209,30 +213,63 @@ async function handleSaveTags(tagNames: string[]) {
   }
 }
 
-// ==================== Global search integration ====================
+// ==================== URL query 与标签同步（tag 为 tag name，如 xxx/yyy）====================
 
-watch(pendingHighlightNoteId, (noteId) => {
-  if (!noteId)
+function applyTagFromUrl(tagName: string | undefined) {
+  if (!tagName) {
+    store.selectTag(null)
+    activeTagPath.value = null
     return
-  store.search('')
-  store.selectTag(null)
-  activeTagPath.value = null
-  highlightedNoteId.value = noteId
-  nextTick(() => {
-    const el = document.querySelector(`[data-note-id="${noteId}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    pendingHighlightNoteId.value = null
-  })
-})
+  }
+  const tag = tagsList.value.find(t => t.name === tagName)
+  if (!tag) {
+    store.selectTag(null)
+    activeTagPath.value = null
+    return
+  }
+  store.selectTag(tag.id)
+  activeTagPath.value = tag.name
+}
 
-watch(pendingTagSelection, (sel) => {
-  if (!sel)
-    return
-  store.selectTag(sel.tagId)
-  activeTagPath.value = sel.tagName
-  store.search('')
-  pendingTagSelection.value = null
-})
+watch(
+  [() => route.query.tag as string | undefined, tagsList],
+  ([tagName]) => {
+    if (isSyncingToUrl.value)
+      return
+    const name = typeof tagName === 'string' ? tagName : undefined
+    const tag = name ? tagsList.value.find(t => t.name === name) : null
+    const expectedId = tag?.id ?? null
+    if (name && !tag && tagsList.value.length === 0) {
+      return
+    }
+    if (expectedId !== store.selectedTagId) {
+      isSyncingFromUrl.value = true
+      applyTagFromUrl(name)
+      store.search('')
+      isSyncingFromUrl.value = false
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => store.selectedTagId,
+  (newId) => {
+    if (isSyncingFromUrl.value)
+      return
+    const tag = newId ? tagsList.value.find(t => t.id === newId) : null
+    const tagName = tag?.name ?? null
+    const urlTag = route.query.tag as string | undefined
+    if (tagName !== urlTag) {
+      isSyncingToUrl.value = true
+      router.replace({
+        name: 'memories',
+        query: tagName ? { tag: tagName } : {},
+      })
+      isSyncingToUrl.value = false
+    }
+  },
+)
 
 // ESC to cancel editing (only when not in modal)
 onKeyStroke('Escape', () => {

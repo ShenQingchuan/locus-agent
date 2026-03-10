@@ -20,11 +20,6 @@ const commandPaletteQuery = ref('')
 const commandSearchResults = ref<CommandItem[]>([])
 const isCommandSearching = ref(false)
 
-/** Note ID selected from search, consumed by MemoriesView to highlight */
-const pendingHighlightNoteId = ref<string | null>(null)
-/** Tag selected from search, consumed by MemoriesView to filter */
-const pendingTagSelection = ref<{ tagId: string, tagName: string } | null>(null)
-
 export const commandGroups = [
   { key: 'memories', label: '记忆' },
   { key: 'tags', label: '标签' },
@@ -110,17 +105,12 @@ export function useGlobalSearch() {
   function handleCommandSelect(item: CommandItem) {
     const data = item.data as SearchCommandItemData
     if (data.type === 'note' && data.noteId) {
-      pendingHighlightNoteId.value = data.noteId
-      // Navigate to memories view if not already there
-      if (router.currentRoute.value.name !== 'memories') {
-        router.push({ name: 'memories' })
-      }
+      const firstTag = data.tags?.[0]
+      const query = firstTag ? { tag: firstTag.name } : {}
+      router.push({ name: 'memories', query })
     }
-    else if (data.type === 'tag' && data.tagId) {
-      pendingTagSelection.value = { tagId: data.tagId, tagName: data.tagName ?? '' }
-      if (router.currentRoute.value.name !== 'memories') {
-        router.push({ name: 'memories' })
-      }
+    else if (data.type === 'tag' && data.tagName) {
+      router.push({ name: 'memories', query: { tag: data.tagName } })
     }
     else if (data.type === 'conversation' && data.conversationId) {
       router.push({ name: 'chat', query: { session: data.conversationId } })
@@ -145,8 +135,6 @@ export function useGlobalSearch() {
     commandSearchResults,
     isCommandSearching,
     commandGroups,
-    pendingHighlightNoteId,
-    pendingTagSelection,
     handleCommandSearch,
     handleCommandSelect,
     openSearch,
