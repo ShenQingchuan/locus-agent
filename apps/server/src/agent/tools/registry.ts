@@ -67,6 +67,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
   'read_plan',
   'ask_question',
   'manage_todos',
+  'delegate',
 ])
 
 const MCP_WRITE_KEYWORDS = [
