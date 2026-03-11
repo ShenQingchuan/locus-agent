@@ -54,7 +54,7 @@ function handleTagTreeSelect(node: TreeNode) {
 
     <!-- Tag tree -->
     <div class="flex-1 overflow-hidden px-2 pt-3 pb-2 flex flex-col">
-      <div class="px-3 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+      <div class="pl-2 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
         标签
       </div>
       <template v-if="tagTree.length > 0">
