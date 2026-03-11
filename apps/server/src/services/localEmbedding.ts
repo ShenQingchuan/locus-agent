@@ -183,12 +183,36 @@ async function ensurePipeline(): Promise<any> {
 }
 
 /**
+ * Extract last-token embedding from raw pipeline output and L2-normalize.
+ * Qwen3-Embedding is decoder-only — the last token aggregates full context
+ * via causal attention, unlike encoder models that use mean/CLS pooling.
+ */
+function lastTokenPool(output: { data: Float32Array | Float64Array, dims: number[] }): Float32Array {
+  const [, seqLen, hiddenDim] = output.dims
+  const offset = (seqLen - 1) * hiddenDim
+  const embedding = new Float32Array(hiddenDim)
+
+  for (let i = 0; i < hiddenDim; i++)
+    embedding[i] = output.data[offset + i]
+
+  let norm = 0
+  for (let i = 0; i < hiddenDim; i++)
+    norm += embedding[i] * embedding[i]
+  norm = Math.sqrt(norm)
+
+  for (let i = 0; i < hiddenDim; i++)
+    embedding[i] /= norm
+
+  return embedding
+}
+
+/**
  * Embed a single text using the local ONNX model
  */
 export async function embedTextLocal(text: string): Promise<Float32Array> {
   const extractor = await ensurePipeline()
-  const output = await extractor(text, { pooling: 'mean', normalize: true })
-  return new Float32Array(output.data)
+  const output = await extractor(text, { pooling: 'none', normalize: false })
+  return lastTokenPool(output)
 }
 
 /**
@@ -199,16 +223,15 @@ export async function embedBatchLocal(
   onProgress?: (done: number, total: number) => void,
 ): Promise<Float32Array[]> {
   const extractor = await ensurePipeline()
-  const CHUNK_SIZE = 8 // smaller chunks for local inference
+  const CHUNK_SIZE = 8
   const results: Float32Array[] = []
 
   for (let i = 0; i < texts.length; i += CHUNK_SIZE) {
     const chunk = texts.slice(i, i + CHUNK_SIZE)
 
-    // Process individually within chunk for memory safety
     for (const text of chunk) {
-      const output = await extractor(text, { pooling: 'mean', normalize: true })
-      results.push(new Float32Array(output.data))
+      const output = await extractor(text, { pooling: 'none', normalize: false })
+      results.push(lastTokenPool(output))
     }
 
     onProgress?.(results.length, texts.length)

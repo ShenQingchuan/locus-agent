@@ -157,11 +157,26 @@ function startEditing(note: NoteWithTags) {
   highlightedNoteId.value = null
   editingNoteId.value = note.id
   resetEditorSave()
+  isSyncingToUrl.value = true
+  router.replace({
+    name: 'memories',
+    query: {
+      ...(store.selectedTagId ? { tag: tagsList.value.find(t => t.id === store.selectedTagId)?.name } : {}),
+      id: note.id,
+    },
+  })
+  isSyncingToUrl.value = false
 }
 
 function cancelEditing() {
   editingNoteId.value = null
   resetEditorSave()
+  isSyncingToUrl.value = true
+  router.replace({
+    name: 'memories',
+    query: store.selectedTagId ? { tag: tagsList.value.find(t => t.id === store.selectedTagId)?.name } : {},
+  })
+  isSyncingToUrl.value = false
 }
 
 // ==================== Delete ====================
@@ -253,6 +268,19 @@ watch(
 )
 
 watch(
+  () => route.query.id as string | undefined,
+  (idFromUrl) => {
+    if (isSyncingToUrl.value)
+      return
+    if (idFromUrl)
+      editingNoteId.value = idFromUrl
+    else if (route.name === 'memories')
+      editingNoteId.value = null
+  },
+  { immediate: true },
+)
+
+watch(
   () => store.selectedTagId,
   (newId) => {
     if (isSyncingFromUrl.value)
@@ -260,11 +288,15 @@ watch(
     const tag = newId ? tagsList.value.find(t => t.id === newId) : null
     const tagName = tag?.name ?? null
     const urlTag = route.query.tag as string | undefined
-    if (tagName !== urlTag) {
+    const urlId = route.query.id as string | undefined
+    if (tagName !== urlTag || (editingNoteId.value ? editingNoteId.value !== urlId : !!urlId)) {
       isSyncingToUrl.value = true
       router.replace({
         name: 'memories',
-        query: tagName ? { tag: tagName } : {},
+        query: {
+          ...(tagName ? { tag: tagName } : {}),
+          ...(editingNoteId.value ? { id: editingNoteId.value } : {}),
+        },
       })
       isSyncingToUrl.value = false
     }

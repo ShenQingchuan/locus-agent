@@ -138,6 +138,8 @@ export function useGitStatus(workspacePath: Ref<string>, isActive: Ref<boolean> 
   function refresh() {
     if (!workspacePath.value)
       return
+    if (isRefreshing.value)
+      return
     isRefreshing.value = true
     queryCache.invalidateQueries({ key: getGitStatusQueryKey(workspacePath.value) })
     if (selectedFilePath.value) {

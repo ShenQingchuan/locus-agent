@@ -1,4 +1,5 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
+import consola from 'consola'
 import { count, desc, eq, inArray, like } from 'drizzle-orm'
 import { db, isVecAvailable } from '../db/index.js'
 import { noteConversations, notes, noteTags, tags } from '../db/schema.js'
@@ -7,17 +8,28 @@ import { getOrCreateTag } from './tag.js'
 // ==================== Embedding 自动索引 ====================
 
 /**
- * Async embed a note and store in vector DB (fire-and-forget).
- * Requires Zhipu API key to be configured and sqlite-vec to be available.
+ * Build the text that gets embedded for a note.
+ * Tags are prepended so the embedding captures category semantics.
  */
-function autoEmbedNote(noteId: string, content: string): void {
+export function buildEmbeddingText(content: string, tagNames: string[]): string {
+  if (tagNames.length === 0)
+    return content
+  return `${tagNames.join(' ')}\n${content}`
+}
+
+/**
+ * Async embed a note and store in vector DB (fire-and-forget).
+ * Requires embedding provider to be configured and sqlite-vec to be available.
+ */
+function autoEmbedNote(noteId: string, content: string, tagNames: string[]): void {
   if (!isVecAvailable() || !content.trim())
     return
 
   import('./embedding.js').then(async ({ embedPassage, isEmbeddingConfigured }) => {
     if (!isEmbeddingConfigured())
       return
-    const vector = await embedPassage(content)
+    const text = buildEmbeddingText(content, tagNames)
+    const vector = await embedPassage(text)
     const { upsertNoteEmbedding } = await import('./vectorStore.js')
     upsertNoteEmbedding(noteId, vector)
   }).catch((err) => {
@@ -97,7 +109,7 @@ export async function createNote(input: CreateNoteInput): Promise<NoteWithTags> 
   const result = await getNoteWithTags(id) as NoteWithTags
 
   // 异步生成 embedding（不阻塞响应）
-  autoEmbedNote(result.id, result.content)
+  autoEmbedNote(result.id, result.content, result.tags.map(t => t.name))
 
   return result
 }
@@ -203,9 +215,9 @@ export async function updateNote(
 
   const result = await getNoteWithTags(id)
 
-  // 内容变更时重新生成 embedding
-  if (input.content !== undefined && result) {
-    autoEmbedNote(id, result.content)
+  // 内容或标签变更时重新生成 embedding
+  if ((input.content !== undefined || input.tagNames !== undefined) && result) {
+    autoEmbedNote(id, result.content, result.tags.map(t => t.name))
   }
 
   return result
@@ -271,11 +283,13 @@ export async function searchNotesHybrid(query: string): Promise<NoteWithTags[]> 
   const { isVecAvailable, searchByVector } = await import('./vectorStore.js')
 
   // Cosine distance: 0 = identical, 1 = orthogonal, 2 = opposite.
-  // Two-layer filter:
-  //   1) hard ceiling — reject anything above this regardless
-  //   2) relative factor — reject if distance > best_distance * factor
-  // A result must pass BOTH to be included.
-  const VEC_HARD_CEILING = 0.55
+  // Three-layer filter:
+  //   1) best-dist floor — if even the best hit exceeds this, discard all vector results
+  //   2) hard ceiling — reject anything above this regardless
+  //   3) relative factor — reject if distance > best_distance * factor
+  // A result must pass ALL applicable checks to be included.
+  const VEC_BEST_FLOOR = 0.57
+  const VEC_HARD_CEILING = 0.57
   const VEC_RELATIVE_FACTOR = 1.25
 
   // --- 1. Vector semantic search (best-effort) ---
@@ -288,11 +302,19 @@ export async function searchNotesHybrid(query: string): Promise<NoteWithTags[]> 
 
       if (vecResults.length > 0) {
         const bestDist = vecResults[0].distance
-        const adaptiveThreshold = Math.min(bestDist * VEC_RELATIVE_FACTOR, VEC_HARD_CEILING)
 
-        vecMatchedIds = vecResults
-          .filter(r => r.distance <= adaptiveThreshold)
-          .map(r => r.noteId)
+        if (bestDist <= VEC_BEST_FLOOR) {
+          const adaptiveThreshold = Math.min(bestDist * VEC_RELATIVE_FACTOR, VEC_HARD_CEILING)
+
+          vecMatchedIds = vecResults
+            .filter(r => r.distance <= adaptiveThreshold)
+            .map(r => r.noteId)
+
+          consola.debug(`[search] vec query="${query}" threshold=${adaptiveThreshold.toFixed(4)} hits=${vecMatchedIds.length}/${vecResults.length}`)
+        }
+        else {
+          consola.debug(`[search] vec bestDist=${bestDist.toFixed(4)} > floor=${VEC_BEST_FLOOR}, skipped`)
+        }
       }
     }
     catch (err) {

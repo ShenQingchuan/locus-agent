@@ -71,10 +71,30 @@ export async function embedText(text: string): Promise<Float32Array> {
   return new Float32Array(embedding)
 }
 
-/** Alias for storage */
+/** Embed document/passage text (no instruction prefix) */
 export const embedPassage = embedText
-/** Alias for search queries */
-export const embedQuery = embedText
+
+/**
+ * Instruction prefix for Qwen3-Embedding query-side.
+ * With last-token pooling the instruction tokens influence the final
+ * representation via causal attention without polluting a mean average.
+ */
+const QUERY_INSTRUCTION = 'Instruct: Given a search query, retrieve relevant notes that match the query\nQuery: '
+
+/**
+ * Embed a search query — adds a task instruction for the local
+ * Qwen3-Embedding model to improve retrieval discrimination.
+ */
+export async function embedQuery(text: string): Promise<Float32Array> {
+  const provider = getEmbeddingProvider()
+
+  if (provider === 'local')
+    return embedTextLocal(`${QUERY_INSTRUCTION}${text}`)
+
+  const model = createEmbeddingModel()
+  const { embedding } = await embed({ model, value: text })
+  return new Float32Array(embedding)
+}
 
 /**
  * Batch embed texts using the active provider

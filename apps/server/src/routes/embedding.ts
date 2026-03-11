@@ -1,8 +1,9 @@
 import type { EmbeddingProvider } from '../services/embedding.js'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { db } from '../db/index.js'
-import { notes } from '../db/schema.js'
+import { notes, noteTags, tags } from '../db/schema.js'
 import { embedBatch, getEmbeddingProvider, setEmbeddingProvider } from '../services/embedding.js'
 import {
   clearTransientStatus,
@@ -18,6 +19,7 @@ import {
   isLocalModelReady,
   resetPipeline,
 } from '../services/localEmbedding.js'
+import { buildEmbeddingText } from '../services/note.js'
 import { clearAllEmbeddings, getEmbeddingCount, upsertNoteEmbedding } from '../services/vectorStore.js'
 
 export const embeddingRoutes = new Hono()
@@ -239,6 +241,19 @@ embeddingRoutes.post('/reindex', (c) => {
         return
       }
 
+      // Fetch tag names for each note to include in embedding text
+      const noteTagRows = await db
+        .select({ noteId: noteTags.noteId, tagName: tags.name })
+        .from(noteTags)
+        .innerJoin(tags, eq(noteTags.tagId, tags.id))
+
+      const tagsByNoteId = new Map<string, string[]>()
+      for (const row of noteTagRows) {
+        const arr = tagsByNoteId.get(row.noteId) ?? []
+        arr.push(row.tagName)
+        tagsByNoteId.set(row.noteId, arr)
+      }
+
       clearAllEmbeddings()
 
       await stream.writeSSE({
@@ -246,7 +261,9 @@ embeddingRoutes.post('/reindex', (c) => {
         data: JSON.stringify({ status: 'indexing', indexedCount: 0, totalCount }),
       })
 
-      const texts = allNotes.map(n => n.content)
+      const texts = allNotes.map(n =>
+        buildEmbeddingText(n.content, tagsByNoteId.get(n.id) ?? []),
+      )
       const embeddings = await embedBatch(texts, (done, total) => {
         stream.writeSSE({
           event: 'progress',

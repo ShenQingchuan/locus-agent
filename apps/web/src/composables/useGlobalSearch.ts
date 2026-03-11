@@ -105,9 +105,7 @@ export function useGlobalSearch() {
   function handleCommandSelect(item: CommandItem) {
     const data = item.data as SearchCommandItemData
     if (data.type === 'note' && data.noteId) {
-      const firstTag = data.tags?.[0]
-      const query = firstTag ? { tag: firstTag.name } : {}
-      router.push({ name: 'memories', query })
+      router.push({ name: 'memories', query: { id: data.noteId } })
     }
     else if (data.type === 'tag' && data.tagName) {
       router.push({ name: 'memories', query: { tag: data.tagName } })

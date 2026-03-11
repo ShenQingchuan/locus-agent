@@ -199,7 +199,6 @@ function refreshCodingDataOnActivate() {
   }
 
   queryCache.invalidateQueries({ key: getTasksListQueryKey(currentProjectKey.value) })
-  gitStatus.refresh()
 }
 
 onMounted(async () => {
