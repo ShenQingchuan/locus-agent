@@ -19,12 +19,14 @@
     "db:migrate": "pnpm -F @univedge/locus-server db:migrate",
     "db:studio": "pnpm -F @univedge/locus-server db:studio",
     "reexport:chains": "node scripts/find-reexport-chains.mjs",
-    "reexport:scan": "sg scan"
+    "release": "bun scripts/release.ts",
+    "release:dry": "bun scripts/release.ts --dry-run"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-tools",
     "@types/node": "catalog:dev-tools",
     "eslint": "catalog:dev-tools",
+    "git-cliff": "catalog:cli-tools",
     "typescript": "catalog:dev-tools"
   }
 }
