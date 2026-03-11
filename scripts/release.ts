@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Release 脚本：统一版本号、生成 Changelog、打 Git tag、创建 GitHub Release。
+ * Release 脚本：统一版本号、生成 Changelog、打 Git tag、推送到 origin、创建 GitHub Release。
  *
- * 依赖：git-cliff（pnpm 已装）、GitHub CLI (gh) 已登录。
+ * 依赖：git-cliff（pnpm 已装）、GitHub CLI (gh) 已登录、当前分支已配置远程 origin。
+ * 会在打 tag 后执行 git push origin HEAD <tag>，再创建 Release，避免本地 tag 未推送导致 gh 报错。
  *
  * 用法：
  *   bun scripts/release.ts [版本号]   # 默认 0.1.0
- *   bun scripts/release.ts 0.1.0 --dry-run   # 仅改版本与生成 notes，不 commit/tag/release
+ *   bun scripts/release.ts 0.1.0 --dry-run   # 仅改版本与生成 notes，不 commit/tag/push/release
  */
 
 import { execSync } from 'node:child_process'
@@ -81,6 +82,11 @@ function gitCommitAndTag(): void {
   console.log(`  Committed and tagged ${tag}`)
 }
 
+function pushCommitAndTag(): void {
+  execSync(`git push origin HEAD ${tag}`, { cwd: root, stdio: 'inherit' })
+  console.log(`  Pushed commit and tag ${tag} to origin`)
+}
+
 function createGitHubRelease(): void {
   const notesFile = join(root, 'RELEASE_NOTES.md')
   execSync(`gh release create ${tag} --notes-file "${notesFile}"`, {
@@ -110,7 +116,10 @@ async function main(): Promise<void> {
   console.log('\n4. Git commit and tag...')
   gitCommitAndTag()
 
-  console.log('\n5. Creating GitHub Release...')
+  console.log('\n5. Push to origin (commit + tag)...')
+  pushCommitAndTag()
+
+  console.log('\n6. Creating GitHub Release...')
   createGitHubRelease()
 
   console.log('\nDone.')
