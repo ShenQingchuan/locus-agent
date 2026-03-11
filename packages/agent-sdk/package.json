@@ -1,7 +1,7 @@
 {
   "name": "@univedge/locus-agent-sdk",
   "type": "module",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Shared SDK for Locus Agent — runtime contracts, hook events, plugin system, SSE protocol, and prompt utilities.",
   "repository": {
     "type": "git",
@@ -18,7 +18,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [".cursor", "dist"],
+  "files": [
+    ".cursor",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"

@@ -1,7 +1,7 @@
 {
   "name": "@univedge/locus-ui",
   "type": "module",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Shared Vue 3 UI components for Locus Agent.",
   "repository": {
@@ -18,7 +18,9 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vue-tsc --declaration --emitDeclarationOnly --outDir dist",
     "typecheck": "vue-tsc --noEmit"
