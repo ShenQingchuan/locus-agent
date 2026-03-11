@@ -1,3 +1,20 @@
+## [0.1.3] - 2026-03-11
+
+
+### Features
+
+- Update input schema for manageMemoryTool and MCPManager
+
+
+### Miscellaneous
+
+- Simplify release script usage and update versioning options
+
+
+### Refactor
+
+- Update system prompt guidelines for tool usage and memory management
+
 ## [0.1.2] - 2026-03-11
 
 
