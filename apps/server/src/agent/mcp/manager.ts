@@ -268,9 +268,14 @@ class MCPManager extends EventEmitter {
 
       for (const [toolName, rawTool] of Object.entries(rawTools)) {
         const t = rawTool as Tool & { execute?: (args: unknown) => Promise<unknown>, description?: string, inputSchema?: unknown }
+        // Ensure input_schema has "type" field — some MCP servers omit it,
+        // which causes Anthropic API to reject the request.
+        const schema = (t.inputSchema && typeof t.inputSchema === 'object')
+          ? { type: 'object', ...(t.inputSchema as Record<string, unknown>) }
+          : t.inputSchema
         nextTools[toolName] = tool({
           description: t.description ?? '',
-          inputSchema: t.inputSchema as any,
+          inputSchema: schema as any,
         })
         if (t.execute) {
           entry.executors.set(toolName, t.execute)

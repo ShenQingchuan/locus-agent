@@ -32,41 +32,31 @@ export const manageMemoryTool = tool({
     + 'Use "update" to change a memory\'s content and/or tags (pass memory_id from a prior read). '
     + 'Use "delete" to remove memories by ID. '
     + 'Tags use multi-level format like "preference/code-style", "project/my-app".',
-  inputSchema: z.discriminatedUnion('action', [
-    z.object({
-      action: z.literal('create'),
-      memories: z.array(memoryItemSchema).min(1).describe('Array of memories to create.'),
-    }),
-    z.object({
-      action: z.literal('read'),
-      query: z.string().optional().describe(
-        'Natural language search query. Uses semantic vector search. '
-        + 'Describe what you are looking for.',
-      ),
-      tags: z.array(z.string()).optional().describe(
-        'Filter by tag names. Prefix matching: "project" matches "project/locus-agent".',
-      ),
-    }).refine(
-      data => !!(data.query?.trim() || (data.tags && data.tags.length > 0)),
-      { message: 'For action "read", at least one of "query" or "tags" must be provided.' },
+  inputSchema: z.object({
+    action: z.enum(['create', 'read', 'update', 'delete']).describe(
+      'The action to perform: "create" to save new memories, "read" to search, "update" to modify, "delete" to remove.',
     ),
-    z.object({
-      action: z.literal('update'),
-      memory_id: z.string().describe('ID of the memory to update (from a prior read result).'),
-      content: z.string().optional().describe('New content; omit to keep existing.'),
-      tags: z.array(z.string()).optional().describe(
-        'New tags (replaces all existing tags); omit to keep existing. '
-        + 'Use multi-level format e.g. ["preference/tools"].',
-      ),
-    }).refine(
-      data => data.content !== undefined || data.tags !== undefined,
-      { message: 'For action "update", provide at least one of "content" or "tags".' },
+    memories: z.array(memoryItemSchema).optional().describe(
+      'Required for "create". Array of memories to create.',
     ),
-    z.object({
-      action: z.literal('delete'),
-      memory_ids: z.array(z.string()).min(1).describe('IDs of memories to delete (from a prior read result).'),
-    }),
-  ]),
+    query: z.string().optional().describe(
+      'For "read". Natural language search query. Uses semantic vector search.',
+    ),
+    tags: z.array(z.string()).optional().describe(
+      'For "read": filter by tag names (prefix matching). '
+      + 'For "update": new tags (replaces all existing). '
+      + 'Use multi-level format e.g. ["preference/tools", "project/locus-agent"].',
+    ),
+    memory_id: z.string().optional().describe(
+      'Required for "update". ID of the memory to update (from a prior read result).',
+    ),
+    content: z.string().optional().describe(
+      'For "update". New content; omit to keep existing.',
+    ),
+    memory_ids: z.array(z.string()).optional().describe(
+      'Required for "delete". IDs of memories to delete (from a prior read result).',
+    ),
+  }),
 })
 
 /** Input type for executeManageMemory (matches tool inputSchema). */
