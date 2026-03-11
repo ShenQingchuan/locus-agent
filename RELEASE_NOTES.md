@@ -1,3 +1,11 @@
+## [0.1.2] - 2026-03-11
+
+
+### Bug Fixes
+
+- Display dynamic version in CLI output
+
+
 ## [0.1.1] - 2026-03-11
 
 
