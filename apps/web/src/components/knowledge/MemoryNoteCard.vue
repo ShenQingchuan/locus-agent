@@ -56,9 +56,19 @@ function handleDelete(e: Event, noteId: string) {
     </div>
 
     <div class="px-3.5 pb-2.5 flex items-center justify-between">
-      <span class="text-[11px] text-muted-foreground/80">
-        {{ formatRelativeDateShort(note.updatedAt) }}
-      </span>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[11px] text-muted-foreground/80">
+          {{ formatRelativeDateShort(note.updatedAt) }}
+        </span>
+        <span
+          class="text-[10px] leading-none px-1 py-0.5 rounded"
+          :class="note.workspacePath
+            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+            : 'bg-muted text-muted-foreground/70'"
+        >
+          {{ note.workspacePath ? '工作空间' : '全局' }}
+        </span>
+      </div>
       <div class="flex items-center gap-0.5 flex-shrink-0">
         <button
           class="p-1 rounded text-muted-foreground/80 hover:text-foreground hover:bg-accent/60 transition-colors"

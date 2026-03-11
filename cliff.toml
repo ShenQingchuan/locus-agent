@@ -14,9 +14,7 @@ body = """
 {% endfor %}
 """
 trim = true
-postprocessors = [
-  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/ShenQingchuan/locus-agent/issues/${1}))" },
-]
+postprocessors = [ { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/ShenQingchuan/locus-agent/issues/${1}))" }, ]
 
 [git]
 conventional_commits = true

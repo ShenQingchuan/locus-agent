@@ -69,7 +69,11 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     return formatWriteResult(result)
   },
   manage_memory: async (args, _callbacks, context) => {
-    const result = await executeManageMemory(args as Parameters<typeof executeManageMemory>[0], context?.conversationId)
+    const result = await executeManageMemory(
+      args as Parameters<typeof executeManageMemory>[0],
+      context?.conversationId,
+      context?.workspaceRoot,
+    )
     return formatManageMemoryResult(result)
   },
   skill: async (args, _callbacks, context) => {

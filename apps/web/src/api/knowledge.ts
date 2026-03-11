@@ -33,6 +33,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export async function fetchNotes(params?: {
   folderId?: string | null
   tagId?: string
+  /** 'global' = 仅全局, 路径字符串 = 仅该工作空间, undefined = 不过滤 */
+  workspacePath?: string
   limit?: number
   offset?: number
 }): Promise<NoteWithTags[]> {
@@ -41,6 +43,8 @@ export async function fetchNotes(params?: {
     searchParams.set('folderId', params.folderId)
   if (params?.tagId)
     searchParams.set('tagId', params.tagId)
+  if (params?.workspacePath)
+    searchParams.set('workspacePath', params.workspacePath)
   if (params?.limit)
     searchParams.set('limit', String(params.limit))
   if (params?.offset)

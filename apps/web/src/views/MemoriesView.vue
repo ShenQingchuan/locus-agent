@@ -22,8 +22,12 @@ import {
 import { useMemoriesSidebar } from '@/composables/useMemoriesSidebar'
 import { useNoteEditorSave } from '@/composables/useNoteEditorSave'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useWorkspaceStore } from '@/stores/workspace'
+
+type MemoryScope = 'all' | 'global' | 'workspace'
 
 const store = useKnowledgeStore()
+const workspaceStore = useWorkspaceStore()
 const toast = useToast()
 const queryCache = useQueryCache()
 const route = useRoute()
@@ -32,12 +36,22 @@ const { sidebarCollapsed, toggleSidebar } = useMemoriesSidebar()
 
 const isSyncingFromUrl = ref(false)
 const isSyncingToUrl = ref(false)
+const memoryScope = ref<MemoryScope>('all')
 
 const selectedTagId = computed(() => store.selectedTagId)
+
+const workspaceQueryPath = computed<string | undefined>(() => {
+  if (memoryScope.value === 'global')
+    return 'global'
+  if (memoryScope.value === 'workspace' && workspaceStore.currentWorkspacePath)
+    return workspaceStore.currentWorkspacePath
+  return undefined
+})
 
 const { data: notesList, isPending: isNotesLoading } = useNotesListQuery(
   computed(() => null),
   selectedTagId,
+  workspaceQueryPath,
 )
 const { data: searchResults, isPending: isSearchLoading } = useSearchNotesQuery(
   computed(() => store.searchQuery),
@@ -102,6 +116,9 @@ async function handlePublish(data: { editorState: Record<string, unknown>, conte
     const note = await api.createNote({
       content: data.content,
       editorState: data.editorState,
+      workspacePath: memoryScope.value === 'workspace' && workspaceStore.currentWorkspacePath
+        ? workspaceStore.currentWorkspacePath
+        : null,
     })
     queryCache.setQueryData(['note', note.id], note)
     queryCache.invalidateQueries({ key: ['notes'] })
@@ -334,9 +351,9 @@ onKeyStroke('Escape', () => {
 
       <!-- Center: composer + card stream -->
       <div class="flex-1 flex flex-col min-w-0 h-full">
-        <div class="flex-shrink-0 h-10 flex items-center px-3 border-b border-border/50 font-mono">
+        <div class="flex-shrink-0 h-10 flex items-center px-3 border-b border-border/50 font-mono gap-3">
           <button
-            class="flex-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            class="flex-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors flex-shrink-0"
             :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
             @click="toggleSidebar"
           >
@@ -345,7 +362,37 @@ onKeyStroke('Escape', () => {
               :class="sidebarCollapsed ? 'i-carbon-side-panel-open' : 'i-carbon-side-panel-close'"
             />
           </button>
-          <span v-if="store.selectedTagId || activeTagPath" class="ml-2 text-xs text-muted-foreground">
+
+          <div class="flex items-center gap-0.5 font-sans">
+            <button
+              class="px-2 py-1 rounded text-xs transition-colors"
+              :class="memoryScope === 'all' ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
+              @click="memoryScope = 'all'"
+            >
+              全部
+            </button>
+            <button
+              class="px-2 py-1 rounded text-xs transition-colors"
+              :class="memoryScope === 'global' ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
+              @click="memoryScope = 'global'"
+            >
+              全局
+            </button>
+            <button
+              class="px-2 py-1 rounded text-xs transition-colors"
+              :class="[
+                memoryScope === 'workspace' ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+                !workspaceStore.isWorkspaceActive ? 'opacity-50 cursor-not-allowed' : '',
+              ]"
+              :disabled="!workspaceStore.isWorkspaceActive"
+              :title="workspaceStore.isWorkspaceActive ? workspaceStore.currentWorkspaceName : '请先选择工作空间'"
+              @click="workspaceStore.isWorkspaceActive && (memoryScope = 'workspace')"
+            >
+              工作空间
+            </button>
+          </div>
+
+          <span v-if="store.selectedTagId || activeTagPath" class="text-xs text-muted-foreground">
             #{{ store.selectedTagId ? tagsList.find(t => t.id === store.selectedTagId)?.name : activeTagPath }}
           </span>
         </div>

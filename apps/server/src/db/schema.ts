@@ -145,6 +145,8 @@ export const notes = sqliteTable('notes', {
   /** LLM-generated summary (reserved for future use, currently empty) */
   summary: text('summary'),
   folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+  /** null = 全局记忆，有值 = 工作空间维度记忆 */
+  workspacePath: text('workspace_path'),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -154,6 +156,7 @@ export const notes = sqliteTable('notes', {
 }, t => [
   index('idx_notes_folder_id').on(t.folderId),
   index('idx_notes_updated_at').on(t.updatedAt),
+  index('idx_notes_workspace_path').on(t.workspacePath),
 ])
 
 /** 标签 */

@@ -30,14 +30,14 @@ pnpm release 0.1.0
 
 脚本会依次：
 
-1. 将所有 `package.json`（根目录、packages/*、apps/*）的 `version` 设为指定版本  
-2. 使用 git-cliff 根据 Git 历史生成 `RELEASE_NOTES.md`（受 `cliff.toml` 配置影响）  
-3. **暂停**：提示你查看/编辑 `RELEASE_NOTES.md`，确认后按 Enter 继续  
-4. 执行 `git add`（含 `RELEASE_NOTES.md` 与各 `package.json`）、`git commit`、`git tag vX.Y.Z`  
-5. 执行 `git push origin HEAD vX.Y.Z`，将提交与 tag 推送到远程  
-6. 执行 `pnpm build`，构建各包（供 npm 发布用）  
-7. 执行 `pnpm -r publish --no-git-checks`，将**未设置 "private": true** 的包发布到 npm（当前为 `@univedge/locus-agent-sdk`、`@univedge/locus-cli`）  
-8. 执行 `gh release create vX.Y.Z --notes-file RELEASE_NOTES.md`，创建 GitHub Release  
+1. 将所有 `package.json`（根目录、packages/*、apps/*）的 `version` 设为指定版本
+2. 使用 git-cliff 根据 Git 历史生成 `RELEASE_NOTES.md`（受 `cliff.toml` 配置影响）
+3. **暂停**：提示你查看/编辑 `RELEASE_NOTES.md`，确认后按 Enter 继续
+4. 执行 `git add`（含 `RELEASE_NOTES.md` 与各 `package.json`）、`git commit`、`git tag vX.Y.Z`
+5. 执行 `git push origin HEAD vX.Y.Z`，将提交与 tag 推送到远程
+6. 执行 `pnpm build`，构建各包（供 npm 发布用）
+7. 执行 `pnpm -r publish --no-git-checks`，将**未设置 "private": true** 的包发布到 npm（当前为 `@univedge/locus-agent-sdk`、`@univedge/locus-cli`）
+8. 执行 `gh release create vX.Y.Z --notes-file RELEASE_NOTES.md`，创建 GitHub Release
 
 `RELEASE_NOTES.md` 纳入版本库（会被 commit），作为当次发布的 Changelog 记录；你可在暂停步骤中修改后再继续。
 

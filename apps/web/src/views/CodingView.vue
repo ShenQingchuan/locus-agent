@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@univedge/locus-agent-sdk'
+import type { Conversation, MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import { useQueryCache } from '@pinia/colada'
-import { DirectoryBrowserModal, useToast } from '@univedge/locus-ui'
+import { useToast } from '@univedge/locus-ui'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'
@@ -19,27 +19,15 @@ import { provideMarkConversationDirty } from '@/composables/useDirtyConversation
 import { useGitStatus } from '@/composables/useGitStatus'
 import { useResizePanel } from '@/composables/useResizePanel'
 import { useChatStore } from '@/stores/chat'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { runWithLoadingState } from '@/utils/loadingState'
 import { createProjectKey } from '@/utils/projectKey'
-import { getWorkspaceDisplayName } from '@/utils/workspace'
 
 type CodingSection = 'planning' | 'workspace'
 
 const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')
-const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
-const initialWorkspacePath = lastWorkspacePath.value.trim()
-const currentProjectName = ref(getWorkspaceDisplayName(initialWorkspacePath))
-const currentProjectPath = ref(initialWorkspacePath)
-const isWorkspaceLoading = ref(false)
-const isWorkspacePickerOpen = ref(false)
-const isWorkspacePickerLoading = ref(false)
-const isWorkspacePathLoading = ref(false)
-const currentBrowsePath = ref(initialWorkspacePath)
-const browseEntries = ref<WorkspaceDirectoryEntry[]>([])
-const allBrowseEntries = ref<WorkspaceDirectoryEntry[]>([])
-const isBrowseTruncated = ref(false)
-let browseRequestToken = 0
 const currentProjectKey = ref<string | undefined>()
+const isWorkspaceLoading = ref(false)
 const kanbanBoardRef = ref<InstanceType<typeof KanbanBoard> | null>(null)
 const isHistoryOpen = ref(false)
 const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-collapsed', false)
@@ -47,8 +35,10 @@ const dirtyConversations = new Set<string>()
 
 const toast = useToast()
 const chatStore = useChatStore()
+const workspaceStore = useWorkspaceStore()
 const queryCache = useQueryCache()
 const isCodingViewActive = ref(true)
+const currentProjectPath = computed(() => workspaceStore.currentWorkspacePath)
 const gitStatus = useGitStatus(currentProjectPath, isCodingViewActive)
 
 const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
@@ -108,7 +98,7 @@ const {
 const codingScope = computed(() => ({
   space: 'coding' as const,
   projectKey: currentProjectKey.value,
-  workspaceRoot: currentProjectPath.value || undefined,
+  workspaceRoot: workspaceStore.currentWorkspacePath || undefined,
 }))
 
 const canUseAssistant = computed(() => !!currentProjectKey.value)
@@ -157,34 +147,23 @@ watch(() => chatStore.currentConversationId, (_newId, oldId) => {
   }
 })
 
-async function restoreWorkspaceFromLastPath() {
-  const savedPath = lastWorkspacePath.value.trim()
+async function initWorkspaceProjectKey() {
+  const savedPath = workspaceStore.currentWorkspacePath.trim()
   if (!savedPath) {
-    currentProjectName.value = '未选择工作空间'
-    currentProjectPath.value = ''
+    currentProjectKey.value = undefined
     return
   }
-
-  currentProjectName.value = getWorkspaceDisplayName(savedPath)
-  currentProjectPath.value = savedPath
-  currentBrowsePath.value = savedPath
 
   try {
     await runWithLoadingState(isWorkspaceLoading, async () => {
       const result = await workspaceApi.openWorkspace(savedPath)
       const projectKey = await createProjectKey(result.rootPath)
-      currentProjectName.value = result.rootName
-      currentProjectPath.value = result.rootPath
       currentProjectKey.value = projectKey
-      currentBrowsePath.value = result.rootPath
     })
   }
   catch {
-    lastWorkspacePath.value = ''
-    currentProjectName.value = '未选择工作空间'
-    currentProjectPath.value = ''
+    workspaceStore.closeWorkspace()
     currentProjectKey.value = undefined
-    currentBrowsePath.value = ''
   }
 }
 
@@ -201,9 +180,18 @@ function refreshCodingDataOnActivate() {
   queryCache.invalidateQueries({ key: getTasksListQueryKey(currentProjectKey.value) })
 }
 
+watch(() => workspaceStore.currentWorkspacePath, async (newPath) => {
+  if (newPath.trim()) {
+    await initWorkspaceProjectKey()
+  }
+  else {
+    currentProjectKey.value = undefined
+  }
+})
+
 onMounted(async () => {
   await chatStore.loadModelSettings()
-  await restoreWorkspaceFromLastPath()
+  await initWorkspaceProjectKey()
 })
 
 onActivated(async () => {
@@ -215,8 +203,8 @@ onActivated(async () => {
     return
   }
 
-  if (!currentProjectKey.value && lastWorkspacePath.value.trim() && !isWorkspaceLoading.value) {
-    await restoreWorkspaceFromLastPath()
+  if (!currentProjectKey.value && workspaceStore.currentWorkspacePath.trim() && !isWorkspaceLoading.value) {
+    await initWorkspaceProjectKey()
   }
 
   refreshCodingDataOnActivate()
@@ -225,145 +213,6 @@ onActivated(async () => {
 onDeactivated(() => {
   isCodingViewActive.value = false
 })
-
-function filterDirectoryEntries(entries: WorkspaceDirectoryEntry[], keyword: string): WorkspaceDirectoryEntry[] {
-  const query = keyword.trim().toLowerCase()
-  if (!query) {
-    return entries
-  }
-  return entries.filter(entry => entry.name.toLowerCase().includes(query))
-}
-
-function splitInputPath(inputPath: string): { browsePath: string, keyword: string } {
-  const trimmed = inputPath.trim()
-  if (!trimmed) {
-    return { browsePath: '', keyword: '' }
-  }
-
-  const normalized = trimmed.endsWith('/')
-    ? trimmed.slice(0, -1)
-    : trimmed
-
-  if (trimmed.endsWith('/')) {
-    return { browsePath: normalized || '/', keyword: '' }
-  }
-
-  const slashIndex = normalized.lastIndexOf('/')
-  if (slashIndex <= 0) {
-    return { browsePath: normalized, keyword: '' }
-  }
-
-  return {
-    browsePath: normalized.slice(0, slashIndex),
-    keyword: normalized.slice(slashIndex + 1),
-  }
-}
-
-async function loadBrowseEntries(path: string, options: { silent?: boolean, keyword?: string } = {}) {
-  if (!path) {
-    return
-  }
-
-  const token = ++browseRequestToken
-
-  try {
-    await runWithLoadingState(isWorkspacePathLoading, async () => {
-      const result = await workspaceApi.fetchWorkspaceDirectories(path)
-
-      if (token !== browseRequestToken) {
-        return
-      }
-
-      currentBrowsePath.value = result.path
-      allBrowseEntries.value = result.entries
-      browseEntries.value = filterDirectoryEntries(result.entries, options.keyword || '')
-      isBrowseTruncated.value = result.truncated
-    })
-  }
-  catch (error) {
-    if (!options.silent) {
-      toast.error(error instanceof Error ? error.message : '加载目录失败')
-    }
-  }
-}
-
-function handlePathInput(path: string) {
-  const { browsePath, keyword } = splitInputPath(path)
-  if (!browsePath) {
-    return
-  }
-
-  if (currentBrowsePath.value === browsePath && allBrowseEntries.value.length > 0) {
-    browseEntries.value = filterDirectoryEntries(allBrowseEntries.value, keyword)
-    return
-  }
-
-  loadBrowseEntries(browsePath, { silent: true, keyword })
-}
-
-async function openWorkspacePicker() {
-  isWorkspacePickerOpen.value = true
-
-  try {
-    await runWithLoadingState(isWorkspacePickerLoading, async () => {
-      const result = await workspaceApi.fetchWorkspaceRoots()
-      const nextPath = currentBrowsePath.value || result.defaultPath || result.roots[0]?.path || ''
-      if (nextPath) {
-        await loadBrowseEntries(nextPath)
-      }
-    })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '加载工作空间根目录失败')
-  }
-}
-
-function closeWorkspacePicker() {
-  isWorkspacePickerOpen.value = false
-}
-
-async function openCurrentBrowsePathAsWorkspace() {
-  if (!currentBrowsePath.value) {
-    return
-  }
-
-  try {
-    await runWithLoadingState(isWorkspaceLoading, async () => {
-      const result = await workspaceApi.openWorkspace(currentBrowsePath.value)
-      const projectKey = await createProjectKey(result.rootPath)
-      currentProjectName.value = result.rootName
-      currentProjectPath.value = result.rootPath
-      currentProjectKey.value = projectKey
-      lastWorkspacePath.value = result.rootPath
-      activeSection.value = 'workspace'
-      isWorkspacePickerOpen.value = false
-      isHistoryOpen.value = false
-    })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '打开工作空间失败')
-  }
-}
-
-function goToParentBrowsePath() {
-  if (!currentBrowsePath.value) {
-    return
-  }
-
-  const normalized = currentBrowsePath.value.endsWith('/')
-    ? currentBrowsePath.value.slice(0, -1)
-    : currentBrowsePath.value
-  const index = normalized.lastIndexOf('/')
-
-  if (index <= 0) {
-    return
-  }
-
-  const parentPath = normalized.slice(0, index)
-  if (parentPath) {
-    loadBrowseEntries(parentPath)
-  }
-}
 
 async function handleSend(payload: { content: string, attachments: MessageImageAttachment[] }) {
   if ((!payload.content.trim() && payload.attachments.length === 0) || !canUseAssistant.value)
@@ -629,19 +478,15 @@ watch(manageKanbanResultCount, (current, previous) => {
           <!-- Normal content -->
           <template v-else>
             <header class="h-11 border-b border-border px-4 flex items-center justify-between">
-              <button
-                class="min-w-0 inline-flex items-center gap-2 rounded px-2 py-1 transition-colors hover:bg-muted"
-                @click="openWorkspacePicker"
-              >
+              <div class="min-w-0 inline-flex items-center gap-2 px-2 py-1">
                 <span class="i-material-symbols:folder-managed h-4 w-4 flex-none text-muted-foreground" />
-                <span class="text-sm text-foreground/90 whitespace-nowrap">工作空间</span>
                 <span
-                  class="max-w-[28rem] truncate text-xs font-sans text-muted-foreground"
-                  :title="currentProjectName"
+                  class="max-w-[28rem] truncate text-sm font-sans text-muted-foreground"
+                  :title="workspaceStore.currentWorkspacePath"
                 >
-                  {{ currentProjectName }}
+                  {{ workspaceStore.currentWorkspaceName }}
                 </span>
-              </button>
+              </div>
 
               <button
                 v-if="activeSection === 'planning'"
@@ -691,7 +536,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                   <div class="text-center">
                     <span class="i-material-symbols:folder-managed-outline h-8 w-8 text-muted-foreground/50 mx-auto block mb-2" />
                     <span class="text-sm text-muted-foreground block">请先选择工作空间</span>
-                    <span class="text-xs text-muted-foreground/80 block mt-1">点击左侧「工作空间」打开项目</span>
+                    <span class="text-xs text-muted-foreground/80 block mt-1">点击左下角文件夹图标打开项目</span>
                   </div>
                 </div>
               </section>
@@ -833,7 +678,7 @@ watch(manageKanbanResultCount, (current, previous) => {
                 :is-streaming="chatStore.isStreaming"
                 :show-bottom-hint="false"
                 show-coding-mode
-                :workspace-root="currentProjectPath || undefined"
+                :workspace-root="workspaceStore.currentWorkspacePath || undefined"
                 disabled-placeholder="请选择工作空间后开始项目内对话。"
                 @send="handleSend"
                 @stop="handleStop"
@@ -844,19 +689,4 @@ watch(manageKanbanResultCount, (current, previous) => {
       </div>
     </div>
   </div>
-
-  <DirectoryBrowserModal
-    :open="isWorkspacePickerOpen"
-    :current-path="currentBrowsePath"
-    :entries="browseEntries"
-    :loading="isWorkspacePickerLoading || isWorkspacePathLoading"
-    :truncated="isBrowseTruncated"
-    :confirm-loading="isWorkspaceLoading"
-    @close="closeWorkspacePicker"
-    @refresh="loadBrowseEntries(currentBrowsePath)"
-    @go-parent="goToParentBrowsePath"
-    @navigate="loadBrowseEntries"
-    @submit-path="handlePathInput"
-    @confirm="openCurrentBrowsePathAsWorkspace"
-  />
 </template>

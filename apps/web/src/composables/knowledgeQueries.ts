@@ -5,17 +5,19 @@ import * as api from '@/api/knowledge'
 const STALE_TIME = 30_000 // 30s 内相同 key 不重复请求
 
 /**
- * 笔记列表查询（按 folder/tag 过滤，带缓存）
+ * 笔记列表查询（按 folder/tag/workspace 过滤，带缓存）
  */
 export function useNotesListQuery(
   folderId: ComputedRef<string | null>,
   tagId: ComputedRef<string | null>,
+  workspacePath?: ComputedRef<string | undefined>,
 ) {
   return useQuery({
-    key: () => ['notes', folderId.value, tagId.value],
+    key: () => ['notes', folderId.value, tagId.value, workspacePath?.value ?? null],
     query: () => api.fetchNotes({
       folderId: folderId.value,
       tagId: tagId.value ?? undefined,
+      workspacePath: workspacePath?.value,
     }),
     staleTime: STALE_TIME,
   })

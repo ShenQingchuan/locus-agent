@@ -2,6 +2,7 @@
 import { useDark, useToggle } from '@vueuse/core'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import WorkspacePopover from '@/components/layout/WorkspacePopover.vue'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 
 const router = useRouter()
@@ -94,6 +95,9 @@ const navItems: NavItem[] = [
 
     <!-- Bottom actions -->
     <div class="flex flex-col items-center gap-1 pb-3">
+      <!-- Workspace -->
+      <WorkspacePopover />
+
       <!-- Theme toggle -->
       <button
         class="flex-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors duration-150"

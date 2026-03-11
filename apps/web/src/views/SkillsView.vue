@@ -1,16 +1,12 @@
 <script setup lang="ts">
-import { DirectoryBrowserModal, FileTree, useToast } from '@univedge/locus-ui'
-import { useLocalStorage } from '@vueuse/core'
+import { FileTree } from '@univedge/locus-ui'
 import MarkdownRender from 'markstream-vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import * as workspaceApi from '@/api/workspace'
 import MonacoEditor from '@/components/code/MonacoEditor.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { useSkillsManager } from '@/composables/useSkillsManager'
-import { useWorkspacePicker } from '@/composables/useWorkspacePicker'
-import { runWithLoadingState } from '@/utils/loadingState'
-import { getWorkspaceDisplayName } from '@/utils/workspace'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 const sourceFilterOptions: Array<{ value: 'all' | 'system' | 'project', label: string }> = [
   { value: 'all', label: '所有' },
@@ -18,28 +14,11 @@ const sourceFilterOptions: Array<{ value: 'all' | 'system' | 'project', label: s
   { value: 'project', label: '工作空间' },
 ]
 
-const toast = useToast()
 const route = useRoute()
 const router = useRouter()
-const lastWorkspacePath = useLocalStorage('locus-agent:coding-last-workspace-path', '')
-const initialWorkspacePath = lastWorkspacePath.value.trim()
-const workspaceRootInput = ref(initialWorkspacePath)
-const currentWorkspaceName = ref(getWorkspaceDisplayName(initialWorkspacePath))
+const workspaceStore = useWorkspaceStore()
 
-const selectedWorkspaceRoot = computed(() => workspaceRootInput.value.trim() || undefined)
-
-const {
-  isWorkspacePickerOpen,
-  isWorkspacePickerLoading,
-  isWorkspacePathLoading,
-  currentBrowsePath,
-  browseEntries,
-  isBrowseTruncated,
-  loadBrowseEntries,
-  openWorkspacePicker,
-  goToParentBrowsePath,
-  closeWorkspacePicker,
-} = useWorkspacePicker({ initialPath: initialWorkspacePath })
+const selectedWorkspaceRoot = computed(() => workspaceStore.currentWorkspacePath.trim() || undefined)
 
 const {
   sourceFilter,
@@ -89,35 +68,6 @@ const {
   initialQueryFile: (route.query.file as string) || null,
 })
 
-// ---- Workspace display ----
-function updateWorkspaceDisplay(path?: string) {
-  const normalized = path?.trim() || ''
-  workspaceRootInput.value = normalized
-  currentBrowsePath.value = normalized
-  currentWorkspaceName.value = getWorkspaceDisplayName(normalized)
-}
-
-async function applyWorkspaceSelection(path: string) {
-  try {
-    await runWithLoadingState(isLoadingList, async () => {
-      const result = await workspaceApi.openWorkspace(path)
-      updateWorkspaceDisplay(result.rootPath)
-      lastWorkspacePath.value = result.rootPath
-      isWorkspacePickerOpen.value = false
-      await loadSkills()
-    })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '打开工作空间失败')
-  }
-}
-
-async function clearWorkspaceSelection() {
-  updateWorkspaceDisplay('')
-  lastWorkspacePath.value = ''
-  await loadSkills()
-}
-
 // ---- Route query sync ----
 function syncRouteQuery() {
   const query: Record<string, string> = {}
@@ -139,18 +89,9 @@ watch(selectedFilePath, () => {
   syncRouteQuery()
 })
 
-watch(lastWorkspacePath, (value) => {
-  if (!workspaceRootInput.value.trim()) {
-    updateWorkspaceDisplay(value)
-  }
-})
-
 watch(selectedWorkspaceRoot, () => {
   setupFileWatcher()
-})
-
-onMounted(() => {
-  updateWorkspaceDisplay(lastWorkspacePath.value)
+  loadSkills()
 })
 </script>
 
@@ -172,28 +113,6 @@ onMounted(() => {
               @click="startCreateSkill"
             >
               <span class="i-material-symbols:add h-4.5 w-4.5" />
-            </button>
-          </div>
-
-          <div class="flex items-center gap-1.5">
-            <button
-              class="min-w-0 inline-flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors hover:bg-muted"
-              @click="openWorkspacePicker"
-            >
-              <span class="i-material-symbols:folder-managed h-3.5 w-3.5 flex-none text-muted-foreground" />
-              <span
-                class="max-w-[9rem] truncate text-xs text-muted-foreground"
-                :title="currentWorkspaceName"
-              >
-                {{ currentWorkspaceName }}
-              </span>
-            </button>
-            <button
-              v-if="selectedWorkspaceRoot"
-              class="h-6 px-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
-              @click="clearWorkspaceSelection"
-            >
-              清除
             </button>
           </div>
 
@@ -447,21 +366,6 @@ onMounted(() => {
         </div>
       </aside>
     </main>
-
-    <DirectoryBrowserModal
-      v-model:open="isWorkspacePickerOpen"
-      title="选择工作空间"
-      :current-path="currentBrowsePath"
-      :entries="browseEntries"
-      :loading="isWorkspacePickerLoading || isWorkspacePathLoading"
-      :truncated="isBrowseTruncated"
-      @close="closeWorkspacePicker"
-      @refresh="loadBrowseEntries(currentBrowsePath)"
-      @go-parent="goToParentBrowsePath"
-      @navigate="loadBrowseEntries"
-      @submit-path="loadBrowseEntries"
-      @confirm="applyWorkspaceSelection(currentBrowsePath)"
-    />
   </div>
 </template>
 

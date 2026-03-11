@@ -17,12 +17,14 @@ export const notesRoutes = new Hono()
 notesRoutes.get('/', async (c) => {
   const folderId = c.req.query('folderId')
   const tagId = c.req.query('tagId')
+  const workspacePath = c.req.query('workspacePath')
   const limit = c.req.query('limit')
   const offset = c.req.query('offset')
 
   const result = await listNotes({
     folderId: folderId || undefined,
     tagId,
+    workspacePath: workspacePath || undefined,
     limit: limit ? Number.parseInt(limit) : undefined,
     offset: offset ? Number.parseInt(offset) : undefined,
   })
@@ -33,7 +35,7 @@ notesRoutes.get('/', async (c) => {
 // POST /api/notes - 创建笔记
 notesRoutes.post('/', async (c) => {
   const body = await c.req.json()
-  const { content, editorState, folderId, tagNames, conversationId } = body
+  const { content, editorState, folderId, tagNames, conversationId, workspacePath } = body
 
   const note = await createNote({
     content,
@@ -41,6 +43,7 @@ notesRoutes.post('/', async (c) => {
     folderId,
     tagNames,
     conversationId,
+    workspacePath,
   })
 
   return c.json(note, 201)

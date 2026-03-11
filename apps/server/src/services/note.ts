@@ -1,6 +1,6 @@
 import type { NewNote, Note, Tag } from '../db/schema.js'
 import consola from 'consola'
-import { count, desc, eq, inArray, like } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, like } from 'drizzle-orm'
 import { db, isVecAvailable } from '../db/index.js'
 import { noteConversations, notes, noteTags, tags } from '../db/schema.js'
 import { getOrCreateTag } from './tag.js'
@@ -64,6 +64,8 @@ export interface CreateNoteInput {
   tagNames?: string[]
   /** 关联的对话 ID（来源追踪） */
   conversationId?: string
+  /** null/undefined = 全局记忆，有值 = 工作空间维度记忆 */
+  workspacePath?: string | null
 }
 
 export interface UpdateNoteInput {
@@ -87,6 +89,7 @@ export async function createNote(input: CreateNoteInput): Promise<NoteWithTags> 
     content: input.content ?? '',
     editorState: input.editorState ?? null,
     folderId: input.folderId ?? null,
+    workspacePath: input.workspacePath ?? null,
     createdAt: now,
     updatedAt: now,
   }
@@ -144,17 +147,24 @@ export async function getNoteWithTags(id: string): Promise<NoteWithTags | null> 
 export async function listNotes(options?: {
   folderId?: string | null
   tagId?: string
+  /** 'global' = 仅全局, 路径字符串 = 仅该工作空间, undefined = 不过滤 */
+  workspacePath?: string | 'global'
   limit?: number
   offset?: number
 }): Promise<NoteWithTags[]> {
-  let query = db.select().from(notes)
+  const conditions = []
 
-  // 按文件夹过滤（folderId 为 undefined 表示不过滤 = 全部笔记）
   if (options?.folderId !== undefined && options.folderId !== null) {
-    query = query.where(eq(notes.folderId, options.folderId)) as any
+    conditions.push(eq(notes.folderId, options.folderId))
   }
 
-  // 按标签过滤
+  if (options?.workspacePath === 'global') {
+    conditions.push(isNull(notes.workspacePath))
+  }
+  else if (options?.workspacePath) {
+    conditions.push(eq(notes.workspacePath, options.workspacePath))
+  }
+
   if (options?.tagId) {
     const noteIdsWithTag = await db
       .select({ noteId: noteTags.noteId })
@@ -165,7 +175,12 @@ export async function listNotes(options?: {
     if (ids.length === 0)
       return []
 
-    query = query.where(inArray(notes.id, ids)) as any
+    conditions.push(inArray(notes.id, ids))
+  }
+
+  let query = db.select().from(notes)
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any
   }
 
   const result = await (query as any)
@@ -173,7 +188,6 @@ export async function listNotes(options?: {
     .limit(options?.limit ?? 100)
     .offset(options?.offset ?? 0)
 
-  // 为每个笔记附加标签
   const notesWithTags: NoteWithTags[] = []
   for (const note of result) {
     const noteTags_ = await getNoteTags(note.id)

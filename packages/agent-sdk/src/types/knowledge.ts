@@ -24,6 +24,8 @@ export interface Note {
   /** LLM-generated summary (reserved for future use, currently empty) */
   summary?: string | null
   folderId: string | null
+  /** null = 全局记忆，有值 = 工作空间维度记忆 */
+  workspacePath?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -39,6 +41,7 @@ export interface CreateNoteInput {
   tagNames?: string[]
   conversationId?: string
   pinned?: boolean
+  workspacePath?: string | null
 }
 
 export interface UpdateNoteInput {

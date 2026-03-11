@@ -162,10 +162,12 @@ async function runRead(args: { query?: string, tags?: string[] }): Promise<Manag
  *
  * @param args - Tool arguments (discriminated by action)
  * @param conversationId - Optional conversation ID for create provenance
+ * @param workspacePath - Optional workspace path for workspace-scoped memories
  */
 export async function executeManageMemory(
   args: ManageMemoryInput,
   conversationId?: string,
+  workspacePath?: string,
 ): Promise<ManageMemoryResult> {
   switch (args.action) {
     case 'create': {
@@ -175,6 +177,7 @@ export async function executeManageMemory(
           content: mem.content,
           tagNames: mem.tags,
           conversationId,
+          workspacePath: workspacePath || null,
         })
         created.push({
           id: note.id,
