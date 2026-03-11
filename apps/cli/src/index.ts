@@ -13,6 +13,7 @@ import {
   saveLLMSettings,
   setSetting,
 } from '@univedge/locus-server/settings'
+import { version } from '../package.json'
 import { getLogPath, getMigrationsFolder, getPidPath, getWebDistDir } from './paths.js'
 import { startServer } from './server.js'
 import { runSetup } from './setup/interactive.js'
@@ -200,7 +201,7 @@ async function handleConfig(): Promise<void> {
 }
 
 function handleVersion(): void {
-  console.log('locus-agent v0.1.0')
+  console.log(`locus-agent v${version}`)
 }
 
 function handleHelp(): void {
