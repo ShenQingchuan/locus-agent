@@ -183,6 +183,8 @@ function cancelEditingTitle() {
 
 // Save title manually
 async function saveTitle() {
+  if (isGeneratingTitle.value)
+    return
   const conversationId = chatStore.currentConversationId
   if (!conversationId)
     return
@@ -274,9 +276,9 @@ async function handleGenerateTitle() {
               class="btn-ghost btn-icon flex-shrink-0"
               :class="{ 'opacity-50 pointer-events-none': isGeneratingTitle }"
               title="智能生成标题"
-              @click="handleGenerateTitle"
+              @mousedown.prevent="handleGenerateTitle"
             >
-              <div v-if="isGeneratingTitle" class="i-svg-spinners:ring-resize h-4 w-4" />
+              <div v-if="isGeneratingTitle" class="i-svg-spinners:90-ring-with-bg h-4 w-4" />
               <div v-else class="i-streamline-plump:magic-wand-1-remix h-4 w-4" />
             </button>
           </div>

@@ -571,6 +571,7 @@ export const useChatStore = defineStore('chat', () => {
     stopGeneration,
     saveEditMessage: saveEditedMessage,
     retryFromMessage,
+    deleteMessagesFrom,
   } = messaging
 
   function startPlanExecution(filename: string, content: string) {
@@ -824,6 +825,7 @@ export const useChatStore = defineStore('chat', () => {
     startEditMessage,
     cancelEditMessage,
     saveEditMessage,
+    deleteMessagesFrom,
     generateTitle,
     updateTitle,
   }

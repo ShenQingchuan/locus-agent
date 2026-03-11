@@ -3,10 +3,10 @@ import type { ImageAttachmentStripItem } from '@univedge/locus-ui'
 import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
 import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
-import { ImageAttachmentStrip, Tooltip, useToast } from '@univedge/locus-ui'
+import { ImageAttachmentStrip, Modal, Tooltip, useToast } from '@univedge/locus-ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
@@ -127,6 +127,37 @@ async function handleRetry() {
 
 function handleEdit() {
   chatStore.startEditMessage(props.message.id)
+}
+
+// 删除确认对话框状态
+const showDeleteConfirm = ref(false)
+const isDeleting = ref(false)
+
+function handleDeleteClick() {
+  showDeleteConfirm.value = true
+}
+
+function handleCancelDelete() {
+  showDeleteConfirm.value = false
+}
+
+async function handleConfirmDelete() {
+  if (isDeleting.value)
+    return
+  isDeleting.value = true
+  try {
+    const success = await chatStore.deleteMessagesFrom(props.message.id)
+    if (success) {
+      toast.success('消息已删除')
+    }
+    else {
+      toast.error('删除消息失败')
+    }
+  }
+  finally {
+    isDeleting.value = false
+    showDeleteConfirm.value = false
+  }
 }
 
 const displayParts = computed<MessagePart[]>(() => {
@@ -308,6 +339,15 @@ const { copy, copied } = useClipboard()
           >
             <div :class="copied ? 'i-carbon-checkmark' : 'i-carbon-copy'" class="h-3 w-3" />
           </button>
+          <!-- 删除按钮 -->
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+            title="删除此消息及之后所有消息"
+            :disabled="chatStore.isLoading || isDeleting"
+            @click="handleDeleteClick"
+          >
+            <div class="i-carbon-trash-can h-3 w-3" />
+          </button>
         </div>
 
         <div class="mt-1">
@@ -361,6 +401,15 @@ const { copy, copied } = useClipboard()
             @click="copy(fullTextContent)"
           >
             <div :class="copied ? 'i-carbon-checkmark' : 'i-carbon-copy'" class="h-3 w-3" />
+          </button>
+          <!-- 删除按钮 -->
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+            title="删除此消息及之后所有消息"
+            :disabled="chatStore.isLoading || isDeleting"
+            @click="handleDeleteClick"
+          >
+            <div class="i-carbon-trash-can h-3 w-3" />
           </button>
         </div>
 
@@ -430,5 +479,48 @@ const { copy, copied } = useClipboard()
         </div>
       </div>
     </template>
+
+    <!-- Delete confirmation modal -->
+    <Modal
+      :open="showDeleteConfirm"
+      max-width="max-w-sm"
+      panel-class="rounded-lg border-white/10 shadow-2xl"
+      confirm-on-enter
+      @close="handleCancelDelete"
+      @confirm="handleConfirmDelete"
+    >
+      <!-- Content -->
+      <div class="p-4 space-y-3">
+        <div class="flex items-start gap-2.5">
+          <div class="i-carbon-warning-alt text-3xl text-destructive flex-shrink-0 mt-0.5" />
+          <p class="text-sm text-muted-foreground leading-snug">
+            此操作将删除该消息及其之后的所有消息，<br>
+            且无法撤销。确定要删除吗？
+          </p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <button
+            class="px-2.5 py-1 text-xs font-medium rounded border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors duration-150"
+            :disabled="isDeleting"
+            @click="handleCancelDelete"
+          >
+            取消
+          </button>
+          <button
+            class="px-2.5 py-1 text-xs font-medium rounded bg-destructive hover:bg-destructive/90 text-white transition-colors duration-150 disabled:opacity-50"
+            :disabled="isDeleting"
+            @click="handleConfirmDelete"
+          >
+            <span v-if="isDeleting" class="flex items-center gap-1">
+              <div class="i-carbon-circle-dash animate-spin h-3 w-3" />
+              删除中...
+            </span>
+            <span v-else>删除</span>
+          </button>
+        </div>
+      </div>
+    </Modal>
   </article>
 </template>

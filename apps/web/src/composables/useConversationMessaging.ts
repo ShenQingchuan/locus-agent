@@ -10,9 +10,12 @@ import { streamAssistantReply } from '@/composables/useAssistantStreaming'
 interface RuntimeState {
   messages: Message[]
   isLoading: boolean
+  error: { code: string, message: string } | null
   currentStreamingMessageId: string | null
   messageQueue: Array<{ id: string, content: string, attachments?: MessageImageAttachment[] }>
   isProcessingQueue: boolean
+  pendingApprovals: Map<string, unknown>
+  pendingQuestions: Map<string, unknown>
 }
 
 export interface SendMessageOptions {
@@ -360,6 +363,40 @@ export function createConversationMessagingActions(options: CreateConversationMe
     return conversationId
   }
 
+  async function deleteMessagesFrom(messageId: string): Promise<boolean> {
+    const conversationId = options.currentConversationId.value
+    if (!conversationId) {
+      console.warn('[deleteMessagesFrom] 没有活动的会话')
+      return false
+    }
+
+    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) {
+      console.warn('[deleteMessagesFrom] 未找到消息:', messageId)
+      return false
+    }
+
+    const historyBeforeDelete = runtimeState.messages.slice(0, messageIndex)
+    const backendKeepCount = computeBackendKeepCount(historyBeforeDelete)
+
+    // 先截断后端消息
+    await truncateMessages(conversationId, backendKeepCount)
+
+    // 再更新前端状态
+    runtimeState.messages = historyBeforeDelete
+
+    // 清理相关状态
+    runtimeState.error = null
+    runtimeState.currentStreamingMessageId = null
+    runtimeState.isLoading = false
+    runtimeState.pendingApprovals.clear()
+    runtimeState.pendingQuestions.clear()
+    runtimeState.isProcessingQueue = false
+
+    return true
+  }
+
   return {
     sendMessage,
     processMessageQueue,
@@ -368,5 +405,6 @@ export function createConversationMessagingActions(options: CreateConversationMe
     stopGeneration,
     saveEditMessage,
     retryFromMessage,
+    deleteMessagesFrom,
   }
 }

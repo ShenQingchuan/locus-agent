@@ -189,6 +189,7 @@ export interface AssistantRuntimeManager {
   addPendingQuestion: (question: PendingQuestion, conversationId?: string | null) => void
   removePendingQuestion: (toolCallId: string, conversationId?: string | null) => void
   clearMessages: (conversationId?: string | null) => void
+  deleteMessagesFrom: (messageId: string, conversationId?: string | null) => boolean
   setLoading: (loading: boolean, conversationId?: string | null) => void
   setError: (err: AssistantError, conversationId?: string | null) => void
   clearError: (conversationId?: string | null) => void
@@ -733,6 +734,32 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
     runtimeState.isProcessingQueue = false
   }
 
+  function deleteMessagesFrom(messageId: string, conversationId: string | null = options.currentConversationId.value): boolean {
+    const runtimeState = getConversationRuntimeState(conversationId)
+    const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
+
+    if (messageIndex === -1) {
+      console.warn('[deleteMessagesFrom] 未找到消息:', messageId)
+      return false
+    }
+
+    // 删除该位置及之后的所有消息
+    runtimeState.messages = runtimeState.messages.slice(0, messageIndex)
+
+    // 清理相关的待办任务（因为它们可能依赖于被删除的消息）
+    runtimeState.todoTasks = []
+
+    // 清空相关状态
+    runtimeState.error = null
+    runtimeState.currentStreamingMessageId = null
+    runtimeState.isLoading = false
+    runtimeState.pendingApprovals.clear()
+    runtimeState.pendingQuestions.clear()
+    runtimeState.isProcessingQueue = false
+
+    return true
+  }
+
   function setLoading(loading: boolean, conversationId: string | null = options.currentConversationId.value) {
     getConversationRuntimeState(conversationId).isLoading = loading
   }
@@ -777,6 +804,7 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
     addPendingQuestion,
     removePendingQuestion,
     clearMessages,
+    deleteMessagesFrom,
     setLoading,
     setError,
     clearError,

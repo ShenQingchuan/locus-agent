@@ -11,17 +11,21 @@ const props = withDefaults(defineProps<{
   closeOnBackdrop?: boolean
   /** Whether pressing ESC should close the modal */
   closeOnEsc?: boolean
+  /** Whether pressing Enter should trigger confirm */
+  confirmOnEnter?: boolean
   /** Additional class for the modal panel */
   panelClass?: string
 }>(), {
   maxWidth: 'max-w-md',
   closeOnBackdrop: true,
   closeOnEsc: true,
+  confirmOnEnter: false,
   panelClass: '',
 })
 
 const emit = defineEmits<{
   close: []
+  confirm: []
 }>()
 
 function handleClose() {
@@ -38,6 +42,14 @@ onKeyStroke('Escape', (e) => {
   if (props.open && props.closeOnEsc) {
     e.preventDefault()
     handleClose()
+  }
+})
+
+// Enter key to confirm
+onKeyStroke('Enter', (e) => {
+  if (props.open && props.confirmOnEnter) {
+    e.preventDefault()
+    emit('confirm')
   }
 })
 
