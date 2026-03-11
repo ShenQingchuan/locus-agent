@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Release 脚本：统一版本号、生成 Changelog、打 tag、推送、构建、发布 npm、创建 GitHub Release。
+ * Release 脚本：统一版本号、生成 CHANGELOG.md 与 RELEASE_NOTES.md、打 tag、推送、构建、发布 npm、创建 GitHub Release。
  *
  * 依赖：git-cliff、GitHub CLI (gh) 已登录、远程 origin 已配置、已登录 npm（npm login）。
  * 仅会发布 package.json 中未设置 "private": true 的包（当前为 @univedge/locus-agent-sdk、@univedge/locus-cli）。
@@ -74,28 +74,23 @@ function bumpVersions(): void {
   }
 }
 
-function generateChangelog(): void {
-  const outFile = join(root, 'RELEASE_NOTES.md')
+const RE_VERSION_TITLE = /^## \[[^\]\n]+\][^\n]*\n+/
 
-  // 只生成尚未 tag 的新提交的 changelog，并标记为当前版本
+/** 步骤 2：用 git-cliff 生成 RELEASE_NOTES.md（仅当前版本内容，不含版本标题），供用户审阅 */
+function generateReleaseNotes(): void {
+  const releaseNotesFile = join(root, 'RELEASE_NOTES.md')
+
   const newChangelog = execSync(`pnpm exec git cliff --unreleased --tag ${tag}`, {
     cwd: root,
     encoding: 'utf-8',
   })
 
-  // 读取现有的历史 changelog（如果存在）
-  let existingChangelog = ''
-  if (existsSync(outFile)) {
-    existingChangelog = readFileSync(outFile, 'utf-8')
-  }
-
-  // 新内容插入顶部，保留原有历史
-  const combined = existingChangelog
-    ? `${newChangelog.trimEnd()}\n\n${existingChangelog}`
-    : newChangelog
-
-  writeFileSync(outFile, combined)
-  console.log(`  Changelog prepended to RELEASE_NOTES.md`)
+  // 去掉 "## [x.y.z] - yyyy-mm-dd" 标题行，只保留分类内容
+  const releaseNotes = newChangelog
+    .replace(RE_VERSION_TITLE, '')
+    .trim()
+  writeFileSync(releaseNotesFile, `${releaseNotes}\n`)
+  console.log(`  Release notes written to RELEASE_NOTES.md`)
 }
 
 /** 暂停：等待用户查看/编辑 RELEASE_NOTES.md 后按 Enter 继续 */
@@ -111,12 +106,32 @@ function waitForReview(): Promise<void> {
   })
 }
 
+/** 步骤 4：将用户确认后的 RELEASE_NOTES.md 加上版本标题，插入 CHANGELOG.md 顶部 */
+function updateChangelog(): void {
+  const changelogFile = join(root, 'CHANGELOG.md')
+  const releaseNotesFile = join(root, 'RELEASE_NOTES.md')
+
+  const releaseNotes = readFileSync(releaseNotesFile, 'utf-8').trimEnd()
+  const today = new Date().toISOString().slice(0, 10)
+  const entry = `## [${version}] - ${today}\n\n${releaseNotes}`
+
+  let existing = ''
+  if (existsSync(changelogFile)) {
+    existing = readFileSync(changelogFile, 'utf-8')
+  }
+  const combined = existing
+    ? `${entry}\n\n${existing}`
+    : `${entry}\n`
+  writeFileSync(changelogFile, combined)
+  console.log(`  CHANGELOG.md updated`)
+}
+
 const RE_LEADING_DOT_SLASH = /^\.\//
 function gitCommitAndTag(): void {
   const files = packageJsonPaths.filter(p => existsSync(p))
     .map(p => p.replace(root, '.').replace(RE_LEADING_DOT_SLASH, ''))
     .join(' ')
-  execSync(`git add ${files} RELEASE_NOTES.md`, { cwd: root, stdio: 'inherit' })
+  execSync(`git add ${files} CHANGELOG.md`, { cwd: root, stdio: 'inherit' })
   execSync(`git commit -m "chore(release): ${tag}"`, { cwd: root, stdio: 'inherit' })
   execSync(`git tag ${tag}`, { cwd: root, stdio: 'inherit' })
   console.log(`  Committed and tagged ${tag}`)
@@ -152,8 +167,8 @@ async function main(): Promise<void> {
   console.log('1. Bumping versions in package.json...')
   bumpVersions()
 
-  console.log('\n2. Generating changelog (git-cliff)...')
-  generateChangelog()
+  console.log('\n2. Generating release notes (git-cliff)...')
+  generateReleaseNotes()
 
   console.log('\n3. 暂停：请查看/编辑 RELEASE_NOTES.md')
   await waitForReview()
@@ -163,19 +178,22 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log('\n4. Git commit and tag...')
+  console.log('\n4. Updating CHANGELOG.md...')
+  updateChangelog()
+
+  console.log('\n5. Git commit and tag...')
   gitCommitAndTag()
 
-  console.log('\n5. Push to origin (commit + tag)...')
+  console.log('\n6. Push to origin (commit + tag)...')
   pushCommitAndTag()
 
-  console.log('\n6. Build (for npm publish)...')
+  console.log('\n7. Build (for npm publish)...')
   buildPackages()
 
-  console.log('\n7. Publish to npm...')
+  console.log('\n8. Publish to npm...')
   publishToNpm()
 
-  console.log('\n8. Creating GitHub Release...')
+  console.log('\n9. Creating GitHub Release...')
   createGitHubRelease()
 
   console.log('\nDone.')

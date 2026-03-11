@@ -20,7 +20,7 @@ pnpm release:dry
 pnpm release:dry 0.2.0
 ```
 
-确认 `package.json` 版本与 `RELEASE_NOTES.md` 无误后，再执行正式发布：
+确认 `package.json` 版本与 `CHANGELOG.md` 无误后，再执行正式发布：
 
 ```bash
 pnpm release
@@ -31,19 +31,20 @@ pnpm release 0.1.0
 脚本会依次：
 
 1. 将所有 `package.json`（根目录、packages/*、apps/*）的 `version` 设为指定版本
-2. 使用 git-cliff 根据 Git 历史生成 `RELEASE_NOTES.md`（受 `cliff.toml` 配置影响）
+2. 使用 git-cliff 生成 `RELEASE_NOTES.md`（仅当前版本的变更内容，不含版本标题）
 3. **暂停**：提示你查看/编辑 `RELEASE_NOTES.md`，确认后按 Enter 继续
-4. 执行 `git add`（含 `RELEASE_NOTES.md` 与各 `package.json`）、`git commit`、`git tag vX.Y.Z`
-5. 执行 `git push origin HEAD vX.Y.Z`，将提交与 tag 推送到远程
-6. 执行 `pnpm build`，构建各包（供 npm 发布用）
-7. 执行 `pnpm -r publish --no-git-checks`，将**未设置 "private": true** 的包发布到 npm（当前为 `@univedge/locus-agent-sdk`、`@univedge/locus-cli`）
-8. 执行 `gh release create vX.Y.Z --notes-file RELEASE_NOTES.md`，创建 GitHub Release
+4. 将确认后的 `RELEASE_NOTES.md` 加上版本标题（`## [x.y.z] - yyyy-mm-dd`），插入 `CHANGELOG.md` 顶部
+5. 执行 `git add`（含 `CHANGELOG.md` 与各 `package.json`）、`git commit`、`git tag vX.Y.Z`
+6. 执行 `git push origin HEAD vX.Y.Z`，将提交与 tag 推送到远程
+7. 执行 `pnpm build`，构建各包（供 npm 发布用）
+8. 执行 `pnpm -r publish --no-git-checks`，将**未设置 "private": true** 的包发布到 npm（当前为 `@univedge/locus-agent-sdk`、`@univedge/locus-cli`）
+9. 执行 `gh release create vX.Y.Z --notes-file RELEASE_NOTES.md`，创建 GitHub Release
 
-`RELEASE_NOTES.md` 纳入版本库（会被 commit），作为当次发布的 Changelog 记录；你可在暂停步骤中修改后再继续。
+`CHANGELOG.md` 纳入版本库（会被 commit），作为累积的 Changelog 记录。`RELEASE_NOTES.md` 仅用于 GitHub Release 说明（不提交到 Git，已加入 `.gitignore`）；你只需在暂停步骤中审阅一次 `RELEASE_NOTES.md` 即可。
 
 ## 发布中断后的恢复
 
-若脚本在 **步骤 5～8** 任一步报错，而本地已有 release 提交和 tag，可按需补跑：
+若脚本在 **步骤 6～9** 任一步报错，而本地已有 release 提交和 tag，可按需补跑：
 
 ```bash
 # 仅未推送时
@@ -54,7 +55,7 @@ pnpm build
 pnpm -r publish --no-git-checks
 
 # 仅未建 GitHub Release 时
-gh release create v0.1.0 --notes-file RELEASE_NOTES.md
+gh release create v0.1.0 --notes-file RELEASE_NOTES.md  # 需先确认该文件仍存在
 ```
 
 若想放弃本次发布、撤销本地 commit 与 tag（未 push 时）：

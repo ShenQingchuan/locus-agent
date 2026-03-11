@@ -26,3 +26,6 @@ dist
 **/*.tsbuildinfo
 tmp/
 .opencode/
+
+# Release (ephemeral, generated per release for gh)
+RELEASE_NOTES.md

@@ -1,5 +1,7 @@
 # Locus Agent
 
+![NPM Version](https://img.shields.io/npm/v/%40univedge%2Flocus-cli)
+
 AI 智能助手，支持多模型接入与 MCP 工具扩展。
 
 ## 亮点
