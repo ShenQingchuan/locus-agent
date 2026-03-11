@@ -9,16 +9,30 @@ export type EmbeddingStatusType
     | 'error'
 
 export type EmbeddingProvider = 'zhipu' | 'local'
+export type EmbeddingLocalFamily = 'qwen' | 'bge'
+
+export interface EmbeddingSelection {
+  provider: EmbeddingProvider
+  label: string
+  modelId: string
+  source: string
+  dimensions: number
+  localFamily: EmbeddingLocalFamily | null
+}
 
 export interface EmbeddingStatus {
   status: EmbeddingStatusType
   error?: string
   indexedCount: number
-  /** Which provider built the current index (null = never indexed) */
-  indexedWith: EmbeddingProvider | null
+  /** Which model built the current index (null = never indexed) */
+  indexedWith: EmbeddingSelection | null
   vecAvailable: boolean
   embeddingConfigured: boolean
   provider: EmbeddingProvider
+  localFamily: EmbeddingLocalFamily
+  localModelLabel: string
+  localModelId: string
+  localModelSource: string
   localModelReady: boolean
   localModelFiles: { name: string, size: number }[]
   localRuntimeInstalled: boolean
@@ -122,6 +136,13 @@ export function setEmbeddingProvider(provider: EmbeddingProvider): Promise<Embed
   return request<EmbeddingStatus & { success: boolean }>('/provider', {
     method: 'POST',
     body: JSON.stringify({ provider }),
+  })
+}
+
+export function setLocalEmbeddingFamily(family: EmbeddingLocalFamily): Promise<EmbeddingStatus & { success: boolean }> {
+  return request<EmbeddingStatus & { success: boolean }>('/local-family', {
+    method: 'POST',
+    body: JSON.stringify({ family }),
   })
 }
 

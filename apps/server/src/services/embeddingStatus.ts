@@ -1,10 +1,19 @@
-import type { EmbeddingProvider } from './embedding.js'
+import type {
+  EmbeddingLocalFamily,
+  EmbeddingProvider,
+  EmbeddingSelection,
+} from './embedding.js'
 import type { ModelFileInfo } from './localEmbedding.js'
 import { isVecAvailable } from '../db/index.js'
 import { getSetting, setSetting } from '../settings/index.js'
-import { getEmbeddingProvider, isEmbeddingConfigured } from './embedding.js'
+import {
+  getActiveEmbeddingSelection,
+  getEmbeddingProvider,
+  getLocalEmbeddingModelFamily,
+  isEmbeddingConfigured,
+} from './embedding.js'
 import { isLocalDepsInstalled } from './localDeps.js'
-import { getLocalModelFiles, isLocalModelReady } from './localEmbedding.js'
+import { getLocalEmbeddingModel, getLocalModelFiles, isLocalModelReady } from './localEmbedding.js'
 import { getEmbeddingCount } from './vectorStore.js'
 
 // ==================== Types ====================
@@ -19,11 +28,15 @@ export interface EmbeddingStatus {
   status: EmbeddingStatusType
   error?: string
   indexedCount: number
-  /** Which provider was used to build the current index (null = never indexed) */
-  indexedWith: EmbeddingProvider | null
+  /** Which model was used to build the current index (null = never indexed) */
+  indexedWith: EmbeddingSelection | null
   vecAvailable: boolean
   embeddingConfigured: boolean
   provider: EmbeddingProvider
+  localFamily: EmbeddingLocalFamily
+  localModelLabel: string
+  localModelId: string
+  localModelSource: string
   localModelReady: boolean
   localModelFiles: ModelFileInfo[]
   /** Whether ONNX runtime deps are installed in the data directory */
@@ -38,15 +51,40 @@ const KEY_INDEXED_WITH = 'embedding.indexed_with'
 
 // ==================== Public API ====================
 
-export function getIndexedWith(): EmbeddingProvider | null {
+function getLegacyIndexedWith(provider: EmbeddingProvider): EmbeddingSelection {
+  return getActiveEmbeddingSelection(provider)
+}
+
+export function getIndexedWith(): EmbeddingSelection | null {
   const val = getSetting(KEY_INDEXED_WITH)
-  if (val === 'zhipu' || val === 'local')
-    return val
+  if (!val)
+    return null
+
+  try {
+    const parsed = JSON.parse(val) as Partial<EmbeddingSelection>
+    if (parsed.provider === 'zhipu' || parsed.provider === 'local') {
+      return {
+        provider: parsed.provider,
+        label: parsed.label || parsed.modelId || parsed.provider,
+        modelId: parsed.modelId || parsed.provider,
+        source: parsed.source || '',
+        dimensions: typeof parsed.dimensions === 'number' ? parsed.dimensions : 1024,
+        localFamily: parsed.provider === 'local' && (parsed.localFamily === 'qwen' || parsed.localFamily === 'bge')
+          ? parsed.localFamily
+          : null,
+      }
+    }
+  }
+  catch {
+    if (val === 'zhipu' || val === 'local')
+      return getLegacyIndexedWith(val)
+  }
+
   return null
 }
 
-export function setIndexedWith(provider: EmbeddingProvider): void {
-  setSetting(KEY_INDEXED_WITH, provider)
+export function setIndexedWith(selection: EmbeddingSelection): void {
+  setSetting(KEY_INDEXED_WITH, JSON.stringify(selection))
 }
 
 export function clearIndexedWith(): void {
@@ -57,6 +95,8 @@ export function getEmbeddingStatus(): EmbeddingStatus {
   const vecAvailable = isVecAvailable()
   const configured = isEmbeddingConfigured()
   const provider = getEmbeddingProvider()
+  const localFamily = getLocalEmbeddingModelFamily()
+  const localModel = getLocalEmbeddingModel()
 
   const transient = getSetting(KEY_TRANSIENT) as 'indexing' | 'error' | undefined
   const error = getSetting(KEY_ERROR) || undefined
@@ -86,6 +126,10 @@ export function getEmbeddingStatus(): EmbeddingStatus {
     vecAvailable,
     embeddingConfigured: configured,
     provider,
+    localFamily,
+    localModelLabel: localModel.label,
+    localModelId: localModel.modelId,
+    localModelSource: localModel.source,
     localModelReady: isLocalModelReady(),
     localModelFiles: getLocalModelFiles(),
     localRuntimeInstalled: isLocalDepsInstalled(),

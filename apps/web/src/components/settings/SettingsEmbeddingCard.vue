@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type {
+  EmbeddingLocalFamily,
   EmbeddingProvider,
   EmbeddingStatus,
 } from '@/api/embedding'
-import { useToast } from '@univedge/locus-ui'
+import { Select, useToast } from '@univedge/locus-ui'
 import { useThrottleFn } from '@vueuse/core'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useEmbeddingTasks } from '@/composables/useEmbeddingTasks'
@@ -21,6 +22,10 @@ const embeddingState = ref<EmbeddingStatus>({
   vecAvailable: true,
   embeddingConfigured: false,
   provider: 'zhipu',
+  localFamily: 'qwen',
+  localModelLabel: 'Qwen3-Embedding-0.6B',
+  localModelId: 'onnx-community/Qwen3-Embedding-0.6B-ONNX',
+  localModelSource: 'https://huggingface.co/onnx-community/Qwen3-Embedding-0.6B-ONNX',
   localModelReady: false,
   localModelFiles: [],
   localRuntimeInstalled: false,
@@ -62,21 +67,34 @@ function scrollInstallOutputToBottom() {
 // ---------------------------------------------------------------------------
 
 const activeProvider = computed(() => embeddingState.value.provider)
+const activeLocalFamily = computed(() => embeddingState.value.localFamily)
 
-const PROVIDER_LABELS: Record<EmbeddingProvider, string> = {
-  zhipu: '智谱 embedding-3',
-  local: 'Qwen3-Embedding-0.6B',
-}
+const LOCAL_FAMILY_OPTIONS: { value: EmbeddingLocalFamily, label: string }[] = [
+  { value: 'qwen', label: 'Qwen' },
+  { value: 'bge', label: 'BGE' },
+]
 
 const indexedWithLabel = computed(() => {
-  const p = embeddingState.value.indexedWith
-  return p ? PROVIDER_LABELS[p] : null
+  return embeddingState.value.indexedWith?.label ?? null
 })
 
-/** True when there are indexed notes from a DIFFERENT provider */
+const activeSelectionKey = computed(() => {
+  if (activeProvider.value === 'local')
+    return `local:${embeddingState.value.localModelId}`
+  return 'zhipu:embedding-3'
+})
+
+/** True when there are indexed notes from a DIFFERENT provider/model */
 const hasMismatchedIndex = computed(() => {
   const { indexedCount, indexedWith } = embeddingState.value
-  return indexedCount > 0 && indexedWith !== null && indexedWith !== activeProvider.value
+  if (indexedCount === 0 || !indexedWith)
+    return false
+
+  const indexedKey = indexedWith.provider === 'local'
+    ? `local:${indexedWith.modelId}`
+    : `zhipu:${indexedWith.modelId}`
+
+  return indexedKey !== activeSelectionKey.value
 })
 
 const embeddingStatusLabel = computed(() => {
@@ -126,6 +144,24 @@ async function switchProvider(provider: EmbeddingProvider) {
   try {
     const { setEmbeddingProvider } = await import('@/api/embedding')
     const result = await setEmbeddingProvider(provider)
+    embeddingState.value = result
+  }
+  catch (err) {
+    toast.error(`切换失败: ${err instanceof Error ? err.message : '未知错误'}`)
+  }
+  finally {
+    providerSwitching.value = false
+  }
+}
+
+async function switchLocalFamily(value: string) {
+  if ((value !== 'qwen' && value !== 'bge') || value === activeLocalFamily.value || providerSwitching.value)
+    return
+
+  providerSwitching.value = true
+  try {
+    const { setLocalEmbeddingFamily } = await import('@/api/embedding')
+    const result = await setLocalEmbeddingFamily(value)
     embeddingState.value = result
   }
   catch (err) {
@@ -289,13 +325,13 @@ onMounted(() => {
         @click="switchProvider('local')"
       >
         <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-foreground">Qwen3-Embedding-0.6B</span>
+          <span class="text-xs font-medium text-foreground">{{ embeddingState.localModelLabel }}</span>
           <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-500/80 font-medium">
             本地
           </span>
         </div>
         <div class="text-[11px] text-muted-foreground mt-0.5">
-          1024 维 · ONNX 离线推理
+          {{ embeddingState.localFamily === 'qwen' ? 'Qwen 系列' : 'BGE 系列' }} · ONNX 离线推理
         </div>
       </button>
     </div>
@@ -324,6 +360,39 @@ onMounted(() => {
 
         <!-- ==================== Local provider ==================== -->
         <template v-if="activeProvider === 'local'">
+          <div class="rounded-lg border border-border bg-muted/20 p-3 space-y-2.5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs font-medium text-foreground">
+                  本地嵌入模型
+                </div>
+                <div class="text-[11px] text-muted-foreground mt-0.5">
+                  切换模型后需要重新索引
+                </div>
+              </div>
+              <Select
+                :options="LOCAL_FAMILY_OPTIONS"
+                :model-value="activeLocalFamily"
+                placement="bottom-end"
+                size="sm"
+                trigger="click"
+                arrow-direction="down"
+                @update:model-value="switchLocalFamily"
+              />
+            </div>
+
+            <div class="rounded-md border border-border/70 bg-background/70 px-2.5 py-2 text-[11px] text-muted-foreground space-y-1">
+              <div>
+                <span class="text-foreground">模型 ID：</span>
+                <span class="font-mono break-all">{{ embeddingState.localModelId }}</span>
+              </div>
+              <div>
+                <span class="text-foreground">来源：</span>
+                <span class="break-all">{{ embeddingState.localModelSource }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Runtime not installed -->
           <template v-if="!embeddingState.localRuntimeInstalled && !runtimeInstalling">
             <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-start gap-1.5">
@@ -355,7 +424,7 @@ onMounted(() => {
           <template v-if="embeddingState.localRuntimeInstalled && !embeddingState.localModelReady && !modelDownloading">
             <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-start gap-1.5">
               <div class="i-carbon-information h-4 w-4 flex-shrink-0 text-muted-foreground" />
-              <span class="text-muted-foreground">需要下载模型文件到本地（约 700 MB）</span>
+              <span class="text-muted-foreground">需要下载 {{ embeddingState.localModelLabel }} 到本地，来源已记录；切换模型后请重新索引</span>
             </div>
             <button
               class="btn-primary btn-sm"
@@ -475,7 +544,7 @@ onMounted(() => {
         <div v-if="hasMismatchedIndex" class="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs flex items-start gap-1.5">
           <div class="i-carbon-warning-alt h-4 w-4 flex-shrink-0 text-amber-500" />
           <span class="text-muted-foreground">
-            已有索引由 <strong class="text-foreground">{{ indexedWithLabel }}</strong> 生成，当前模型不同，搜索结果可能不准确。请重新索引。
+            已有索引由 <strong class="text-foreground">{{ indexedWithLabel }}</strong> 生成，当前模型为 <strong class="text-foreground">{{ activeProvider === 'local' ? embeddingState.localModelLabel : '智谱 embedding-3' }}</strong>，搜索结果可能不准确。请重新索引。
           </span>
         </div>
 

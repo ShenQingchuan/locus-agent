@@ -1,20 +1,36 @@
+import type { LocalEmbeddingFamily } from './localEmbedding.js'
 import { embed, embedMany } from 'ai'
 import { createZhipu } from 'zhipu-ai-provider'
 import { getSetting, setSetting } from '../settings/index.js'
 import {
   embedBatchLocal,
+  embedQueryLocal,
   embedTextLocal,
+  getLocalEmbeddingFamily,
+  getLocalEmbeddingModel,
   isLocalModelReady,
+
+  setLocalEmbeddingFamily,
 } from './localEmbedding.js'
 
 // ==================== Constants ====================
 
 /**
- * Both Zhipu embedding-3 and Qwen3-Embedding-0.6B output 1024 dimensions
+ * Both Zhipu embedding-3 and the current local Qwen/BGE presets output 1024 dimensions.
  */
 export const EMBEDDING_DIM = 1024
 
 export type EmbeddingProvider = 'zhipu' | 'local'
+export type EmbeddingLocalFamily = LocalEmbeddingFamily
+
+export interface EmbeddingSelection {
+  provider: EmbeddingProvider
+  label: string
+  modelId: string
+  source: string
+  dimensions: number
+  localFamily: EmbeddingLocalFamily | null
+}
 
 // ==================== Provider settings ====================
 
@@ -24,6 +40,39 @@ export function getEmbeddingProvider(): EmbeddingProvider {
 
 export function setEmbeddingProvider(provider: EmbeddingProvider): void {
   setSetting('embedding.provider', provider)
+}
+
+export function getLocalEmbeddingModelFamily(): EmbeddingLocalFamily {
+  return getLocalEmbeddingFamily()
+}
+
+export function setLocalEmbeddingModelFamily(family: EmbeddingLocalFamily): void {
+  setLocalEmbeddingFamily(family)
+}
+
+export function getActiveEmbeddingSelection(
+  provider = getEmbeddingProvider(),
+): EmbeddingSelection {
+  if (provider === 'local') {
+    const model = getLocalEmbeddingModel()
+    return {
+      provider,
+      label: model.label,
+      modelId: model.modelId,
+      source: model.source,
+      dimensions: model.dimensions,
+      localFamily: model.family,
+    }
+  }
+
+  return {
+    provider,
+    label: '智谱 embedding-3',
+    modelId: 'embedding-3',
+    source: 'https://open.bigmodel.cn/',
+    dimensions: EMBEDDING_DIM,
+    localFamily: null,
+  }
 }
 
 // ==================== Zhipu ====================
@@ -48,7 +97,7 @@ function createEmbeddingModel() {
 // ==================== Unified API ====================
 
 /**
- * Whether the currently-selected embedding provider is ready to use
+ * Whether the currently-selected embedding provider is ready to use.
  */
 export function isEmbeddingConfigured(): boolean {
   const provider = getEmbeddingProvider()
@@ -58,7 +107,7 @@ export function isEmbeddingConfigured(): boolean {
 }
 
 /**
- * Embed a single text using the active provider
+ * Embed a single text using the active provider.
  */
 export async function embedText(text: string): Promise<Float32Array> {
   const provider = getEmbeddingProvider()
@@ -71,25 +120,17 @@ export async function embedText(text: string): Promise<Float32Array> {
   return new Float32Array(embedding)
 }
 
-/** Embed document/passage text (no instruction prefix) */
+/** Embed document/passage text (no instruction prefix). */
 export const embedPassage = embedText
 
 /**
- * Instruction prefix for Qwen3-Embedding query-side.
- * With last-token pooling the instruction tokens influence the final
- * representation via causal attention without polluting a mean average.
- */
-const QUERY_INSTRUCTION = 'Instruct: Given a search query, retrieve relevant notes that match the query\nQuery: '
-
-/**
- * Embed a search query — adds a task instruction for the local
- * Qwen3-Embedding model to improve retrieval discrimination.
+ * Embed a search query using the active provider.
  */
 export async function embedQuery(text: string): Promise<Float32Array> {
   const provider = getEmbeddingProvider()
 
   if (provider === 'local')
-    return embedTextLocal(`${QUERY_INSTRUCTION}${text}`)
+    return embedQueryLocal(text)
 
   const model = createEmbeddingModel()
   const { embedding } = await embed({ model, value: text })
@@ -97,7 +138,7 @@ export async function embedQuery(text: string): Promise<Float32Array> {
 }
 
 /**
- * Batch embed texts using the active provider
+ * Batch embed texts using the active provider.
  */
 export async function embedBatch(
   texts: string[],
@@ -108,7 +149,6 @@ export async function embedBatch(
   if (provider === 'local')
     return embedBatchLocal(texts, onProgress)
 
-  // Zhipu API path
   const model = createEmbeddingModel()
   const CHUNK_SIZE = 64
   const results: Float32Array[] = []
@@ -116,9 +156,8 @@ export async function embedBatch(
   for (let i = 0; i < texts.length; i += CHUNK_SIZE) {
     const chunk = texts.slice(i, i + CHUNK_SIZE)
     const { embeddings } = await embedMany({ model, values: chunk })
-    for (const emb of embeddings) {
+    for (const emb of embeddings)
       results.push(new Float32Array(emb))
-    }
     onProgress?.(results.length, texts.length)
   }
 

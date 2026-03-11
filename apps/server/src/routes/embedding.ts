@@ -1,10 +1,17 @@
-import type { EmbeddingProvider } from '../services/embedding.js'
+import type { EmbeddingLocalFamily, EmbeddingProvider } from '../services/embedding.js'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { db } from '../db/index.js'
 import { notes, noteTags, tags } from '../db/schema.js'
-import { embedBatch, getEmbeddingProvider, setEmbeddingProvider } from '../services/embedding.js'
+import {
+  embedBatch,
+  getActiveEmbeddingSelection,
+  getEmbeddingProvider,
+  getLocalEmbeddingModelFamily,
+  setEmbeddingProvider,
+  setLocalEmbeddingModelFamily,
+} from '../services/embedding.js'
 import {
   clearTransientStatus,
   getEmbeddingStatus,
@@ -58,6 +65,24 @@ embeddingRoutes.post('/provider', async (c) => {
   }
 
   setEmbeddingProvider(provider)
+  resetPipeline()
+
+  return c.json({ success: true, ...getEmbeddingStatus() })
+})
+
+embeddingRoutes.get('/local-family', (c) => {
+  return c.json({ family: getLocalEmbeddingModelFamily() })
+})
+
+embeddingRoutes.post('/local-family', async (c) => {
+  const body = await c.req.json<{ family: EmbeddingLocalFamily }>()
+  const family = body.family
+
+  if (family !== 'qwen' && family !== 'bge') {
+    return c.json({ error: 'Invalid local family. Must be "qwen" or "bge".' }, 400)
+  }
+
+  setLocalEmbeddingModelFamily(family)
   resetPipeline()
 
   return c.json({ success: true, ...getEmbeddingStatus() })
@@ -280,8 +305,8 @@ embeddingRoutes.post('/reindex', (c) => {
         upsertNoteEmbedding(allNotes[i].id, embeddings[i])
       }
 
-      // Record which provider built this index
-      setIndexedWith(getEmbeddingProvider())
+      // Record which model built this index
+      setIndexedWith(getActiveEmbeddingSelection())
       clearTransientStatus()
 
       await stream.writeSSE({
