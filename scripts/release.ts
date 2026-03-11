@@ -52,11 +52,26 @@ function bumpVersions(): void {
 
 function generateChangelog(): void {
   const outFile = join(root, 'RELEASE_NOTES.md')
-  execSync(`pnpm exec git cliff --tag ${tag} -o "${outFile}"`, {
+
+  // 只生成尚未 tag 的新提交的 changelog，并标记为当前版本
+  const newChangelog = execSync(`pnpm exec git cliff --unreleased --tag ${tag}`, {
     cwd: root,
-    stdio: 'inherit',
+    encoding: 'utf-8',
   })
-  console.log(`  Changelog written to RELEASE_NOTES.md`)
+
+  // 读取现有的历史 changelog（如果存在）
+  let existingChangelog = ''
+  if (existsSync(outFile)) {
+    existingChangelog = readFileSync(outFile, 'utf-8')
+  }
+
+  // 新内容插入顶部，保留原有历史
+  const combined = existingChangelog
+    ? `${newChangelog.trimEnd()}\n\n${existingChangelog}`
+    : newChangelog
+
+  writeFileSync(outFile, combined)
+  console.log(`  Changelog prepended to RELEASE_NOTES.md`)
 }
 
 /** 暂停：等待用户查看/编辑 RELEASE_NOTES.md 后按 Enter 继续 */
