@@ -1,6 +1,6 @@
-import type { SkillDetail, SkillFileNode, SkillSummary } from '@locus-agent/agent-sdk'
-import type { FileTreeNode } from '@locus-agent/ui'
-import { useToast } from '@locus-agent/ui'
+import type { SkillDetail, SkillFileNode, SkillSummary } from '@univedge/locus-agent-sdk'
+import type { FileTreeNode } from '@univedge/locus-ui'
+import { useToast } from '@univedge/locus-ui'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createSkill, fetchSkillDetail, fetchSkillFileContent, fetchSkillFiles, fetchSkills, saveSkillFileContent, updateSkillPreference, watchSkillFiles } from '@/api/skills'
 

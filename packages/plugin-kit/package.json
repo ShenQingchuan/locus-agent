@@ -1,8 +1,14 @@
 {
-  "name": "@locus-agent/plugin-kit",
+  "name": "@univedge/locus-plugin-kit",
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "description": "Plugin development kit for Locus Agent — define, register, and manage lifecycle hooks.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent",
+    "directory": "packages/plugin-kit"
+  },
   "exports": {
     ".": {
       "bun": "./src/index.ts",
@@ -19,7 +25,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@locus-agent/agent-sdk": "workspace:*"
+    "@univedge/locus-agent-sdk": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:dev-tools"

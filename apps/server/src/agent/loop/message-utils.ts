@@ -1,4 +1,4 @@
-import type { PendingToolCall } from '@locus-agent/agent-sdk'
+import type { PendingToolCall } from '@univedge/locus-agent-sdk'
 import type { AssistantModelMessage, ModelMessage, ToolModelMessage } from 'ai'
 import type { ExecuteToolPipelineResult } from './types.js'
 

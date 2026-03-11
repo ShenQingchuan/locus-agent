@@ -1,8 +1,8 @@
-import type { CacheEntry, ResultCacheStorage } from '@locus-agent/agent-sdk'
+import type { CacheEntry, ResultCacheStorage } from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { compactToolResults as compactToolResultsCore } from '@locus-agent/agent-sdk'
+import { compactToolResults as compactToolResultsCore } from '@univedge/locus-agent-sdk'
 import { getDataDir } from '../../settings/paths.js'
 
 const CACHE_SUBDIR = 'tmp/tools-result'

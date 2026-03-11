@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@locus-agent/agent-sdk'
-import { DirectoryBrowserModal, useToast } from '@locus-agent/ui'
+import type { Conversation, MessageImageAttachment, WorkspaceDirectoryEntry } from '@univedge/locus-agent-sdk'
 import { useQueryCache } from '@pinia/colada'
+import { DirectoryBrowserModal, useToast } from '@univedge/locus-ui'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import * as workspaceApi from '@/api/workspace'

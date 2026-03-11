@@ -1,5 +1,5 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
-import { DEFAULT_MODELS } from '@locus-agent/agent-sdk'
+import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
+import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
 
 export type { CustomProviderMode, LLMProviderType }
 

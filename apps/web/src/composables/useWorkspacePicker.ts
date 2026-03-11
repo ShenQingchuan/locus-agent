@@ -1,5 +1,5 @@
-import type { WorkspaceDirectoryEntry } from '@locus-agent/agent-sdk'
-import { useToast } from '@locus-agent/ui'
+import type { WorkspaceDirectoryEntry } from '@univedge/locus-agent-sdk'
+import { useToast } from '@univedge/locus-ui'
 import { ref } from 'vue'
 import * as workspaceApi from '@/api/workspace'
 import { runWithLoadingState } from '@/utils/loadingState'

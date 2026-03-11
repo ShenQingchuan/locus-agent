@@ -1,19 +1,19 @@
 ---
 name: locus-agent-sdk
-description: "@locus-agent/agent-sdk shared contracts for agent runtime, hooks, plugins, SSE, and context management. Use when importing SDK types, extending hooks/plugins, or working with agent loop, tool execution, SSE streaming, or prompt building."
+description: "@univedge/locus-agent-sdk shared contracts for agent runtime, hooks, plugins, SSE, and context management. Use when importing SDK types, extending hooks/plugins, or working with agent loop, tool execution, SSE streaming, or prompt building."
 metadata:
   author: Locus Agent Team
   version: "2026.3.9"
   source: Extracted from locus-agent monorepo
 ---
 
-# @locus-agent/agent-sdk
+# @univedge/locus-agent-sdk
 
 The shared SDK package for Locus Agent providing runtime contracts, hook event model, plugin system, SSE protocol, context management, and prompt building utilities.
 
 ## Preferences
 
-- Always import types directly from `@locus-agent/agent-sdk` — never re-export from intermediate modules
+- Always import types directly from `@univedge/locus-agent-sdk` — never re-export from intermediate modules
 - SDK defines only interfaces and pure logic; no heavy dependencies (AI SDK, database drivers, etc.)
 - Use generic type parameters (`TModel`, `TMessage`) to stay framework-agnostic
 - Hook handlers must return a `HookDecision` — use `{ type: 'noop' }` when no action needed
@@ -35,7 +35,7 @@ The shared SDK package for Locus Agent providing runtime contracts, hook event m
 ### Agent Loop
 
 ```typescript
-import type { AgentLoopCallbacks, AgentLoopOptions, AgentLoopResult, PendingToolCall, TokenUsage } from '@locus-agent/agent-sdk'
+import type { AgentLoopCallbacks, AgentLoopOptions, AgentLoopResult, PendingToolCall, TokenUsage } from '@univedge/locus-agent-sdk'
 ```
 
 - `AgentLoopOptions<TModel, TMessage>` — full config for an agent run (model, messages, callbacks, approval mode, tool allowlist)
@@ -45,7 +45,7 @@ import type { AgentLoopCallbacks, AgentLoopOptions, AgentLoopResult, PendingTool
 ### Tool Execution
 
 ```typescript
-import type { StreamingToolExecutor, ToolExecutionContext, ToolExecutor, ToolOutputCallbacks } from '@locus-agent/agent-sdk'
+import type { StreamingToolExecutor, ToolExecutionContext, ToolExecutor, ToolOutputCallbacks } from '@univedge/locus-agent-sdk'
 ```
 
 - `ToolExecutor<TArgs, TResult>` — simple async executor
@@ -55,8 +55,8 @@ import type { StreamingToolExecutor, ToolExecutionContext, ToolExecutor, ToolOut
 ### Tool Policy
 
 ```typescript
-import type { ToolCategory, ToolPolicyConfig } from '@locus-agent/agent-sdk'
-import { classifyTool } from '@locus-agent/agent-sdk'
+import type { ToolCategory, ToolPolicyConfig } from '@univedge/locus-agent-sdk'
+import { classifyTool } from '@univedge/locus-agent-sdk'
 
 const cat = classifyTool('bash', policy) // 'interactive' | 'trusted' | 'serial' | 'normal'
 ```
@@ -64,7 +64,7 @@ const cat = classifyTool('bash', policy) // 'interactive' | 'trusted' | 'serial'
 ### Delegation
 
 ```typescript
-import type { DelegateArgs, DelegateCallbacks, DelegateResult, SubAgentConfig } from '@locus-agent/agent-sdk'
+import type { DelegateArgs, DelegateCallbacks, DelegateResult, SubAgentConfig } from '@univedge/locus-agent-sdk'
 ```
 
 ## Hook Event Model
@@ -86,7 +86,7 @@ import type { DelegateArgs, DelegateCallbacks, DelegateResult, SubAgentConfig } 
 ### HookBus Interface
 
 ```typescript
-import type { HookBus, HookDecision, HookHandler } from '@locus-agent/agent-sdk'
+import type { HookBus, HookDecision, HookHandler } from '@univedge/locus-agent-sdk'
 
 bus.on('tool:before_execute', async (invocation) => {
   // invocation.payload is typed per event
@@ -109,7 +109,7 @@ bus.on('tool:before_execute', async (invocation) => {
 ### Manifest
 
 ```typescript
-import type { PluginManifest } from '@locus-agent/agent-sdk'
+import type { PluginManifest } from '@univedge/locus-agent-sdk'
 
 const manifest: PluginManifest = {
   id: 'com.example.git-guardian',
@@ -127,8 +127,8 @@ const manifest: PluginManifest = {
 ### Permissions & Scope
 
 ```typescript
-import type { PermissionScope, PluginScope } from '@locus-agent/agent-sdk'
-import { hasPermission, PLUGIN_SCOPE_ORDER } from '@locus-agent/agent-sdk'
+import type { PermissionScope, PluginScope } from '@univedge/locus-agent-sdk'
+import { hasPermission, PLUGIN_SCOPE_ORDER } from '@univedge/locus-agent-sdk'
 
 // Scopes: 'global' > 'workspace' > 'project' > 'conversation'
 // Permission strings: 'workspace.read', 'tools.invoke:bash', 'network.domain:api.example.com', etc.
@@ -139,7 +139,7 @@ import { hasPermission, PLUGIN_SCOPE_ORDER } from '@locus-agent/agent-sdk'
 ### Auto-Compaction
 
 ```typescript
-import { COMPACTION_SYSTEM_PROMPT, DEFAULT_COMPACTION_THRESHOLD, shouldCompact } from '@locus-agent/agent-sdk'
+import { COMPACTION_SYSTEM_PROMPT, DEFAULT_COMPACTION_THRESHOLD, shouldCompact } from '@univedge/locus-agent-sdk'
 
 if (shouldCompact(inputTokens, contextWindow)) {
   // trigger compaction via MessageSummarizer
@@ -149,8 +149,8 @@ if (shouldCompact(inputTokens, contextWindow)) {
 ### Tool Result Cache
 
 ```typescript
-import type { ResultCacheStorage, ToolResultCacheOptions } from '@locus-agent/agent-sdk'
-import { compactToolResults } from '@locus-agent/agent-sdk'
+import type { ResultCacheStorage, ToolResultCacheOptions } from '@univedge/locus-agent-sdk'
+import { compactToolResults } from '@univedge/locus-agent-sdk'
 
 // Implement ResultCacheStorage for your backend (fs, sqlite, etc.)
 const entries = compactToolResults(messages, { storage, hotTailCount: 5, minSizeToCache: 500 })
@@ -159,7 +159,7 @@ const entries = compactToolResults(messages, { storage, hotTailCount: 5, minSize
 ## Prompt Builder
 
 ```typescript
-import { createPromptBuilder } from '@locus-agent/agent-sdk'
+import { createPromptBuilder } from '@univedge/locus-agent-sdk'
 
 const prompt = createPromptBuilder()
   .addSection({ id: 'role', content: 'You are a coding assistant.', priority: 0 })
@@ -174,7 +174,7 @@ Plugins can patch sections via `patchSection(id, { sectionId, action: 'append' |
 ### Server Side
 
 ```typescript
-import { createSSEEventPayload, serializeSSEEvent } from '@locus-agent/agent-sdk'
+import { createSSEEventPayload, serializeSSEEvent } from '@univedge/locus-agent-sdk'
 
 const line = serializeSSEEvent(createSSEEventPayload('text-delta', { textDelta: 'Hello' }))
 // => "data: {\"type\":\"text-delta\",\"textDelta\":\"Hello\"}\n\n"
@@ -183,8 +183,8 @@ const line = serializeSSEEvent(createSSEEventPayload('text-delta', { textDelta: 
 ### Client Side
 
 ```typescript
-import type { SSEEventHandlers } from '@locus-agent/agent-sdk'
-import { consumeSSEStream } from '@locus-agent/agent-sdk'
+import type { SSEEventHandlers } from '@univedge/locus-agent-sdk'
+import { consumeSSEStream } from '@univedge/locus-agent-sdk'
 
 await consumeSSEStream(response.body.getReader(), {
   onTextDelta: d => append(d),
@@ -194,6 +194,6 @@ await consumeSSEStream(response.body.getReader(), {
 
 ## Anti-Patterns to Avoid
 
-1. **No re-export chains** — import directly from `@locus-agent/agent-sdk`, never from an intermediate barrel that re-exports SDK types
+1. **No re-export chains** — import directly from `@univedge/locus-agent-sdk`, never from an intermediate barrel that re-exports SDK types
 2. **No heavy deps in SDK** — SDK must not import `ai` (Vercel AI SDK), `drizzle-orm`, or any runtime-specific library
 3. **No concrete implementations for IO** — use interfaces like `ResultCacheStorage`, `MessageSummarizer`; let consumers inject implementations

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GitChangedFile, GitStatusResponse } from '@locus-agent/agent-sdk'
+import type { GitChangedFile, GitStatusResponse } from '@univedge/locus-agent-sdk'
 import { computed, ref } from 'vue'
 import ChangedFilesList from './ChangedFilesList.vue'
 import DiffViewer from './DiffViewer.vue'

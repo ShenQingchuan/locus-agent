@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DelegateDelta } from '@locus-agent/agent-sdk'
+import type { DelegateDelta } from '@univedge/locus-agent-sdk'
 import MarkdownRender from 'markstream-vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import SubAgentToolCallItem from './SubAgentToolCallItem.vue'

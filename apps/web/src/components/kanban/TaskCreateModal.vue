@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { TaskPriority, TaskStatus } from '@locus-agent/agent-sdk'
-import { Modal } from '@locus-agent/ui'
+import type { TaskPriority, TaskStatus } from '@univedge/locus-agent-sdk'
+import { Modal } from '@univedge/locus-ui'
 import { ref, watch } from 'vue'
 import * as api from '@/api/tasks'
 

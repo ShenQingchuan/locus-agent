@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { NoteWithTags } from '@locus-agent/agent-sdk'
-import { formatNotePreview, formatRelativeDateShort } from '@locus-agent/agent-sdk'
+import type { NoteWithTags } from '@univedge/locus-agent-sdk'
+import { formatNotePreview, formatRelativeDateShort } from '@univedge/locus-agent-sdk'
 
 defineProps<{
   note: NoteWithTags

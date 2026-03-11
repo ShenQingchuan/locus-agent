@@ -1,4 +1,4 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
 
 export interface SettingsConfigResponse {
   setupCompleted: boolean

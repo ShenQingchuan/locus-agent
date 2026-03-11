@@ -1,5 +1,5 @@
-import type { PermissionScope, PluginScope } from '@locus-agent/agent-sdk'
-import type { PluginRecord, PluginStore } from '@locus-agent/plugin-kit'
+import type { PermissionScope, PluginScope } from '@univedge/locus-agent-sdk'
+import type { PluginRecord, PluginStore } from '@univedge/locus-plugin-kit'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db/index.js'
 import { plugins } from '../../db/schema.js'

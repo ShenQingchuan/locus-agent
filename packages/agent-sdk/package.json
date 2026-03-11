@@ -1,8 +1,13 @@
 {
-  "name": "@locus-agent/agent-sdk",
+  "name": "@univedge/locus-agent-sdk",
   "type": "module",
   "version": "1.0.0",
-  "private": true,
+  "description": "Shared SDK for Locus Agent — runtime contracts, hook events, plugin system, SSE protocol, and prompt utilities.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent",
+    "directory": "packages/agent-sdk"
+  },
   "exports": {
     ".": {
       "bun": "./src/index.ts",

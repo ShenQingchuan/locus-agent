@@ -4,7 +4,7 @@ import type {
   PluginArtifact,
   PromptPatch,
   SuggestionItem,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 
 /**
  * Processed result of merging multiple HookDecisions.

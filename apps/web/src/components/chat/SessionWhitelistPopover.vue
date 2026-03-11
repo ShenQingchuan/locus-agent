@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { WhitelistRule } from '@locus-agent/agent-sdk'
-import { getRiskLevel } from '@locus-agent/agent-sdk'
+import type { WhitelistRule } from '@univedge/locus-agent-sdk'
+import { getRiskLevel } from '@univedge/locus-agent-sdk'
 import { onClickOutside } from '@vueuse/core'
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'

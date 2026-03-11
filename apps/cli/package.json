@@ -1,7 +1,13 @@
 {
-  "name": "locus-agent",
+  "name": "@univedge/locus-cli",
   "type": "module",
   "version": "0.1.0",
+  "description": "Locus Agent CLI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent",
+    "directory": "apps/cli"
+  },
   "bin": {
     "locus": "./dist/index.js"
   },
@@ -15,8 +21,8 @@
   },
   "dependencies": {
     "@clack/prompts": "catalog:cli-tools",
-    "@locus-agent/agent-sdk": "workspace:*",
-    "@locus-agent/server": "workspace:*",
+    "@univedge/locus-agent-sdk": "workspace:*",
+    "@univedge/locus-server": "workspace:*",
     "hono": "catalog:hono-family"
   },
   "devDependencies": {

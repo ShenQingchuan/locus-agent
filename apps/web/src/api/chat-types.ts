@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageImageAttachment, MessageMetadata, ParsedDelegateDelta, PendingApproval, PendingQuestion, PlanBinding, SSEEvent, SSEEventHandlers } from '@locus-agent/agent-sdk'
+import type { CoreMessage, MessageImageAttachment, MessageMetadata, ParsedDelegateDelta, PendingApproval, PendingQuestion, PlanBinding, SSEEvent, SSEEventHandlers } from '@univedge/locus-agent-sdk'
 
 export type { PendingApproval, PendingQuestion, SSEEvent }
 export type { ParsedDelegateDelta as DelegateDeltaEvent }

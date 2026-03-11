@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ImageAttachmentStripItem } from '@locus-agent/ui'
+import type { ImageAttachmentStripItem } from '@univedge/locus-ui'
 import type { QuestionAnswer } from '@/api/chat'
 import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
-import { DEFAULT_MODELS } from '@locus-agent/agent-sdk'
-import { ImageAttachmentStrip, Tooltip, useToast } from '@locus-agent/ui'
+import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
+import { ImageAttachmentStrip, Tooltip, useToast } from '@univedge/locus-ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, reactive, watch } from 'vue'

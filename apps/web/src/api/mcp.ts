@@ -1,4 +1,4 @@
-import type { MCPServersConfig, MCPServerStatus } from '@locus-agent/agent-sdk'
+import type { MCPServersConfig, MCPServerStatus } from '@univedge/locus-agent-sdk'
 
 export interface MCPStatusChangeEvent {
   name: string

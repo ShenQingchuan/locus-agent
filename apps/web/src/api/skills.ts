@@ -7,7 +7,7 @@ import type {
   SkillPreferenceUpdateResponse,
   SkillsListResponse,
   SkillSource,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 
 const API_BASE = '/api'
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EditorState, NoteEditorChange } from '@locus-agent/agent-sdk'
+import type { EditorState, NoteEditorChange } from '@univedge/locus-agent-sdk'
 import type { NodeJSON } from 'prosekit/core'
 import type { HighlightParser } from 'prosekit/extensions/code-block'
 import type { ComponentPublicInstance } from 'vue'

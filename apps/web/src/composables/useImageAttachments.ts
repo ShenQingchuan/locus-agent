@@ -1,6 +1,6 @@
-import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
-import type { ImageAttachmentStripItem } from '@locus-agent/ui'
-import { useToast } from '@locus-agent/ui'
+import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
+import type { ImageAttachmentStripItem } from '@univedge/locus-ui'
+import { useToast } from '@univedge/locus-ui'
 import { computed, ref } from 'vue'
 
 export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024

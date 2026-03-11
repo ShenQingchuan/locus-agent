@@ -1,4 +1,4 @@
-import type { StreamingToolExecutor, ToolExecutor } from '@locus-agent/agent-sdk'
+import type { StreamingToolExecutor, ToolExecutor } from '@univedge/locus-agent-sdk'
 import type { ToolName } from './tool-definitions.js'
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'

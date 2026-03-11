@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding } from '@locus-agent/agent-sdk'
+import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
 import { streamChat } from '@/api/chat'

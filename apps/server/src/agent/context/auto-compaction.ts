@@ -1,10 +1,10 @@
-import type { CompactionResult } from '@locus-agent/agent-sdk'
+import type { CompactionResult } from '@univedge/locus-agent-sdk'
 import type { LanguageModel, ModelMessage } from 'ai'
 import {
   COMPACTION_SYSTEM_PROMPT,
   DEFAULT_RECENT_TURNS_TO_KEEP,
   shouldCompact,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 import { generateText } from 'ai'
 
 export { shouldCompact }

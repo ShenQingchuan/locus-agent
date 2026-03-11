@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { WhitelistRule } from '@locus-agent/agent-sdk'
-import { getRiskLevel } from '@locus-agent/agent-sdk'
-import { useToast } from '@locus-agent/ui'
+import type { WhitelistRule } from '@univedge/locus-agent-sdk'
+import { getRiskLevel } from '@univedge/locus-agent-sdk'
+import { useToast } from '@univedge/locus-ui'
 import { onMounted, ref } from 'vue'
 import { deleteWhitelistRule, fetchWhitelistRules } from '@/api/whitelist'
 

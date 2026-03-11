@@ -1,4 +1,4 @@
-import type { PluginPermissions } from '@locus-agent/agent-sdk'
+import type { PluginPermissions } from '@univedge/locus-agent-sdk'
 
 /**
  * Placeholder interface for a future plugin marketplace/registry.

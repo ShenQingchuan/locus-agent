@@ -3,7 +3,7 @@
  * Exports the agent loop and all tool-related functions.
  *
  * Shared types (DelegateArgs, DelegateResult, SubAgentConfig, ToolExecutionContext, etc.)
- * should be imported directly from @locus-agent/agent-sdk.
+ * should be imported directly from @univedge/locus-agent-sdk.
  */
 
 export { runAgentLoop } from './loop.js'

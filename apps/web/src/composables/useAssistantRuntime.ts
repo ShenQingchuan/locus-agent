@@ -6,7 +6,7 @@ import type {
   MessageImageAttachment,
   ToolCall,
   ToolResult,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 import type { ComputedRef, Ref } from 'vue'
 import type { PendingApproval, PendingQuestion } from '@/api/chat'
 import { computed, ref } from 'vue'

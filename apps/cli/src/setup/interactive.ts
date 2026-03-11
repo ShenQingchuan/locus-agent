@@ -1,8 +1,8 @@
-import type { CustomProviderMode } from '@locus-agent/agent-sdk'
-import type { LLMSettings } from '@locus-agent/server/settings'
+import type { CustomProviderMode } from '@univedge/locus-agent-sdk'
+import type { LLMSettings } from '@univedge/locus-server/settings'
 import { exit } from 'node:process'
 import * as p from '@clack/prompts'
-import { DEFAULT_API_BASES } from '@locus-agent/agent-sdk'
+import { DEFAULT_API_BASES } from '@univedge/locus-agent-sdk'
 
 export interface SetupResult extends LLMSettings {
   port: number

@@ -3,7 +3,7 @@ import type {
   EmbeddingProvider,
   EmbeddingStatus,
 } from '@/api/embedding'
-import { useToast } from '@locus-agent/ui'
+import { useToast } from '@univedge/locus-ui'
 import { useThrottleFn } from '@vueuse/core'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useEmbeddingTasks } from '@/composables/useEmbeddingTasks'

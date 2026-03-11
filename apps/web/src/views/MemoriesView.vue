@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { NoteWithTags } from '@locus-agent/agent-sdk'
-import type { TreeNode } from '@locus-agent/ui'
+import type { NoteWithTags } from '@univedge/locus-agent-sdk'
+import type { TreeNode } from '@univedge/locus-ui'
 import type { TagTreeData } from '@/utils/tagTree'
-import { useToast } from '@locus-agent/ui'
 import { useQueryCache } from '@pinia/colada'
+import { useToast } from '@univedge/locus-ui'
 import { onClickOutside, onKeyStroke } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

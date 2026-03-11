@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Tooltip } from '@locus-agent/ui'
+import { Tooltip } from '@univedge/locus-ui'
 import { computed } from 'vue'
 
 const props = defineProps<{

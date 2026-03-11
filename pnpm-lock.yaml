@@ -201,10 +201,10 @@ importers:
       '@clack/prompts':
         specifier: catalog:cli-tools
         version: 0.10.1
-      '@locus-agent/agent-sdk':
+      '@univedge/locus-agent-sdk':
         specifier: workspace:*
         version: link:../../packages/agent-sdk
-      '@locus-agent/server':
+      '@univedge/locus-server':
         specifier: workspace:*
         version: link:../server
       hono:
@@ -241,15 +241,15 @@ importers:
       '@huggingface/transformers':
         specifier: catalog:embedding
         version: 3.8.1
-      '@locus-agent/agent-sdk':
-        specifier: workspace:*
-        version: link:../../packages/agent-sdk
-      '@locus-agent/plugin-kit':
-        specifier: workspace:*
-        version: link:../../packages/plugin-kit
       '@openrouter/ai-sdk-provider':
         specifier: catalog:ai-sdk
         version: 2.2.5(ai@6.0.116(zod@4.3.6))(zod@4.3.6)
+      '@univedge/locus-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/agent-sdk
+      '@univedge/locus-plugin-kit':
+        specifier: workspace:*
+        version: link:../../packages/plugin-kit
       ai:
         specifier: catalog:ai-sdk
         version: 6.0.116(zod@4.3.6)
@@ -294,18 +294,18 @@ importers:
       '@ai-sdk/vue':
         specifier: catalog:vue-family
         version: 3.0.116(vue@3.5.30(typescript@5.9.3))(zod@4.3.6)
-      '@locus-agent/agent-sdk':
-        specifier: workspace:*
-        version: link:../../packages/agent-sdk
-      '@locus-agent/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@pierre/diffs':
         specifier: catalog:vue-family
         version: 1.0.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@pinia/colada':
         specifier: catalog:vue-family
         version: 0.21.7(pinia@3.0.4(typescript@5.9.3)(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))
+      '@univedge/locus-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/agent-sdk
+      '@univedge/locus-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@vueuse/core':
         specifier: catalog:vue-family
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
@@ -391,7 +391,7 @@ importers:
 
   packages/plugin-kit:
     dependencies:
-      '@locus-agent/agent-sdk':
+      '@univedge/locus-agent-sdk':
         specifier: workspace:*
         version: link:../agent-sdk
     devDependencies:

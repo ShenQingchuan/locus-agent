@@ -1,5 +1,5 @@
-import type { TagWithCount } from '@locus-agent/agent-sdk'
-import type { TreeNode } from '@locus-agent/ui'
+import type { TagWithCount } from '@univedge/locus-agent-sdk'
+import type { TreeNode } from '@univedge/locus-ui'
 
 /**
  * Data attached to each tree node for tag display.

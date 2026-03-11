@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GitChangedFile, GitFileStatus, GitStatusResponse } from '@locus-agent/agent-sdk'
+import type { GitChangedFile, GitFileStatus, GitStatusResponse } from '@univedge/locus-agent-sdk'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{

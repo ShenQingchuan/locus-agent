@@ -1,4 +1,4 @@
-import { BuiltinTool } from '@locus-agent/agent-sdk'
+import { BuiltinTool } from '@univedge/locus-agent-sdk'
 
 export const interactiveTools = new Set<string>([
   BuiltinTool.AskQuestion,

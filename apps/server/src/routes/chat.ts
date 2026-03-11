@@ -6,14 +6,14 @@ import type {
   ToolCall,
   ToolResult,
   WhitelistRule,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
 import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import type { AddMessageInput } from '../services/message.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@locus-agent/agent-sdk'
+import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import {

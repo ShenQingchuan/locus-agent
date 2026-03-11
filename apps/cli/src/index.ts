@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
-import { initDB } from '@locus-agent/server/db'
+import { initDB } from '@univedge/locus-server/db'
 import {
   ensureDataDir,
   getLLMSettings,
@@ -12,7 +12,7 @@ import {
   isYoloMode,
   saveLLMSettings,
   setSetting,
-} from '@locus-agent/server/settings'
+} from '@univedge/locus-server/settings'
 import { getLogPath, getMigrationsFolder, getPidPath, getWebDistDir } from './paths.js'
 import { startServer } from './server.js'
 import { runSetup } from './setup/interactive.js'
@@ -154,7 +154,7 @@ async function handleStart(): Promise<void> {
 
   console.log(`Locus Agent started (pid ${child.pid}) at http://localhost:${port}`)
   console.log(`Log: ${logPath}`)
-  console.log(`Run \`locus-agent stop\` to stop the server.`)
+  console.log(`Run \`locus stop\` to stop the server.`)
 }
 
 /**
@@ -205,7 +205,7 @@ function handleVersion(): void {
 
 function handleHelp(): void {
   console.log(`
-Usage: locus-agent [command] [options]
+Usage: locus [command] [options]
 
 Commands:
   (default)    Start Locus Agent server (background)

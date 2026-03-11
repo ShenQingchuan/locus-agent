@@ -7,8 +7,8 @@ import type {
   HookPayloadMap,
   HookScope,
   PermissionScope,
-} from '@locus-agent/agent-sdk'
-import { HOOK_CATEGORIES, HookKind } from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
+import { HOOK_CATEGORIES, HookKind } from '@univedge/locus-agent-sdk'
 
 interface SubscribedHandler {
   pluginId: string

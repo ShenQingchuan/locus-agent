@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Task } from '@locus-agent/agent-sdk'
-import type { DropdownItem } from '@locus-agent/ui'
-import { Dropdown } from '@locus-agent/ui'
+import type { Task } from '@univedge/locus-agent-sdk'
+import type { DropdownItem } from '@univedge/locus-ui'
+import { Dropdown } from '@univedge/locus-ui'
 import { computed } from 'vue'
 
 const props = defineProps<{

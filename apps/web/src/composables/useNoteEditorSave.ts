@@ -1,4 +1,4 @@
-import type { NoteEditorChange, NoteWithTags } from '@locus-agent/agent-sdk'
+import type { NoteEditorChange, NoteWithTags } from '@univedge/locus-agent-sdk'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref } from 'vue'
 

@@ -1,4 +1,4 @@
-import type { LLMProviderType } from '@locus-agent/agent-sdk'
+import type { LLMProviderType } from '@univedge/locus-agent-sdk'
 import type { LLMConfig } from './config-store.js'
 import { getDefaultModelId, getProviderConfig, setProviderConfig } from './config-store.js'
 import { createCodingModel, createLLMModel } from './model-factory.js'

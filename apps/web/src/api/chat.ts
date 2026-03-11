@@ -1,6 +1,6 @@
-import type { AddToWhitelistPayload } from '@locus-agent/agent-sdk'
+import type { AddToWhitelistPayload } from '@univedge/locus-agent-sdk'
 import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer } from './chat-types.js'
-import { consumeSSEStream } from '@locus-agent/agent-sdk'
+import { consumeSSEStream } from '@univedge/locus-agent-sdk'
 
 export type { ChatStreamOptions, ConversationPlansResponse, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
 export type { DelegateDeltaEvent } from './chat-types.js'

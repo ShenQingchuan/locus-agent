@@ -1,4 +1,4 @@
-import type { MCPServersConfig } from '@locus-agent/agent-sdk'
+import type { MCPServersConfig } from '@univedge/locus-agent-sdk'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db/index.js'
 import { settings as settingsTable } from '../../db/schema.js'

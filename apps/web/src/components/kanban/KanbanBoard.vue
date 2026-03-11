@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TaskStatus } from '@locus-agent/agent-sdk'
+import type { TaskStatus } from '@univedge/locus-agent-sdk'
 import { useQueryCache } from '@pinia/colada'
 import { useElementSize } from '@vueuse/core'
 import { computed, ref } from 'vue'

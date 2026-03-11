@@ -1,4 +1,4 @@
-# @locus-agent/agent-sdk
+# @univedge/locus-agent-sdk
 
 Locus Agent 的共享 SDK 包，提供运行时契约、Hook 事件模型、插件系统契约，以及 SSE 协议、上下文管理、Prompt 组装等可复用组件。
 
@@ -10,7 +10,7 @@ monorepo 内部包，由 `pnpm-workspace.yaml` 管理：
 // package.json
 {
   "dependencies": {
-    "@locus-agent/agent-sdk": "workspace:*"
+    "@univedge/locus-agent-sdk": "workspace:*"
   }
 }
 ```
@@ -18,7 +18,7 @@ monorepo 内部包，由 `pnpm-workspace.yaml` 管理：
 ## 模块概览
 
 ```
-@locus-agent/agent-sdk
+@univedge/locus-agent-sdk
 ├── types/        # 基础共享类型（message, tool, sse-events, provider, …）
 ├── runtime/      # Agent 运行时契约（loop, tool, delegation, policy）
 ├── hooks/        # Hook 事件模型（events, payloads, hook-bus, decisions）
@@ -42,7 +42,7 @@ import type {
   AgentLoopResult,
   PendingToolCall,
   TokenUsage,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 ```
 
 **`AgentLoopOptions<TModel, TMessage>`** — 启动一次 Agent 循环所需的全部配置：
@@ -61,7 +61,7 @@ import type {
   ToolExecutionContext,
   ToolExecutor,
   ToolOutputCallbacks,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 ```
 
 - `ToolExecutor<TArgs, TResult>` — 简单工具执行器
@@ -71,8 +71,8 @@ import type {
 ### Runtime — Tool Policy
 
 ```typescript
-import type { ToolCategory, ToolPolicyConfig } from '@locus-agent/agent-sdk'
-import { classifyTool } from '@locus-agent/agent-sdk'
+import type { ToolCategory, ToolPolicyConfig } from '@univedge/locus-agent-sdk'
+import { classifyTool } from '@univedge/locus-agent-sdk'
 
 const category = classifyTool('bash', myPolicy) // => 'serial'
 ```
@@ -87,7 +87,7 @@ import type {
   DelegateCallbacks,
   DelegateResult,
   SubAgentConfig,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 ```
 
 定义子代理（sub-agent）的标准化接口。
@@ -97,8 +97,8 @@ import type {
 SDK 定义了完整的 Agent 生命周期 Hook 事件。
 
 ```typescript
-import type { HookCategory, HookEventName } from '@locus-agent/agent-sdk'
-import { HOOK_CATEGORIES } from '@locus-agent/agent-sdk'
+import type { HookCategory, HookEventName } from '@univedge/locus-agent-sdk'
+import { HOOK_CATEGORIES } from '@univedge/locus-agent-sdk'
 
 // 16 个生命周期事件，分属 observe / enrich / guard 三类
 HOOK_CATEGORIES['tool:before_execute'] // => 'guard'
@@ -118,7 +118,7 @@ HOOK_CATEGORIES['context:resolve'] // => 'enrich'
 ### Hooks — HookBus
 
 ```typescript
-import type { HookBus, HookDecision, HookHandler } from '@locus-agent/agent-sdk'
+import type { HookBus, HookDecision, HookHandler } from '@univedge/locus-agent-sdk'
 
 // SDK 只定义接口，实现在 server 端
 const bus: HookBus = createMyHookBus()
@@ -137,8 +137,8 @@ const unsub = bus.on('tool:before_execute', async (invocation) => {
 ### Plugins — 插件清单与权限
 
 ```typescript
-import type { PluginManifest, PluginPermissions, PluginScope } from '@locus-agent/agent-sdk'
-import { hasPermission, PLUGIN_SCOPE_ORDER } from '@locus-agent/agent-sdk'
+import type { PluginManifest, PluginPermissions, PluginScope } from '@univedge/locus-agent-sdk'
+import { hasPermission, PLUGIN_SCOPE_ORDER } from '@univedge/locus-agent-sdk'
 ```
 
 **`PluginManifest`** 定义插件所需的全部元数据：
@@ -160,7 +160,7 @@ import {
   DEFAULT_COMPACTION_THRESHOLD,
   DEFAULT_RECENT_TURNS_TO_KEEP,
   shouldCompact,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 
 if (shouldCompact(inputTokens, contextWindow)) {
   // 触发压缩流程
@@ -170,8 +170,8 @@ if (shouldCompact(inputTokens, contextWindow)) {
 ### Context — Tool Result Cache
 
 ```typescript
-import type { ResultCacheStorage, ToolResultCacheOptions } from '@locus-agent/agent-sdk'
-import { compactToolResults } from '@locus-agent/agent-sdk'
+import type { ResultCacheStorage, ToolResultCacheOptions } from '@univedge/locus-agent-sdk'
+import { compactToolResults } from '@univedge/locus-agent-sdk'
 
 const entries = compactToolResults(messages, {
   storage, // ResultCacheStorage 实现
@@ -183,7 +183,7 @@ const entries = compactToolResults(messages, {
 ### Prompt — PromptBuilder
 
 ```typescript
-import { createPromptBuilder } from '@locus-agent/agent-sdk'
+import { createPromptBuilder } from '@univedge/locus-agent-sdk'
 
 const builder = createPromptBuilder()
   .addSection({ id: 'role', content: 'You are a coding assistant.', priority: 0 })
@@ -198,7 +198,7 @@ const systemPrompt = builder.build()
 ### SSE — 服务端序列化
 
 ```typescript
-import { createSSEEventPayload, serializeSSEEvent } from '@locus-agent/agent-sdk'
+import { createSSEEventPayload, serializeSSEEvent } from '@univedge/locus-agent-sdk'
 
 // 服务端发送 SSE 事件
 const payload = createSSEEventPayload('text-delta', { textDelta: 'Hello' })
@@ -208,8 +208,8 @@ const sseString = serializeSSEEvent(payload) // => "data: {\"type\":\"text-delta
 ### SSE — 客户端消费
 
 ```typescript
-import type { SSEEventHandlers } from '@locus-agent/agent-sdk'
-import { consumeSSEStream } from '@locus-agent/agent-sdk'
+import type { SSEEventHandlers } from '@univedge/locus-agent-sdk'
+import { consumeSSEStream } from '@univedge/locus-agent-sdk'
 
 const handlers: SSEEventHandlers = {
   onTextDelta: delta => appendToUI(delta),
@@ -226,5 +226,5 @@ await consumeSSEStream(reader, handlers)
 
 1. **契约优先** — SDK 只定义接口和纯逻辑，不引入外部重依赖（如 Vercel AI SDK、数据库驱动）
 2. **泛型解耦** — `AgentLoopOptions<TModel, TMessage>` 等核心类型使用泛型，不绑定具体实现
-3. **单一数据源** — 所有共享类型从 SDK 导出，消费方直接 `import from '@locus-agent/agent-sdk'`，禁止中转 re-export
+3. **单一数据源** — 所有共享类型从 SDK 导出，消费方直接 `import from '@univedge/locus-agent-sdk'`，禁止中转 re-export
 4. **渐进式采用** — 现有 server/web 可逐步迁移到 SDK 契约，无需一次性重写

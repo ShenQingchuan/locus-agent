@@ -1,6 +1,6 @@
-import type { ToolExecutionContext, ToolOutputCallbacks } from '@locus-agent/agent-sdk'
+import type { ToolExecutionContext, ToolOutputCallbacks } from '@univedge/locus-agent-sdk'
 import type { Tool } from 'ai'
-import { BuiltinTool } from '@locus-agent/agent-sdk'
+import { BuiltinTool } from '@univedge/locus-agent-sdk'
 import { mcpManager } from '../mcp/manager.js'
 import { tools } from './tool-definitions.js'
 import { getBuiltinFormattedExecutor, getBuiltinRawExecutor, hasBuiltinFormattedExecutor } from './tool-executors.js'

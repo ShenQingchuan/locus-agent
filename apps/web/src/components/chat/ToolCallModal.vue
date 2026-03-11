@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Modal } from '@locus-agent/ui'
+import { Modal } from '@univedge/locus-ui'
 import { computed, watch } from 'vue'
 
 const props = defineProps<{

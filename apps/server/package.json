@@ -1,8 +1,14 @@
 {
-  "name": "@locus-agent/server",
+  "name": "@univedge/locus-server",
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "description": "Backend server for Locus Agent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent",
+    "directory": "apps/server"
+  },
   "exports": {
     ".": {
       "bun": "./src/index.ts",
@@ -46,9 +52,9 @@
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
     "@huggingface/transformers": "catalog:embedding",
-    "@locus-agent/agent-sdk": "workspace:*",
-    "@locus-agent/plugin-kit": "workspace:*",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
+    "@univedge/locus-agent-sdk": "workspace:*",
+    "@univedge/locus-plugin-kit": "workspace:*",
     "ai": "catalog:ai-sdk",
     "consola": "catalog:cli-tools",
     "drizzle-orm": "catalog:database",

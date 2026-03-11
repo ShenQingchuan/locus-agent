@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SearchCommandItemData } from '@/composables/useGlobalSearch'
-import { CommandPalette, ToastContainer } from '@locus-agent/ui'
+import { CommandPalette, ToastContainer } from '@univedge/locus-ui'
 import { useMagicKeys, whenever } from '@vueuse/core'
 import { computed } from 'vue'
 import { RouterView, useRouter } from 'vue-router'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { NoteEditorChange } from '@locus-agent/agent-sdk'
+import type { NoteEditorChange } from '@univedge/locus-agent-sdk'
 import { ref } from 'vue'
 import NoteEditor from './NoteEditor.vue'
 

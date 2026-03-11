@@ -1,4 +1,4 @@
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
 import { eq } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { settings as settingsTable } from '../db/schema.js'

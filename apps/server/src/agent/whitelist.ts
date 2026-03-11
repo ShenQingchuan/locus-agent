@@ -1,5 +1,5 @@
-import type { WhitelistRule } from '@locus-agent/agent-sdk'
-import { BuiltinTool, getRiskLevel } from '@locus-agent/agent-sdk'
+import type { WhitelistRule } from '@univedge/locus-agent-sdk'
+import { BuiltinTool, getRiskLevel } from '@univedge/locus-agent-sdk'
 
 /**
  * 工具调用白名单管理

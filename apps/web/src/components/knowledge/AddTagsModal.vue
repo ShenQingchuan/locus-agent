@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Tag, TagWithCount } from '@locus-agent/agent-sdk'
-import type { TreeNode } from '@locus-agent/ui'
+import type { Tag, TagWithCount } from '@univedge/locus-agent-sdk'
+import type { TreeNode } from '@univedge/locus-ui'
 import type { TagTreeData } from '@/utils/tagTree'
-import { Modal, Tree } from '@locus-agent/ui'
+import { Modal, Tree } from '@univedge/locus-ui'
 import { computed, ref, watch } from 'vue'
 import { buildTagTree } from '@/utils/tagTree'
 

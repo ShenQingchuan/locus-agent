@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { getDataDir } from '@locus-agent/server/settings'
+import { getDataDir } from '@univedge/locus-server/settings'
 
 /**
  * Web build output directory.

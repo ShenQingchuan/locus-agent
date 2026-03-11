@@ -5,7 +5,7 @@ import type {
   PermissionScope,
   PluginManifest,
   PluginScope,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 
 /**
  * Runtime state of a loaded plugin.

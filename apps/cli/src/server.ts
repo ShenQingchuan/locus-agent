@@ -1,9 +1,9 @@
-import type { LLMSettings } from '@locus-agent/server/settings'
+import type { LLMSettings } from '@univedge/locus-server/settings'
 import { resolve } from 'node:path'
-import { createApp } from '@locus-agent/server'
-import { setServerConfig } from '@locus-agent/server/config'
-import { initDB } from '@locus-agent/server/db'
-import { setLLMConfig } from '@locus-agent/server/providers'
+import { createApp } from '@univedge/locus-server'
+import { setServerConfig } from '@univedge/locus-server/config'
+import { initDB } from '@univedge/locus-server/db'
+import { setLLMConfig } from '@univedge/locus-server/providers'
 import { serveStatic } from 'hono/bun'
 
 export interface StartOptions {

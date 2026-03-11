@@ -1,4 +1,4 @@
-import { BuiltinTool } from '@locus-agent/agent-sdk'
+import { BuiltinTool } from '@univedge/locus-agent-sdk'
 import { askQuestionTool } from './ask_question.js'
 import { bashTool } from './bash.js'
 import { delegateTool } from './delegate.js'

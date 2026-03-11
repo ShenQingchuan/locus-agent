@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DirectoryBrowserModal, FileTree, useToast } from '@locus-agent/ui'
+import { DirectoryBrowserModal, FileTree, useToast } from '@univedge/locus-ui'
 import { useLocalStorage } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, onMounted, ref, watch } from 'vue'

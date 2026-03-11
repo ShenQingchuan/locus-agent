@@ -4,16 +4,20 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.32.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent"
+  },
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "dev:server": "pnpm -F @locus-agent/server dev",
-    "dev:web": "pnpm -F @locus-agent/web dev",
+    "dev:server": "pnpm -F @univedge/locus-server dev",
+    "dev:web": "pnpm -F @univedge/locus-web dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
-    "db:generate": "pnpm -F @locus-agent/server db:generate",
-    "db:migrate": "pnpm -F @locus-agent/server db:migrate",
-    "db:studio": "pnpm -F @locus-agent/server db:studio",
+    "db:generate": "pnpm -F @univedge/locus-server db:generate",
+    "db:migrate": "pnpm -F @univedge/locus-server db:migrate",
+    "db:studio": "pnpm -F @univedge/locus-server db:studio",
     "reexport:chains": "node scripts/find-reexport-chains.mjs",
     "reexport:scan": "sg scan"
   },

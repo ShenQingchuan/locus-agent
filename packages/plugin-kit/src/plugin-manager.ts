@@ -1,4 +1,4 @@
-import type { HookEventName } from '@locus-agent/agent-sdk'
+import type { HookEventName } from '@univedge/locus-agent-sdk'
 import type { HookBusImpl } from './hook-bus-impl.js'
 import type { PluginLoader } from './plugin-loader.js'
 import type { PluginStore } from './plugin-store.js'

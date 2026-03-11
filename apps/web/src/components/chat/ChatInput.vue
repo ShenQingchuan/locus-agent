@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { MessageImageAttachment } from '@locus-agent/agent-sdk'
-import type { DropdownItem } from '@locus-agent/ui'
+import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
+import type { DropdownItem } from '@univedge/locus-ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { getCodingProviderForParent } from '@locus-agent/agent-sdk'
-import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@locus-agent/ui'
+import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@univedge/locus-ui'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useEscConfirm } from '@/composables/useEscConfirm'

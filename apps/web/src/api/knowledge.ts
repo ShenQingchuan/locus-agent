@@ -12,7 +12,7 @@ import type {
   TagWithCount,
   UpdateFolderInput,
   UpdateNoteInput,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 
 const API_BASE = '/api'
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { RiskLevel } from '@locus-agent/agent-sdk'
-import { getCommandRiskLevel, getRiskLevel } from '@locus-agent/agent-sdk'
+import type { RiskLevel } from '@univedge/locus-agent-sdk'
+import { getCommandRiskLevel, getRiskLevel } from '@univedge/locus-agent-sdk'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{

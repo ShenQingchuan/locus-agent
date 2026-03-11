@@ -1,4 +1,4 @@
-import type { MCPServersConfig } from '@locus-agent/agent-sdk'
+import type { MCPServersConfig } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'

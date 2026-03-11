@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { DropdownItem } from '@locus-agent/ui'
-import { Dropdown, useToast } from '@locus-agent/ui'
+import type { DropdownItem } from '@univedge/locus-ui'
 import { useQueryCache } from '@pinia/colada'
+import { Dropdown, useToast } from '@univedge/locus-ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getConversationListQueryKey, useConversationListQuery } from '@/composables/queries'

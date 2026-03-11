@@ -1,4 +1,4 @@
-import type { WhitelistRule } from '@locus-agent/agent-sdk'
+import type { WhitelistRule } from '@univedge/locus-agent-sdk'
 
 export async function fetchWhitelistRules(conversationId?: string): Promise<WhitelistRule[]> {
   try {

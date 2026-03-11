@@ -1,4 +1,4 @@
-import type { InstallOptions } from '@locus-agent/plugin-kit'
+import type { InstallOptions } from '@univedge/locus-plugin-kit'
 import { Hono } from 'hono'
 import { pluginManager } from '../agent/plugins/index.js'
 

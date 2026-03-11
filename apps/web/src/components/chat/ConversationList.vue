@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Conversation } from '@locus-agent/agent-sdk'
-import { List, ListItem, useToast, VirtualList } from '@locus-agent/ui'
+import type { Conversation } from '@univedge/locus-agent-sdk'
+import { List, ListItem, useToast, VirtualList } from '@univedge/locus-ui'
 import { computed, ref } from 'vue'
 import ConversationListItem from './ConversationListItem.vue'
 

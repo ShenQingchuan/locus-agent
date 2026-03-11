@@ -1,8 +1,14 @@
 {
-  "name": "@locus-agent/web",
+  "name": "@univedge/locus-web",
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "description": "Web UI for Locus Agent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShenQingchuan/locus-agent",
+    "directory": "apps/web"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
@@ -11,10 +17,10 @@
   },
   "dependencies": {
     "@ai-sdk/vue": "catalog:vue-family",
-    "@locus-agent/agent-sdk": "workspace:*",
-    "@locus-agent/ui": "workspace:*",
     "@pierre/diffs": "catalog:vue-family",
     "@pinia/colada": "catalog:vue-family",
+    "@univedge/locus-agent-sdk": "workspace:*",
+    "@univedge/locus-ui": "workspace:*",
     "@vueuse/core": "catalog:vue-family",
     "js-tiktoken": "catalog:vue-family",
     "katex": "catalog:vue-family",

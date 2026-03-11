@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { CustomProviderMode, LLMProviderType } from '@locus-agent/agent-sdk'
+import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
 import type { CodingKimiConfig, ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@locus-agent/agent-sdk'
-import { useToast } from '@locus-agent/ui'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@univedge/locus-agent-sdk'
+import { useToast } from '@univedge/locus-ui'
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchSettingsConfig, updateKimiCodeSettings, updateSettingsConfig } from '@/api/settings'

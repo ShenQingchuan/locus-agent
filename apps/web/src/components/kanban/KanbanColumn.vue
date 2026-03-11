@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Task, TaskStatus } from '@locus-agent/agent-sdk'
+import type { Task, TaskStatus } from '@univedge/locus-agent-sdk'
 import type { DraggableEvent } from 'vue-draggable-plus'
 import { computed, ref } from 'vue'
 import { useDraggable } from 'vue-draggable-plus'

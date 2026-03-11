@@ -88,7 +88,7 @@ async function waitForViteReady(vite: Subprocess, timeoutMs: number = 30_000): P
 
 // 1. Start Vite dev server as a managed background process (HMR)
 const vite = Bun.spawn(
-  ['pnpm', '-F', '@locus-agent/web', 'exec', 'vite', '--port', String(VITE_PORT), '--strictPort'],
+  ['pnpm', '-F', '@univedge/locus-web', 'exec', 'vite', '--port', String(VITE_PORT), '--strictPort'],
   { stdout: 'ignore', stderr: 'inherit' },
 )
 

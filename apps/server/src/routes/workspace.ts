@@ -3,7 +3,7 @@ import type {
   GitFileStatus,
   WorkspaceDirectoryEntry,
   WorkspaceTreeNode,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 import { watch as fsWatch } from 'node:fs'
 import { readdir, readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'

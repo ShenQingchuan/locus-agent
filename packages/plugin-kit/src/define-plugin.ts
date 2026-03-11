@@ -3,7 +3,7 @@ import type {
   HookHandler,
   HookPayloadMap,
   PluginManifest,
-} from '@locus-agent/agent-sdk'
+} from '@univedge/locus-agent-sdk'
 import type { PluginDefinition } from './types.js'
 
 interface DefinePluginInput {
@@ -20,7 +20,7 @@ interface DefinePluginInput {
  *
  * Usage:
  * ```ts
- * import { definePlugin } from '@locus-agent/plugin-kit'
+ * import { definePlugin } from '@univedge/locus-plugin-kit'
  *
  * export default definePlugin({
  *   manifest: { id: 'com.example.my-plugin', ... },

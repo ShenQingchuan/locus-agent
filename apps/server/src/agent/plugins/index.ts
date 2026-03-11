@@ -1,4 +1,4 @@
-import { HookBusImpl, PluginLoader, PluginManager } from '@locus-agent/plugin-kit'
+import { HookBusImpl, PluginLoader, PluginManager } from '@univedge/locus-plugin-kit'
 import { createPluginStoreImpl } from './plugin-store-impl.js'
 
 // Singletons

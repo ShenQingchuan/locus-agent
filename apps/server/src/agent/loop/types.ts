@@ -1,4 +1,4 @@
-import type { DelegateDelta, PendingToolCall, ToolExecutionContext } from '@locus-agent/agent-sdk'
+import type { DelegateDelta, PendingToolCall, ToolExecutionContext } from '@univedge/locus-agent-sdk'
 import type { LanguageModel, ModelMessage } from 'ai'
 import type { QuestionAnswer, QuestionItem } from '../tools/ask_question.js'
 

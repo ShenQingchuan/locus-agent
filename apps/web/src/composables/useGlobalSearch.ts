@@ -1,5 +1,5 @@
-import type { Conversation } from '@locus-agent/agent-sdk'
-import type { CommandItem } from '@locus-agent/ui'
+import type { Conversation } from '@univedge/locus-agent-sdk'
+import type { CommandItem } from '@univedge/locus-ui'
 import { useDebounceFn } from '@vueuse/core'
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'

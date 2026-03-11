@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Switch } from '@locus-agent/ui'
+import { Switch } from '@univedge/locus-ui'
 import MonacoEditor from '@/components/code/MonacoEditor.vue'
 import { statusColor, statusLabel, useMCPManager } from '@/composables/useMCPManager'
 

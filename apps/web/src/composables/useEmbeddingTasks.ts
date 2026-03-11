@@ -1,5 +1,5 @@
 import type { ModelFileProgress } from '@/api/embedding'
-import { useToast } from '@locus-agent/ui'
+import { useToast } from '@univedge/locus-ui'
 import { computed, reactive, ref } from 'vue'
 
 interface DownloadFileState {
