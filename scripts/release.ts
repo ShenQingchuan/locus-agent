@@ -7,8 +7,11 @@
  * 首次发布作用域包需在 package.json 中配置 "publishConfig": { "access": "public" } 或单次使用 pnpm publish --access public。
  *
  * 用法：
- *   bun scripts/release.ts [版本号]
- *   bun scripts/release.ts 0.1.0 --dry-run   # 不 commit/tag/push/build/publish/release
+ *   bun scripts/release.ts --bump          # patch: 0.1.2 -> 0.1.3
+ *   bun scripts/release.ts --minor         # minor: 0.1.2 -> 0.2.0
+ *   bun scripts/release.ts --major         # major: 0.1.2 -> 1.0.0
+ *   bun scripts/release.ts --bump --dry    # dry-run，不 commit/tag/push/build/publish/release
+ *   bun scripts/release.ts 0.2.0           # 直接指定版本号
  */
 
 import { execSync } from 'node:child_process'
@@ -21,9 +24,30 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const root = join(__dirname, '..')
 
 const args = process.argv.slice(2)
-const dryRun = args.includes('--dry-run')
-const version = args.find(a => !a.startsWith('--')) ?? '0.1.0'
+const dryRun = args.includes('--dry')
 
+function resolveVersion(): string {
+  const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'))
+  const current: string = rootPkg.version ?? '0.0.0'
+  const [major, minor, patch] = current.split('.').map(Number)
+
+  if (args.includes('--major'))
+    return `${major + 1}.0.0`
+  if (args.includes('--minor'))
+    return `${major}.${minor + 1}.0`
+  if (args.includes('--bump') || args.includes('--patch'))
+    return `${major}.${minor}.${patch + 1}`
+
+  // 支持直接传版本号
+  const explicit = args.find(a => !a.startsWith('--'))
+  if (explicit)
+    return explicit
+
+  console.error('请指定版本升级方式: --bump (patch), --minor, --major, 或直接传入版本号')
+  process.exit(1)
+}
+
+const version = resolveVersion()
 const tag = version.startsWith('v') ? version : `v${version}`
 
 const packageJsonPaths = [
