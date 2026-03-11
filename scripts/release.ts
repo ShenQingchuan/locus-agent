@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 /**
- * Release 脚本：统一版本号、生成 Changelog、打 Git tag、推送到 origin、创建 GitHub Release。
+ * Release 脚本：统一版本号、生成 Changelog、打 tag、推送、构建、发布 npm、创建 GitHub Release。
  *
- * 依赖：git-cliff（pnpm 已装）、GitHub CLI (gh) 已登录、当前分支已配置远程 origin。
- * 会在打 tag 后执行 git push origin HEAD <tag>，再创建 Release，避免本地 tag 未推送导致 gh 报错。
+ * 依赖：git-cliff、GitHub CLI (gh) 已登录、远程 origin 已配置、已登录 npm（npm login）。
+ * 仅会发布 package.json 中未设置 "private": true 的包（当前为 @univedge/locus-agent-sdk、@univedge/locus-cli）。
+ * 首次发布作用域包需在 package.json 中配置 "publishConfig": { "access": "public" } 或单次使用 pnpm publish --access public。
  *
  * 用法：
- *   bun scripts/release.ts [版本号]   # 默认 0.1.0
- *   bun scripts/release.ts 0.1.0 --dry-run   # 仅改版本与生成 notes，不 commit/tag/push/release
+ *   bun scripts/release.ts [版本号]
+ *   bun scripts/release.ts 0.1.0 --dry-run   # 不 commit/tag/push/build/publish/release
  */
 
 import { execSync } from 'node:child_process'
@@ -87,6 +88,16 @@ function pushCommitAndTag(): void {
   console.log(`  Pushed commit and tag ${tag} to origin`)
 }
 
+function buildPackages(): void {
+  execSync('pnpm build', { cwd: root, stdio: 'inherit' })
+  console.log('  Build done')
+}
+
+function publishToNpm(): void {
+  execSync('pnpm -r publish --no-git-checks', { cwd: root, stdio: 'inherit' })
+  console.log('  Published to npm (only packages without "private": true)')
+}
+
 function createGitHubRelease(): void {
   const notesFile = join(root, 'RELEASE_NOTES.md')
   execSync(`gh release create ${tag} --notes-file "${notesFile}"`, {
@@ -119,7 +130,13 @@ async function main(): Promise<void> {
   console.log('\n5. Push to origin (commit + tag)...')
   pushCommitAndTag()
 
-  console.log('\n6. Creating GitHub Release...')
+  console.log('\n6. Build (for npm publish)...')
+  buildPackages()
+
+  console.log('\n7. Publish to npm...')
+  publishToNpm()
+
+  console.log('\n8. Creating GitHub Release...')
   createGitHubRelease()
 
   console.log('\nDone.')

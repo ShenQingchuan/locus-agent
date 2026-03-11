@@ -8,6 +8,9 @@
     "url": "https://github.com/ShenQingchuan/locus-agent",
     "directory": "apps/cli"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "locus": "./dist/index.js"
   },
