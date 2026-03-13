@@ -37,6 +37,7 @@ export interface AgentLoopOptions<TModel = unknown, TMessage = unknown> {
   abortSignal?: AbortSignal
   confirmMode?: boolean | (() => boolean)
   thinkingMode?: boolean
+  space?: 'chat' | 'coding'
   codingMode?: 'build' | 'plan'
   getToolApproval?: (toolCallId: string, toolName: string, args: unknown) => Promise<boolean>
   onQuestionPending?: (toolCallId: string, questions: QuestionItem[]) => void | Promise<void>

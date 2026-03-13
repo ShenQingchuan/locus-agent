@@ -27,6 +27,8 @@ export type BuiltinToolName = typeof BuiltinTool[keyof typeof BuiltinTool]
 
 export interface ToolExecutionContext {
   conversationId?: string
+  space?: 'chat' | 'coding'
+  codingMode?: 'build' | 'plan'
   projectKey?: string
   workspaceRoot?: string
   skillsWorkspaceRoot?: string

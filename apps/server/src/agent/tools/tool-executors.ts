@@ -20,6 +20,12 @@ import { executeStrReplace, formatStrReplaceResult } from './str-replace.js'
 import { executeTree, formatTreeResult } from './tree.js'
 import { executeWriteFile, formatWriteResult } from './write.js'
 
+function requireCodingSpace(toolName: string, space?: 'chat' | 'coding') {
+  if (space !== 'coding') {
+    throw new Error(`Tool "${toolName}" is only available in coding space`)
+  }
+}
+
 const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = {
   bash: async (args, callbacks, context) => {
     const result = await executeBash(
@@ -85,6 +91,7 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     return formatManageTodosResult(result)
   },
   manage_kanban: async (args, _callbacks, context) => {
+    requireCodingSpace('manage_kanban', context?.space)
     const result = await executeManageKanban(
       args as Parameters<typeof executeManageKanban>[0],
       { conversationId: context?.conversationId, projectKey: context?.projectKey },
@@ -92,6 +99,7 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     return formatManageKanbanResult(result)
   },
   write_plan: async (args, _callbacks, context) => {
+    requireCodingSpace('write_plan', context?.space)
     const result = await executeWritePlan(
       args as Parameters<typeof executeWritePlan>[0],
       { projectKey: context?.projectKey },
@@ -99,13 +107,15 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     return formatWritePlanResult(result)
   },
   read_plan: async (args, _callbacks, context) => {
+    requireCodingSpace('read_plan', context?.space)
     const result = await executeReadPlan(
       args as Parameters<typeof executeReadPlan>[0],
       { projectKey: context?.projectKey },
     )
     return formatReadPlanResult(result)
   },
-  plan_exit: async () => {
+  plan_exit: async (_args, _callbacks, context) => {
+    requireCodingSpace('plan_exit', context?.space)
     const result = await executePlanExit()
     return formatPlanExitResult(result)
   },

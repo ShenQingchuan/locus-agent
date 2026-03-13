@@ -15,7 +15,7 @@ import {
   PLAN_MODE_PROMPT,
 } from '../prompts/index.js'
 import { getCurrentModelInfo } from '../providers/index.js'
-import { getMergedToolsForMode } from '../tools/registry.js'
+import { getMergedToolsForContext } from '../tools/registry.js'
 import { interactiveTools } from '../tools/tool-policy.js'
 import { getWorkspaceRoot } from '../tools/workspace-root.js'
 import { buildAssistantStepMessage, buildToolResultMessage, normalizeToolCallMessageSequence } from './message-utils.js'
@@ -59,6 +59,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     abortSignal,
     confirmMode: confirmModeOpt = false,
     thinkingMode = true,
+    space = 'chat',
     codingMode,
     getToolApproval,
     onQuestionPending,
@@ -75,7 +76,14 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   const messages: ModelMessage[] = [...initialMessages]
   const generatedMessages: ModelMessage[] = []
   const workspaceRoot = workspaceRootOption || getWorkspaceRoot()
-  const toolContext = { conversationId, projectKey, workspaceRoot, skillsWorkspaceRoot: workspaceRootOption }
+  const toolContext = {
+    conversationId,
+    space,
+    codingMode,
+    projectKey,
+    workspaceRoot,
+    skillsWorkspaceRoot: workspaceRootOption,
+  }
 
   // 根据 codingMode 扩展 system prompt
   let effectiveSystemPrompt = `${systemPrompt}\n\n${buildRuntimeContextPrompt(workspaceRoot)}`
@@ -84,10 +92,10 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   if (skillsCatalogPrompt) {
     effectiveSystemPrompt += `\n\n${skillsCatalogPrompt}`
   }
-  if (codingMode === 'plan') {
+  if (space === 'coding' && codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
   }
-  else if (codingMode === 'build') {
+  else if (space === 'coding' && codingMode === 'build') {
     const hasPlan = messages.some(
       m => m.role === 'user' && typeof m.content === 'string' && (m.content.includes('<plan>') || m.content.includes('<plan_ref>')),
     )
@@ -97,7 +105,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   }
 
   const hookScope = {
-    space: (codingMode ? 'coding' : 'chat') as 'chat' | 'coding',
+    space,
     workspaceRoot,
     projectKey,
   }
@@ -126,7 +134,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     let response
     let retryCount = 0
     const maxRetries = 2
-    const tools = getMergedToolsForMode(codingMode, toolAllowlist)
+    const tools = getMergedToolsForContext(space, codingMode, toolAllowlist)
     if (!hasAvailableSkills) {
       delete tools.skill
     }

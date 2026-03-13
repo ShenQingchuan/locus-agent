@@ -38,4 +38,9 @@ export interface DelegateCallbacks {
   onToolCallResult?: (toolCallId: string, toolName: string, result: unknown, isError: boolean) => void | Promise<void>
   onDelegateDelta?: (toolCallId: string, delta: DelegateDelta) => void | Promise<void>
   conversationId?: string
+  space?: 'chat' | 'coding'
+  projectKey?: string
+  workspaceRoot?: string
+  skillsWorkspaceRoot?: string
+  codingMode?: 'build' | 'plan'
 }

@@ -55,58 +55,70 @@ export function getMergedTools(): Record<string, Tool> {
 }
 
 /**
- * Plan 模式下允许的内置工具（只读 + 计划管理）
+ * Chat 空间的基础内置工具集。
+ * Coding 相关能力只在 /coding 打开。
  */
-const PLAN_MODE_ALLOWED_TOOLS = new Set<string>([
+const CHAT_BUILTIN_TOOLS = new Set<string>([
+  BuiltinTool.Bash,
   BuiltinTool.ReadFile,
   BuiltinTool.Glob,
   BuiltinTool.Grep,
   BuiltinTool.Tree,
+  BuiltinTool.AskQuestion,
+  BuiltinTool.Delegate,
   BuiltinTool.ManageMemory,
   BuiltinTool.Skill,
-  BuiltinTool.WritePlan,
-  BuiltinTool.ReadPlan,
-  BuiltinTool.AskQuestion,
-  BuiltinTool.ManageTodos,
-  BuiltinTool.Delegate,
 ])
 
-const MCP_WRITE_KEYWORDS = [
-  'write',
-  'create',
-  'delete',
-  'update',
-  'edit',
-  'modify',
-  'remove',
-  'insert',
-  'patch',
-  'put',
-  'execute',
-  'run',
-  'deploy',
-  'send',
-]
+const CODING_BUILD_BUILTIN_TOOLS = new Set<string>([
+  ...CHAT_BUILTIN_TOOLS,
+  BuiltinTool.StrReplace,
+  BuiltinTool.WriteFile,
+  BuiltinTool.ManageTodos,
+  BuiltinTool.ManageKanban,
+  BuiltinTool.ReadPlan,
+])
 
-function looksLikeWriteTool(name: string, t: Tool): boolean {
-  const lowerName = name.toLowerCase()
-  for (const kw of MCP_WRITE_KEYWORDS) {
-    if (lowerName.includes(kw))
-      return true
+/**
+ * Plan 模式下允许的内置工具（只读 + 计划管理）
+ */
+const CODING_PLAN_BUILTIN_TOOLS = new Set<string>([
+  BuiltinTool.Bash,
+  BuiltinTool.ReadFile,
+  BuiltinTool.Glob,
+  BuiltinTool.Grep,
+  BuiltinTool.Tree,
+  BuiltinTool.AskQuestion,
+  BuiltinTool.Delegate,
+  BuiltinTool.ManageMemory,
+  BuiltinTool.Skill,
+  BuiltinTool.ManageTodos,
+  BuiltinTool.WritePlan,
+  BuiltinTool.ReadPlan,
+  BuiltinTool.PlanExit,
+])
+
+function pickBuiltinTools(allowed: Set<string>): Record<string, Tool> {
+  const filtered: Record<string, Tool> = {}
+  for (const [name, tool] of Object.entries(tools)) {
+    if (allowed.has(name))
+      filtered[name] = tool
   }
-  const desc = ((t as any).description ?? '').toLowerCase()
-  if (desc.includes('write') || desc.includes('modify') || desc.includes('delete') || desc.includes('create file')) {
-    return true
-  }
-  return false
+  return filtered
 }
 
 /**
- * 根据 codingMode 返回对应的工具集
- * plan 模式：只返回只读工具 + 计划管理工具
- * build / undefined：返回全部工具
+ * 根据 space + codingMode 返回工具集：
+ * - chat: 仅基础内置工具
+ * - coding/build: 基础工具 + coding 专属内置工具
+ * - coding/plan: 只读内置工具 + plan 专属工具
+ * MCP 工具不区分 space，始终合并。
  */
-export function getMergedToolsForMode(codingMode?: 'build' | 'plan', allowlist?: string[]): Record<string, Tool> {
+export function getMergedToolsForContext(
+  space: 'chat' | 'coding' = 'chat',
+  codingMode?: 'build' | 'plan',
+  allowlist?: string[],
+): Record<string, Tool> {
   const applyAllowlist = (input: Record<string, Tool>): Record<string, Tool> => {
     if (!allowlist || allowlist.length === 0)
       return input
@@ -119,21 +131,16 @@ export function getMergedToolsForMode(codingMode?: 'build' | 'plan', allowlist?:
     return filtered
   }
 
-  if (codingMode !== 'plan')
-    return applyAllowlist(getMergedTools())
+  const builtinTools = space === 'coding'
+    ? (codingMode === 'plan'
+        ? pickBuiltinTools(CODING_PLAN_BUILTIN_TOOLS)
+        : pickBuiltinTools(CODING_BUILD_BUILTIN_TOOLS))
+    : pickBuiltinTools(CHAT_BUILTIN_TOOLS)
 
-  const filtered: Record<string, Tool> = {}
-  for (const [name, t] of Object.entries(tools)) {
-    if (PLAN_MODE_ALLOWED_TOOLS.has(name)) {
-      filtered[name] = t
-    }
-  }
-  for (const [name, t] of Object.entries(mcpManager.getAllTools())) {
-    if (!looksLikeWriteTool(name, t)) {
-      filtered[name] = t
-    }
-  }
-  return applyAllowlist(filtered)
+  return applyAllowlist({
+    ...builtinTools,
+    ...mcpManager.getAllTools(),
+  })
 }
 
 export function getAvailableTools(): string[] {

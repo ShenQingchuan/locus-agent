@@ -623,6 +623,7 @@ chatRoutes.post('/', async (c) => {
         abortSignal: abortController.signal,
         confirmMode: () => confirmModeState.value,
         thinkingMode: effectiveThinkingMode,
+        space: conversationSpace,
         codingMode: conversationSpace === 'coding' ? codingMode : undefined,
         conversationId,
         projectKey: conversationProjectKey,

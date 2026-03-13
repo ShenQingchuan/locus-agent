@@ -63,6 +63,11 @@ export async function executePendingToolCall(
           model,
           {
             conversationId,
+            space: toolContext.space,
+            codingMode: toolContext.codingMode,
+            projectKey: toolContext.projectKey,
+            workspaceRoot: toolContext.workspaceRoot,
+            skillsWorkspaceRoot: toolContext.skillsWorkspaceRoot,
             onTextDelta: onDelegateDelta
               ? async (delta) => {
                 const d = { type: 'text' as const, content: delta }
