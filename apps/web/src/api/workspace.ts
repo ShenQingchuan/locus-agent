@@ -6,6 +6,7 @@ import type {
   GitStageResponse,
   GitStatusResponse,
   GitUnstageResponse,
+  MentionSearchResponse,
   WorkspaceListResponse,
   WorkspaceRootsResponse,
   WorkspaceTreeResponse,
@@ -39,6 +40,13 @@ export async function fetchWorkspaceDirectories(path: string): Promise<Workspace
 export async function openWorkspace(path: string): Promise<WorkspaceTreeResponse> {
   const query = new URLSearchParams({ path })
   return request<WorkspaceTreeResponse>(`/workspace/tree?${query.toString()}`)
+}
+
+export async function fetchMentionSearch(query: string, basePath?: string): Promise<MentionSearchResponse> {
+  const params = new URLSearchParams({ query })
+  if (basePath)
+    params.set('basePath', basePath)
+  return request<MentionSearchResponse>(`/workspace/mention-search?${params.toString()}`)
 }
 
 export async function fetchGitStatus(path: string): Promise<GitStatusResponse> {

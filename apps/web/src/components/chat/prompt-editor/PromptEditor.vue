@@ -4,6 +4,7 @@ import { createEditor } from 'prosekit/core'
 import { definePlaceholder } from 'prosekit/extensions/placeholder'
 import { ProseKit, useDocChange, useExtension } from 'prosekit/vue'
 import { computed, markRaw, watch } from 'vue'
+import PathMenu from './PathMenu.vue'
 import SlashMenu from './SlashMenu.vue'
 import { definePromptExtension } from './usePromptExtension'
 
@@ -173,6 +174,7 @@ defineExpose({
       :class="{ 'prompt-editor-disabled': disabled }"
     />
     <SlashMenu :workspace-root="workspaceRoot" />
+    <PathMenu :workspace-root="workspaceRoot" />
   </ProseKit>
 </template>
 
@@ -214,6 +216,22 @@ defineExpose({
   color: hsl(var(--primary));
   font-size: 0.8125rem;
   font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1.5;
+  vertical-align: baseline;
+  user-select: all;
+}
+
+.prompt-editor-content span[data-mention="file-mention"],
+.prompt-editor-content span[data-mention="dir-mention"] {
+  display: inline-block;
+  margin: 0 0.25rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  background-color: hsl(var(--accent) / 0.6);
+  color: hsl(var(--accent-foreground));
+  font-size: 0.8125rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
   font-weight: 500;
   line-height: 1.5;
   vertical-align: baseline;

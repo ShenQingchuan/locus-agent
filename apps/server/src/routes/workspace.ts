@@ -1,6 +1,7 @@
 import type {
   GitChangedFile,
   GitFileStatus,
+  MentionSearchEntry,
   WorkspaceDirectoryEntry,
   WorkspaceTreeNode,
 } from '@univedge/locus-agent-sdk'
@@ -149,6 +150,96 @@ workspaceRoutes.get('/tree', async (c) => {
       scannedCount: state.count,
       truncated: state.truncated,
     })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+const MAX_MENTION_ENTRIES = 200
+const HIDDEN_DIR_RE = /^\./
+
+workspaceRoutes.get('/mention-search', async (c) => {
+  try {
+    const query = c.req.query('query') ?? ''
+    const basePath = c.req.query('basePath')
+
+    let resolvedBase: string
+    if (basePath) {
+      resolvedBase = await resolveAllowedDirectory(basePath)
+    }
+    else {
+      resolvedBase = await realpath(homedir())
+    }
+
+    const isAbsolute = query.startsWith('/')
+    let dirToList: string
+    let filter: string
+
+    if (isAbsolute) {
+      const absQuery = query
+      const lastSlash = absQuery.lastIndexOf('/')
+      const dirPart = absQuery.slice(0, lastSlash + 1) || '/'
+      filter = absQuery.slice(lastSlash + 1).toLowerCase()
+      try {
+        dirToList = await realpath(dirPart)
+        const allowedRoots = await getAllowedRoots()
+        if (!allowedRoots.some(root => dirToList === root || dirToList.startsWith(`${root}${sep}`))) {
+          return c.json({ basePath: resolvedBase, resolvedDir: dirPart, entries: [], truncated: false })
+        }
+      }
+      catch {
+        return c.json({ basePath: resolvedBase, resolvedDir: dirPart, entries: [], truncated: false })
+      }
+    }
+    else {
+      const lastSlash = query.lastIndexOf('/')
+      if (lastSlash >= 0) {
+        const dirPart = query.slice(0, lastSlash + 1)
+        filter = query.slice(lastSlash + 1).toLowerCase()
+        dirToList = join(resolvedBase, dirPart)
+      }
+      else {
+        filter = query.toLowerCase()
+        dirToList = resolvedBase
+      }
+    }
+
+    let dirents: Awaited<ReturnType<typeof readdir>>
+    try {
+      dirents = await readdir(dirToList, { withFileTypes: true })
+    }
+    catch {
+      return c.json({ basePath: resolvedBase, resolvedDir: dirToList, entries: [], truncated: false })
+    }
+
+    const raw: MentionSearchEntry[] = []
+    for (const entry of dirents) {
+      if (HIDDEN_DIR_RE.test(entry.name))
+        continue
+      if (entry.name === 'node_modules')
+        continue
+      if (filter && !entry.name.toLowerCase().includes(filter))
+        continue
+      const absPath = join(dirToList, entry.name)
+      raw.push({
+        name: entry.name,
+        absolutePath: absPath,
+        relativePath: relative(resolvedBase, absPath).split(sep).join('/'),
+        type: entry.isDirectory() ? 'directory' : 'file',
+      })
+    }
+
+    raw.sort((a, b) => {
+      if (a.type !== b.type)
+        return a.type === 'directory' ? -1 : 1
+      return sortDirentNames(a.name, b.name)
+    })
+
+    const truncated = raw.length > MAX_MENTION_ENTRIES
+    const entries = truncated ? raw.slice(0, MAX_MENTION_ENTRIES) : raw
+
+    return c.json({ basePath: resolvedBase, resolvedDir: dirToList, entries, truncated })
   }
   catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)

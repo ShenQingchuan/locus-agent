@@ -34,3 +34,17 @@ export interface WorkspaceTreeResponse {
   truncated: boolean
   scannedCount: number
 }
+
+export interface MentionSearchEntry {
+  name: string
+  absolutePath: string
+  relativePath: string
+  type: 'file' | 'directory'
+}
+
+export interface MentionSearchResponse {
+  basePath: string
+  resolvedDir: string
+  entries: MentionSearchEntry[]
+  truncated: boolean
+}

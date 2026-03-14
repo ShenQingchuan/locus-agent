@@ -84,6 +84,48 @@ function defineMentionGuard() {
   )
 }
 
+/**
+ * When backspacing into a mention, delete the mention (and its guard space)
+ * in one step so the guard plugin doesn't re-insert the space endlessly.
+ */
+function defineMentionDeleteKeymap() {
+  return withPriority(
+    defineKeymap({
+      Backspace: (state, dispatch) => {
+        const { selection } = state
+        if (!selection.empty)
+          return false
+
+        const $pos = selection.$from
+        const before = $pos.nodeBefore
+
+        if (!before)
+          return false
+
+        if (before.type.name === 'mention') {
+          if (dispatch)
+            dispatch(state.tr.delete($pos.pos - before.nodeSize, $pos.pos))
+          return true
+        }
+
+        if (before.isText && before.text === ' ') {
+          const posBeforeSpace = $pos.pos - before.nodeSize
+          const $bs = state.doc.resolve(posBeforeSpace)
+          if ($bs.nodeBefore?.type.name === 'mention') {
+            const mention = $bs.nodeBefore
+            if (dispatch)
+              dispatch(state.tr.delete(posBeforeSpace - mention.nodeSize, $pos.pos))
+            return true
+          }
+        }
+
+        return false
+      },
+    }),
+    Priority.high,
+  )
+}
+
 export function definePromptExtension(options: PromptExtensionOptions = {}): Extension {
   const submitKeymap = withPriority(
     defineKeymap({
@@ -124,6 +166,7 @@ export function definePromptExtension(options: PromptExtensionOptions = {}): Ext
     defineHardBreak(),
     defineMention(),
     defineMentionGuard(),
+    defineMentionDeleteKeymap(),
     defineBaseKeymap(),
     defineBaseCommands(),
     defineHistory(),
