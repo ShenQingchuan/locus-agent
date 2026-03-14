@@ -1,3 +1,21 @@
+## [0.1.4] - 2026-03-14
+
+### Features
+
+- Enhance local embedding model management and API
+
+- Enhance agent loop and tool management for coding context
+
+- Allow server startup without LLM credentials and enhance embedding status handling
+
+- Enhance MonacoEditor loading state and styling
+
+- Improve YOLO mode toggling and conversation state synchronization
+
+- Add mention search functionality and enhance prompt editor
+
+- Enhance memory management tool with listing and batch update capabilities
+
 ## [0.1.3] - 2026-03-11
 
 

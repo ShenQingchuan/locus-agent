@@ -1,7 +1,7 @@
 {
   "name": "@univedge/locus-web",
   "type": "module",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Web UI for Locus Agent",
   "repository": {
