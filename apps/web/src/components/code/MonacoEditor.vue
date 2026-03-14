@@ -24,11 +24,13 @@ const containerRef = ref<HTMLDivElement>()
 const editorRef = shallowRef<MonacoEditor.IStandaloneCodeEditor>()
 const monacoRef = shallowRef<{ editor: { setTheme: (theme: string) => void } } | undefined>()
 const isDark = useDark()
+const isLoading = ref(true)
 
 let suppressExternalSync = false
 
 onMounted(async () => {
   const { init } = await import('modern-monaco')
+  isLoading.value = true
 
   const currentTheme = isDark.value ? THEME_DARK : THEME_LIGHT
   const monaco = await init({
@@ -78,6 +80,7 @@ onMounted(async () => {
   })
 
   editorRef.value = editor
+  isLoading.value = false
 })
 
 watch(() => props.modelValue, (newVal) => {
@@ -98,18 +101,61 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="containerRef"
-    class="monaco-editor-container"
-  />
+  <div class="monaco-editor-wrapper">
+    <div
+      v-if="isLoading"
+      class="monaco-editor-loading"
+    >
+      <div class="loading-spinner" />
+    </div>
+    <div
+      ref="containerRef"
+      class="monaco-editor-container"
+      :class="{ 'opacity-0': isLoading }"
+    />
+  </div>
 </template>
 
 <style scoped>
+.monaco-editor-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+}
+
 .monaco-editor-container {
   width: 100%;
   min-height: 280px;
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.monaco-editor-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--background) / 0.8);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  z-index: 10;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
