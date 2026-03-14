@@ -9,6 +9,7 @@ import { compactToolResults } from '../context/tool-result-cache.js'
 import { hookBus } from '../plugins/index.js'
 import {
   BUILD_WITH_PLAN_PROMPT,
+  buildMemoryTagsPrompt,
   buildRuntimeContextPrompt,
   buildSkillsCatalogPrompt,
   DEFAULT_SYSTEM_PROMPT,
@@ -87,10 +88,16 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
   // 根据 codingMode 扩展 system prompt
   let effectiveSystemPrompt = `${systemPrompt}\n\n${buildRuntimeContextPrompt(workspaceRoot)}`
-  const skillsCatalogPrompt = await buildSkillsCatalogPrompt(workspaceRootOption)
+  const [skillsCatalogPrompt, memoryTagsPrompt] = await Promise.all([
+    buildSkillsCatalogPrompt(workspaceRootOption),
+    buildMemoryTagsPrompt(),
+  ])
   const hasAvailableSkills = skillsCatalogPrompt.length > 0
   if (skillsCatalogPrompt) {
     effectiveSystemPrompt += `\n\n${skillsCatalogPrompt}`
+  }
+  if (memoryTagsPrompt) {
+    effectiveSystemPrompt += `\n\n${memoryTagsPrompt}`
   }
   if (space === 'coding' && codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`

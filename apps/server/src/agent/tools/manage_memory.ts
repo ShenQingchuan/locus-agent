@@ -13,15 +13,12 @@ import {
 const memoryItemSchema = z.object({
   content: z.string().describe('The memory content, 1-3 sentences. Be specific and factual.'),
   tags: z.array(z.string()).describe(
-    'Tags for categorization. Use multi-level hierarchical format with "/" separator. '
-    + 'Always create at least 2 levels: a broad category followed by a specific subcategory. '
-    + 'Examples:\n'
-    + '  - Food preferences: "preference/food/snacks", "preference/food/dishes", "preference/food/drinks"\n'
-    + '  - Code style: "preference/code-style/naming", "preference/code-style/formatting"\n'
-    + '  - Project details: "project/my-app/architecture", "project/my-app/dependencies"\n'
-    + '  - Lessons learned: "lesson/debugging", "lesson/performance"\n'
-    + 'Group related memories under the same parent path so they cluster naturally. '
-    + 'Avoid flat, overly broad tags — always think about what subcategory the memory belongs to.',
+    'Tags for categorization. CRITICAL: Prefer existing tags from the "Existing Memory Tags" section in context. '
+    + 'Use the most specific (granular) existing tag that fits first; only use a parent-level tag when no subcategory applies; '
+    + 'create a new tag ONLY when no existing tag is semantically appropriate. '
+    + 'Use multi-level hierarchical format with "/" separator (at least 2 levels). '
+    + 'Examples: "preference/food/snacks", "project/my-app/stack", "lesson/debugging". '
+    + 'Avoid flat tags like "food" or "preference" — always prefer the most specific existing path.',
   ),
 })
 
@@ -34,7 +31,9 @@ const memoryItemSchema = z.object({
 const batchUpdateItemSchema = z.object({
   memory_id: z.string().describe('ID of the memory to update (from a prior read result).'),
   content: z.string().optional().describe('New content; omit to keep existing.'),
-  tags: z.array(z.string()).optional().describe('New tags (replaces all existing); omit to keep existing.'),
+  tags: z.array(z.string()).optional().describe(
+    'New tags (replaces all existing). Prefer existing tags; use most specific first; omit to keep existing.',
+  ),
 })
 
 export const manageMemoryTool = tool({
@@ -47,8 +46,8 @@ export const manageMemoryTool = tool({
     + 'Use "batch_update" to update multiple memories at once (reorganize tags, merge content, etc.). '
     + 'Use "delete" to remove memories by ID. '
     + 'Tags MUST use hierarchical multi-level format with "/" separator (at least 2 levels). '
-    + 'Good: "preference/food/snacks", "project/my-app/stack". '
-    + 'Bad: "food", "preference" (too broad, missing subcategory).',
+    + 'PREFER existing tags; use most specific first, parent only when needed; create new only when necessary. '
+    + 'Good: reuse "preference/food/snacks" from existing. Bad: "food", "preference" (too broad).',
   inputSchema: z.object({
     action: z.enum(['list', 'create', 'read', 'update', 'batch_update', 'delete']).describe(
       'The action to perform: "list" to retrieve all memories, "create" to save new memories, "read" to search, '
@@ -61,9 +60,9 @@ export const manageMemoryTool = tool({
       'For "read". Natural language search query. Uses semantic vector search.',
     ),
     tags: z.array(z.string()).optional().describe(
-      'For "read": filter by tag names (prefix matching, e.g. "preference" matches all preference/* tags). '
-      + 'For "update": new tags (replaces all existing). '
-      + 'Use hierarchical multi-level format e.g. ["preference/tools/editor", "project/locus-agent/stack"].',
+      'For "read": filter by tag names (prefix matching). '
+      + 'For "update": new tags (replaces all existing). Prefer existing tags; use most specific first. '
+      + 'Format: ["preference/tools/editor", "project/locus-agent/stack"].',
     ),
     memory_id: z.string().optional().describe(
       'Required for "update". ID of the memory to update (from a prior read result).',

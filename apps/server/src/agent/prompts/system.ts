@@ -32,7 +32,11 @@ Use \`manage_memory\` (actions: create | read | update | delete) to persist impo
 
 **Guidelines:**
 - Keep each memory concise (1-3 sentences), specific, and factual
-- Use multi-level tags: "preference/code-style", "project/my-app", "lesson/debugging"
+- Prefer existing tags from the "Existing Memory Tags" section. 
+  - Find the most specific (granular) tag first;
+  - Only use parent-level when no subcategory fits;
+  - Create new tags only when necessary
+- Use multi-level format: "preference/code-style", "project/my-app", "lesson/debugging"
 - Do NOT read on every turn — only when relevant
 - Do NOT store trivial or ephemeral information
 

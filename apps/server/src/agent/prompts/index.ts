@@ -1,4 +1,5 @@
 export { BUILD_WITH_PLAN_PROMPT } from './build-with-plan.js'
+export { buildMemoryTagsPrompt } from './memory-tags.js'
 export { PLAN_MODE_PROMPT } from './plan-mode.js'
 export { buildRuntimeContextPrompt } from './runtime-context.js'
 export { buildSkillsCatalogPrompt } from './skills-catalog.js'

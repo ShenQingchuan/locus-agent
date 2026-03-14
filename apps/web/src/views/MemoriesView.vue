@@ -573,7 +573,7 @@ onKeyStroke('Escape', () => {
                 </div>
 
                 <!-- Cards for this day -->
-                <div class="columns-2 gap-3 pl-4 border-l-2 border-border/30">
+                <div class="columns-2 gap-3 pl-4 border-l-2 border-border/30 ml-0.75">
                   <div
                     v-for="note in group.notes"
                     :key="note.id"
