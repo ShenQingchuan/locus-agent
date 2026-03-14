@@ -1,7 +1,7 @@
 {
   "name": "@univedge/locus-server",
   "type": "module",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Backend server for Locus Agent",
   "repository": {

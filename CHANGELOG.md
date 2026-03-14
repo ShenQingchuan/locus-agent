@@ -1,3 +1,15 @@
+## [0.1.5] - 2026-03-14
+
+### Features
+
+- Add Git status loading indicator and refresh logic in CodingView
+
+- Refactor routing and component structure for improved navigation
+
+- Enhance agent loop and memory management with new memory tags prompt
+
+- Enhance mention search functionality and UI components
+
 ## [0.1.4] - 2026-03-14
 
 ### Features

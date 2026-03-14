@@ -1,7 +1,7 @@
 {
   "name": "@univedge/locus-plugin-kit",
   "type": "module",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Plugin development kit for Locus Agent — define, register, and manage lifecycle hooks.",
   "repository": {
