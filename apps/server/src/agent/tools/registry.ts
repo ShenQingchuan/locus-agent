@@ -119,12 +119,13 @@ export function getMergedToolsForContext(
   codingMode?: 'build' | 'plan',
   allowlist?: string[],
 ): Record<string, Tool> {
-  const applyAllowlist = (input: Record<string, Tool>): Record<string, Tool> => {
-    if (!allowlist || allowlist.length === 0)
-      return input
+  // When an explicit allowlist is provided (sub-agents), pick from ALL defined
+  // tools — the allowlist itself is the authority, space filtering is irrelevant.
+  if (allowlist && allowlist.length > 0) {
     const set = new Set(allowlist)
+    const allTools = { ...tools, ...mcpManager.getAllTools() }
     const filtered: Record<string, Tool> = {}
-    for (const [name, tool] of Object.entries(input)) {
+    for (const [name, tool] of Object.entries(allTools)) {
       if (set.has(name))
         filtered[name] = tool
     }
@@ -137,10 +138,10 @@ export function getMergedToolsForContext(
         : pickBuiltinTools(CODING_BUILD_BUILTIN_TOOLS))
     : pickBuiltinTools(CHAT_BUILTIN_TOOLS)
 
-  return applyAllowlist({
+  return {
     ...builtinTools,
     ...mcpManager.getAllTools(),
-  })
+  }
 }
 
 export function getAvailableTools(): string[] {

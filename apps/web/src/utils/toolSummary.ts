@@ -53,6 +53,21 @@ export const toolSummaryResolvers: Record<string, (args: Record<string, unknown>
     }
     return '管理记忆'
   },
+  search_memory: (args) => {
+    const action = String(args.action ?? '')
+    if (action === 'list')
+      return '浏览记忆'
+    if (action === 'read') {
+      const q = typeof args.query === 'string' ? args.query : ''
+      const tags = (args.tags as string[] | undefined) ?? []
+      if (q)
+        return `搜索记忆: "${q.slice(0, 30)}${q.length > 30 ? '...' : ''}"`
+      if (tags.length)
+        return `按标签搜索记忆: ${tags.join(', ')}`
+      return '搜索记忆'
+    }
+    return '查询记忆'
+  },
   manage_todos: (args) => {
     const action = String(args.action ?? '')
     const content = typeof args.content === 'string' ? args.content.trim() : ''

@@ -586,6 +586,9 @@ chatRoutes.post('/', async (c) => {
     let assistantText = ''
     let assistantReasoning = ''
 
+    // Delegate results keyed by toolCallId (for persisting deltas to DB)
+    const delegateFullResults = new Map<string, unknown>()
+
     try {
       const runtimeModelInfo = getCurrentModelInfo()
       const assistantModel = codingProvider
@@ -662,6 +665,11 @@ chatRoutes.post('/', async (c) => {
 
         // 工具调用结果回调
         onToolCallResult: async (toolCallId, toolName, result, isError, isInterrupted) => {
+          // Persist delegate results (with deltas) for DB storage later
+          if (result && typeof result === 'object' && (result as { isSubAgentResult?: boolean }).isSubAgentResult) {
+            delegateFullResults.set(toolCallId, result)
+          }
+
           const toolResult: ToolResult = {
             toolCallId,
             toolName,
@@ -753,6 +761,20 @@ chatRoutes.post('/', async (c) => {
         }
 
         const dbInputs = agentMessagesToDbInputs(result.generatedMessages, assistantModel, usage)
+
+        // Inject full delegate results (with deltas) into DB inputs
+        if (delegateFullResults.size > 0) {
+          for (const input of dbInputs) {
+            if (input.role !== 'tool' || !input.toolResults)
+              continue
+            for (const tr of input.toolResults) {
+              const fullResult = delegateFullResults.get(tr.toolCallId)
+              if (fullResult)
+                tr.result = fullResult
+            }
+          }
+        }
+
         if (dbInputs.length > 0) {
           await addMessages(conversationId, dbInputs)
         }

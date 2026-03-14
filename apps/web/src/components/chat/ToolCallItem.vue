@@ -9,6 +9,7 @@ import { parseDelegateMeta } from '@/utils/delegateParsing'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import { toolsHideSummaryRow, toolSummaryResolvers, toolsWithOutputWidget } from '@/utils/toolSummary'
 import DelegateCard from './DelegateCard.vue'
+import InlineDelegateModal from './InlineDelegateModal.vue'
 import PlanCard from './PlanCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import ToolCallModal from './ToolCallModal.vue'
@@ -46,6 +47,7 @@ const RE_DOUBLE_NEWLINE = /\n\n/
 const RE_QUESTION_ANSWER_BLOCK = /^- ([^\n：]+)：\n([\s\S]*)$/
 
 const modalOpen = ref(false)
+const inlineDelegateModalOpen = ref(false)
 const whitelistOpen = ref(false)
 const whitelistPopoverRef = ref<HTMLElement | null>(null)
 const terminalRef = ref<HTMLElement | null>(null)
@@ -140,6 +142,33 @@ const isAskQuestion = computed(() => props.tool.toolCall.toolName === 'ask_quest
 
 /** Whether this is a delegate tool */
 const isDelegate = computed(() => props.tool.toolCall.toolName === 'delegate')
+
+const INLINE_DELEGATE_TYPES = new Set(['memory_tagger', 'memory-tagger'])
+
+/** Lightweight delegate types rendered as compact inline rows instead of full DelegateCard */
+const isInlineDelegate = computed(() => {
+  if (!isDelegate.value)
+    return false
+  const agentType = String(props.tool.toolCall.args.agent_type ?? '')
+  return INLINE_DELEGATE_TYPES.has(agentType)
+})
+
+/** Extract the sub-agent's final text output for inline display */
+const inlineDelegateResultText = computed(() => {
+  if (!isInlineDelegate.value)
+    return null
+  const { status } = props.tool
+  if (status === 'pending')
+    return '执行中...'
+  if (status === 'error' || status === 'interrupted')
+    return '执行失败'
+  const raw = props.tool.result?.result
+  if (!raw || typeof raw !== 'object')
+    return null
+  const text = (raw as { result?: string }).result ?? ''
+  const firstLine = text.split('\n').find(l => l.trim()) ?? ''
+  return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine
+})
 
 /** Whether this is a write_plan tool */
 const isWritePlan = computed(() => props.tool.toolCall.toolName === 'write_plan')
@@ -473,9 +502,33 @@ watch(bashExpanded, (expanded) => {
       </div>
     </div>
 
-    <!-- Delegate 子代理卡片 -->
+    <!-- Inline delegate (compact row for lightweight sub-agents like memory_tagger) -->
+    <div
+      v-if="isInlineDelegate && delegateArgs"
+      class="flex items-center gap-1.5 text-muted-foreground cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
+      @click="inlineDelegateModalOpen = true"
+    >
+      <div
+        class="h-3 w-3 flex-shrink-0"
+        :class="[statusIcon, statusIconClass]"
+      />
+      <code class="text-xs font-mono whitespace-nowrap">{{ delegateArgs.agentName }}</code>
+      <span class="text-xs font-mono truncate">{{ inlineDelegateResultText }}</span>
+    </div>
+
+    <!-- Inline delegate modal (streaming view) -->
+    <InlineDelegateModal
+      v-if="isInlineDelegate && delegateArgs"
+      :visible="inlineDelegateModalOpen"
+      :agent-name="delegateArgs.agentName"
+      :status="tool.status === 'error' || tool.status === 'interrupted' ? 'error' : tool.status === 'completed' ? 'completed' : 'pending'"
+      :deltas="tool.delegateDeltas?.length ? tool.delegateDeltas : delegateDeltasFromResult"
+      @close="inlineDelegateModalOpen = false"
+    />
+
+    <!-- Delegate 子代理卡片 (full card, skip for inline types) -->
     <DelegateCard
-      v-if="isDelegate && delegateArgs"
+      v-if="isDelegate && delegateArgs && !isInlineDelegate"
       :tool-call-id="tool.toolCall.toolCallId"
       :agent-name="delegateArgs.agentName"
       :agent-type="delegateArgs.agentType"
