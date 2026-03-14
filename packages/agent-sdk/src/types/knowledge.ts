@@ -50,6 +50,7 @@ export interface UpdateNoteInput {
   folderId?: string | null
   tagNames?: string[]
   pinned?: boolean
+  workspacePath?: string | null
 }
 
 // ==================== 文件夹 ====================

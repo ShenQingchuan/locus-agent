@@ -202,7 +202,7 @@ function buildExtension() {
     defineCodeBlockSpecWithDisplayName(),
     defineCodeBlockEditingKeymap(),
     defineMarkdownClipboardText(),
-    definePlaceholder({ placeholder: '开始写作...' }),
+    definePlaceholder({ placeholder: '开始记录 ...' }),
     defineCodeBlockHighlight({
       parser: createDualThemeCodeBlockParser(),
     }),

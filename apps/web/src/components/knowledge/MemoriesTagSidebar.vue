@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import type { TagWithCount } from '@univedge/locus-agent-sdk'
-import type { TreeNode } from '@univedge/locus-ui'
+import type { NoteWithTags, TagWithCount } from '@univedge/locus-agent-sdk'
+import type { ContextMenuItem, TreeNode } from '@univedge/locus-ui'
 import type { TagTreeData } from '@/utils/tagTree'
-import { Tree } from '@univedge/locus-ui'
-import { computed } from 'vue'
+import { ContextMenu, Tree } from '@univedge/locus-ui'
+import { computed, ref } from 'vue'
 import { buildTagTree } from '@/utils/tagTree'
 
 const props = defineProps<{
   tags: TagWithCount[]
+  notes: NoteWithTags[]
   selectedTagId: string | null
   activeTagPath: string | null
   notesCount: number
@@ -16,9 +17,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectTag: [tagId: string | null]
   tagTreeSelect: [node: TreeNode]
+  deleteTags: [tagIds: string[], groupName: string]
 }>()
 
-const tagTree = computed(() => buildTagTree(props.tags))
+const tagTree = computed(() => buildTagTree(props.tags, props.notes))
 
 const defaultExpandedTagIds = computed(() =>
   tagTree.value
@@ -33,6 +35,59 @@ function handleSelectAll() {
 function handleTagTreeSelect(node: TreeNode) {
   emit('tagTreeSelect', node)
 }
+
+// Context menu for tag nodes
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+const contextMenuNode = ref<TreeNode | null>(null)
+
+const tagContextMenuItems = computed<ContextMenuItem[]>(() => {
+  if (!contextMenuNode.value)
+    return []
+  const data = contextMenuNode.value.data as TagTreeData
+  const hasChildren = !!(contextMenuNode.value.children?.length)
+  if (data.tagId && !hasChildren) {
+    return [{ key: 'delete', label: '删除标签', icon: 'i-carbon-trash-can', danger: true }]
+  }
+  return [{ key: 'delete-group', label: '删除该分组下所有标签', icon: 'i-carbon-trash-can', danger: true }]
+})
+
+function collectTagIds(node: TreeNode): string[] {
+  const ids: string[] = []
+  const data = node.data as TagTreeData
+  if (data.tagId)
+    ids.push(data.tagId)
+  if (node.children) {
+    for (const child of node.children) {
+      ids.push(...collectTagIds(child))
+    }
+  }
+  return ids
+}
+
+function handleTagContextMenu(e: MouseEvent, node: TreeNode) {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenuNode.value = node
+  contextMenuRef.value?.openAt(e.clientX, e.clientY)
+}
+
+function handleContextMenuSelect(key: string) {
+  if (!contextMenuNode.value)
+    return
+  const data = contextMenuNode.value.data as TagTreeData
+  const name = contextMenuNode.value.id
+
+  if (key === 'delete' && data.tagId) {
+    emit('deleteTags', [data.tagId], name)
+  }
+  else if (key === 'delete-group') {
+    const tagIds = collectTagIds(contextMenuNode.value)
+    if (tagIds.length > 0) {
+      emit('deleteTags', tagIds, name)
+    }
+  }
+  contextMenuNode.value = null
+}
 </script>
 
 <template>
@@ -40,7 +95,7 @@ function handleTagTreeSelect(node: TreeNode) {
     <!-- All memories button -->
     <div class="px-2 pt-2">
       <button
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+        class="w-full flex items-center gap-2 px-1.5 py-2 rounded-lg text-sm transition-colors"
         :class="!selectedTagId && !activeTagPath
           ? 'bg-accent text-accent-foreground font-medium'
           : 'text-foreground hover:bg-accent/50'"
@@ -73,6 +128,7 @@ function handleTagTreeSelect(node: TreeNode) {
                 :class="activeTagPath === node.id || selectedTagId === (node.data as TagTreeData).tagId
                   ? 'text-accent-foreground font-medium'
                   : 'text-foreground'"
+                @contextmenu="handleTagContextMenu($event, node)"
               >
                 <div
                   class="h-3.5 w-3.5 opacity-50 flex-shrink-0"
@@ -91,5 +147,11 @@ function handleTagTreeSelect(node: TreeNode) {
         暂无标签
       </div>
     </div>
+
+    <ContextMenu
+      ref="contextMenuRef"
+      :items="tagContextMenuItems"
+      @select="handleContextMenuSelect"
+    />
   </div>
 </template>

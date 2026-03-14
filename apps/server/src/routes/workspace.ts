@@ -205,9 +205,9 @@ workspaceRoutes.get('/mention-search', async (c) => {
       }
     }
 
-    let dirents: Awaited<ReturnType<typeof readdir>>
+    let dirents: import('node:fs').Dirent[]
     try {
-      dirents = await readdir(dirToList, { withFileTypes: true })
+      dirents = await readdir(dirToList, { withFileTypes: true, encoding: 'utf-8' })
     }
     catch {
       return c.json({ basePath: resolvedBase, resolvedDir: dirToList, entries: [], truncated: false })

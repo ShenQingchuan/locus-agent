@@ -73,6 +73,7 @@ export interface UpdateNoteInput {
   editorState?: Record<string, unknown> | null
   folderId?: string | null
   tagNames?: string[]
+  workspacePath?: string | null
 }
 
 // ==================== CRUD ====================
@@ -216,6 +217,8 @@ export async function updateNote(
     updates.editorState = input.editorState
   if (input.folderId !== undefined)
     updates.folderId = input.folderId
+  if (input.workspacePath !== undefined)
+    updates.workspacePath = input.workspacePath
 
   await db
     .update(notes)

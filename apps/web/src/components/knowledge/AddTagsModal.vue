@@ -141,7 +141,7 @@ function handleClose() {
         >
           <template #default="{ node, hasChildren }">
             <div
-              class="flex items-center gap-2 flex-1 min-w-0 py-0.5"
+              class="flex items-center gap-2 flex-1 min-w-0 py-0.5 pr-4"
               :class="(node.data as TagTreeData).tagId ? 'cursor-pointer' : ''"
               @click.stop="handleLeafClick(node)"
             >

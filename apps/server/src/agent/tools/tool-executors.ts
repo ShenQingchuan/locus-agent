@@ -75,10 +75,12 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     return formatWriteResult(result)
   },
   manage_memory: async (args, _callbacks, context) => {
+    // Only apply workspace scope in coding space; chat space memories are always global
+    const workspacePath = context?.space === 'coding' ? context?.workspaceRoot : undefined
     const result = await executeManageMemory(
       args as Parameters<typeof executeManageMemory>[0],
       context?.conversationId,
-      context?.workspaceRoot,
+      workspacePath,
     )
     return formatManageMemoryResult(result)
   },

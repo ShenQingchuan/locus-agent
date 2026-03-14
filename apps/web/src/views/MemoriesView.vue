@@ -38,8 +38,6 @@ const isSyncingFromUrl = ref(false)
 const isSyncingToUrl = ref(false)
 const memoryScope = ref<MemoryScope>('all')
 
-const selectedTagId = computed(() => store.selectedTagId)
-
 const workspaceQueryPath = computed<string | undefined>(() => {
   if (memoryScope.value === 'global')
     return 'global'
@@ -48,9 +46,9 @@ const workspaceQueryPath = computed<string | undefined>(() => {
   return undefined
 })
 
-const { data: notesList, isPending: isNotesLoading } = useNotesListQuery(
+const { data: allNotesList, isPending: isNotesLoading } = useNotesListQuery(
   computed(() => null),
-  selectedTagId,
+  computed(() => null),
   workspaceQueryPath,
 )
 const { data: searchResults, isPending: isSearchLoading } = useSearchNotesQuery(
@@ -58,47 +56,152 @@ const { data: searchResults, isPending: isSearchLoading } = useSearchNotesQuery(
 )
 const { data: tags } = useTagsQuery()
 
-const notes = computed(() => {
-  if (store.searchQuery.trim())
-    return searchResults.value ?? []
-  return notesList.value ?? []
-})
 const isLoading = computed(() =>
   store.searchQuery.trim() ? isSearchLoading.value : isNotesLoading.value,
 )
 const tagsList = computed(() => tags.value ?? [])
 
+// Group notes by date for timeline view
+interface DateGroup {
+  dateKey: string
+  date: Date
+  notes: NoteWithTags[]
+}
+
+function formatTimelineDate(date: Date): string {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+  if (dateStart.getTime() === today.getTime()) {
+    return '今天'
+  }
+  if (dateStart.getTime() === yesterday.getTime()) {
+    return '昨天'
+  }
+
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
+function formatTimelineYear(date: Date): string {
+  const now = new Date()
+  if (date.getFullYear() !== now.getFullYear()) {
+    return `${date.getFullYear()}年`
+  }
+  return ''
+}
+
 // ==================== Tag tree ====================
 
 const activeTagPath = ref<string | null>(null)
 
+// Filter notes by selected tag or active tag path (prefix matching)
+const notes = computed(() => {
+  if (store.searchQuery.trim())
+    return searchResults.value ?? []
+
+  const all = allNotesList.value ?? []
+
+  // Filter by exact tag ID
+  if (store.selectedTagId) {
+    return all.filter(n => n.tags.some(t => t.id === store.selectedTagId))
+  }
+
+  // Filter by tag path prefix (for virtual parent nodes like "food" → matches "food/*")
+  if (activeTagPath.value) {
+    const prefix = activeTagPath.value
+    return all.filter(n =>
+      n.tags.some(t => t.name === prefix || t.name.startsWith(`${prefix}/`)),
+    )
+  }
+
+  return all
+})
+
+const groupedNotes = computed<DateGroup[]>(() => {
+  const groups = new Map<string, NoteWithTags[]>()
+
+  for (const note of notes.value) {
+    const date = new Date(note.createdAt)
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+    if (!groups.has(dateKey)) {
+      groups.set(dateKey, [])
+    }
+    groups.get(dateKey)!.push(note)
+  }
+
+  // Sort groups by date (newest first) and notes within each group by createdAt
+  const sortedGroups: Array<[string, NoteWithTags[]]> = []
+  for (const entry of groups.entries()) {
+    sortedGroups.push(entry)
+  }
+  sortedGroups.sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+
+  return sortedGroups.map(([dateKey, dayNotes]) => ({
+    dateKey,
+    date: new Date(dateKey),
+    notes: dayNotes.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ),
+  }))
+})
+
 function handleTagTreeSelect(node: TreeNode) {
   const data = node.data as TagTreeData
-  if (data.tagId) {
-    if (store.selectedTagId === data.tagId) {
-      store.selectTag(null)
-      activeTagPath.value = null
-    }
-    else {
-      store.selectTag(data.tagId)
-      activeTagPath.value = node.id
-    }
+  const hasChildren = !!(node.children?.length)
+  if (data.tagId && !hasChildren) {
+    // Leaf tag: exact match by tag ID
+    store.selectTag(data.tagId)
+    activeTagPath.value = node.id
   }
   else {
-    activeTagPath.value = activeTagPath.value === node.id ? null : node.id
+    // Parent/group node: prefix match by path
+    activeTagPath.value = node.id
     store.selectTag(null)
   }
 }
 
 function selectTag(tagId: string | null) {
-  if (store.selectedTagId === tagId) {
+  if (!tagId) {
     store.selectTag(null)
     activeTagPath.value = null
+    return
   }
-  else {
-    store.selectTag(tagId)
-    const tag = tagsList.value.find(t => t.id === tagId)
-    activeTagPath.value = tag?.name ?? null
+  store.selectTag(tagId)
+  const tag = tagsList.value.find(t => t.id === tagId)
+  activeTagPath.value = tag?.name ?? null
+}
+
+async function handleDeleteTags(tagIds: string[], groupName: string) {
+  const isSingle = tagIds.length === 1
+  const message = isSingle
+    ? `确定要删除标签「${groupName}」吗？标签会从所有记忆中移除，但记忆本身不会被删除。`
+    : `确定要删除「${groupName}」下的 ${tagIds.length} 个标签吗？标签会从所有记忆中移除，但记忆本身不会被删除。`
+
+  const confirmed = await toast.confirm({
+    title: isSingle ? '删除标签' : '删除标签分组',
+    message,
+    confirmText: '删除',
+    cancelText: '取消',
+    type: 'error',
+  })
+  if (confirmed) {
+    try {
+      await Promise.all(tagIds.map(id => api.deleteTag(id)))
+      if (store.selectedTagId && tagIds.includes(store.selectedTagId)) {
+        store.selectTag(null)
+        activeTagPath.value = null
+      }
+      queryCache.invalidateQueries({ key: ['tags'] })
+      queryCache.invalidateQueries({ key: ['notes'] })
+      toast.success(isSingle ? '标签已删除' : `已删除 ${tagIds.length} 个标签`)
+    }
+    catch (e: unknown) {
+      toast.error((e as { message?: string })?.message || '删除标签失败')
+    }
   }
 }
 
@@ -143,11 +246,6 @@ onClickOutside(highlightedCardRef, () => {
 })
 
 const editingNoteId = ref<string | null>(null)
-const editingNote = computed(() => {
-  if (!editingNoteId.value)
-    return null
-  return notes.value.find(n => n.id === editingNoteId.value) ?? null
-})
 
 const {
   lastSavedText,
@@ -213,6 +311,22 @@ async function handleDeleteNote(noteId: string) {
     queryCache.invalidateQueries({ key: ['notes'] })
     queryCache.invalidateQueries({ key: ['note', noteId], exact: true })
     toast.success('记忆已删除')
+  }
+}
+
+// ==================== Scope: workspace → global ====================
+
+async function handleToGlobal(note: NoteWithTags) {
+  try {
+    const updated = await api.updateNote(note.id, { workspacePath: null })
+    if (updated) {
+      queryCache.setQueryData(['note', note.id], updated)
+      queryCache.invalidateQueries({ key: ['notes'] })
+      toast.success('已转为全局记忆')
+    }
+  }
+  catch (e: unknown) {
+    toast.error((e as { message?: string })?.message || '操作失败')
   }
 }
 
@@ -341,11 +455,13 @@ onKeyStroke('Escape', () => {
       >
         <MemoriesTagSidebar
           :tags="tagsList"
+          :notes="allNotesList ?? []"
           :selected-tag-id="store.selectedTagId"
           :active-tag-path="activeTagPath"
-          :notes-count="notesList?.length ?? 0"
+          :notes-count="allNotesList?.length ?? 0"
           @select-tag="selectTag"
           @tag-tree-select="handleTagTreeSelect"
+          @delete-tags="handleDeleteTags"
         />
       </aside>
 
@@ -420,42 +536,7 @@ onKeyStroke('Escape', () => {
               </template>
             </MemoriesComposer>
 
-            <!-- Editing area -->
-            <div
-              v-if="editingNoteId && editingNote"
-              class="mb-6 rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden"
-            >
-              <div class="editing-editor">
-                <NoteEditor
-                  :key="`edit-${editingNoteId}`"
-                  :editor-state="editingNote.editorState ?? null"
-                  :content="editingNote.content"
-                  @change="handleEditingEditorChange"
-                />
-              </div>
-              <div class="flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-muted/20">
-                <span class="text-xs text-muted-foreground/60">
-                  {{ store.isSaving ? '保存中...' : lastSavedText || '编辑中' }}
-                </span>
-                <div class="flex items-center gap-1">
-                  <button
-                    class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                    title="管理标签"
-                    @click="openTagsModal(editingNoteId!)"
-                  >
-                    <div class="i-carbon-tag h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    class="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"
-                    @click="cancelEditing"
-                  >
-                    完成
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Card stream -->
+            <!-- Card stream - Timeline view -->
             <div v-if="isLoading" class="py-12 text-center text-sm text-muted-foreground">
               <div class="i-carbon-circle-dash h-5 w-5 animate-spin mx-auto mb-2 opacity-50" />
               加载中...
@@ -464,28 +545,92 @@ onKeyStroke('Escape', () => {
             <div v-else-if="notes.length === 0" class="py-16 text-center">
               <div class="i-carbon-idea mx-auto h-10 w-10 text-muted-foreground/30 mb-4" />
               <p class="text-sm text-muted-foreground/70">
-                {{ store.searchQuery ? '没有找到匹配的记忆' : '还没有记忆，写下你的第一个想法吧' }}
+                {{ store.searchQuery ? '没有找到匹配的记忆' : '暂无数据' }}
               </p>
             </div>
 
-            <div v-else class="columns-2 gap-3">
+            <div v-else class="space-y-6">
               <div
-                v-for="note in notes"
-                :key="note.id"
-                :data-note-id="note.id"
-                class="break-inside-avoid mb-3"
-                :class="editingNoteId === note.id ? 'hidden' : ''"
+                v-for="group in groupedNotes"
+                :key="group.dateKey"
+                class="timeline-group"
               >
-                <div
-                  :ref="(el) => { if (highlightedNoteId === note.id) highlightedCardRef = el as HTMLElement }"
-                >
-                  <MemoryNoteCard
-                    :note="note"
-                    :is-highlighted="highlightedNoteId === note.id"
-                    @click="(n) => { highlightedNoteId = null; startEditing(n) }"
-                    @open-tags="openTagsModal"
-                    @delete="handleDeleteNote"
-                  />
+                <!-- Timeline date header -->
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-primary/60" />
+                    <span class="text-sm font-medium text-foreground">
+                      {{ formatTimelineDate(group.date) }}
+                    </span>
+                    <span v-if="formatTimelineYear(group.date)" class="text-xs text-muted-foreground">
+                      {{ formatTimelineYear(group.date) }}
+                    </span>
+                  </div>
+                  <div class="flex-1 h-px bg-border/50" />
+                  <span class="text-xs text-muted-foreground/60">
+                    {{ group.notes.length }} 条记忆
+                  </span>
+                </div>
+
+                <!-- Cards for this day -->
+                <div class="columns-2 gap-3 pl-4 border-l-2 border-border/30">
+                  <div
+                    v-for="note in group.notes"
+                    :key="note.id"
+                    :data-note-id="note.id"
+                    class="break-inside-avoid mb-3"
+                  >
+                    <!-- Inline editing area -->
+                    <div
+                      v-if="editingNoteId === note.id"
+                      class="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden col-span-full w-full"
+                      style="column-span: all; -webkit-column-span: all;"
+                    >
+                      <div class="editing-editor">
+                        <NoteEditor
+                          :key="`edit-${note.id}`"
+                          :editor-state="note.editorState ?? null"
+                          :content="note.content"
+                          @change="handleEditingEditorChange"
+                        />
+                      </div>
+                      <div class="flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-muted/20">
+                        <span class="text-xs text-muted-foreground/60">
+                          {{ store.isSaving ? '保存中...' : lastSavedText || '编辑中' }}
+                        </span>
+                        <div class="flex items-center gap-1">
+                          <button
+                            class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            title="管理标签"
+                            @click="openTagsModal(note.id)"
+                          >
+                            <div class="i-carbon-tag h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            class="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"
+                            @click="cancelEditing"
+                          >
+                            完成
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Normal card -->
+                    <div
+                      v-else
+                      :ref="(el) => { if (highlightedNoteId === note.id) highlightedCardRef = el as HTMLElement }"
+                    >
+                      <MemoryNoteCard
+                        :note="note"
+                        :is-highlighted="highlightedNoteId === note.id"
+                        @click="(n) => { highlightedNoteId = null; startEditing(n) }"
+                        @open-tags="openTagsModal"
+                        @delete="handleDeleteNote"
+                        @to-global="handleToGlobal"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

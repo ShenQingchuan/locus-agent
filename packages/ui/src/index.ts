@@ -1,4 +1,6 @@
 export { default as CommandPalette } from './components/CommandPalette.vue'
+export { default as ContextMenu } from './components/ContextMenu.vue'
+export type { ContextMenuItem } from './components/ContextMenu.vue'
 export type { CommandGroup, CommandItem } from './components/CommandPalette.vue'
 export { default as DirectoryBrowserModal } from './components/DirectoryBrowserModal.vue'
 // Re-export component prop types
