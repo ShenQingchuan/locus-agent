@@ -16,17 +16,25 @@ function buildAbsolutePath(rootPath: string, relativePath: string): string {
   return normalizeSearchPath(`${trimmedRoot}/${relativePath}`)
 }
 
+function basenameOfPath(path: string, isDir: boolean): string {
+  const lastSlash = path.lastIndexOf('/')
+  const name = lastSlash >= 0 ? path.slice(lastSlash + 1) : path
+  return isDir ? `${name}/` : name
+}
+
 function flattenWorkspaceTree(rootPath: string, nodes: WorkspaceTreeNode[], items: WorkspaceMentionItem[] = []): WorkspaceMentionItem[] {
   for (const node of nodes) {
     const absolutePath = buildAbsolutePath(rootPath, node.id)
+    const isDir = node.type === 'directory'
     items.push({
       id: node.id,
       label: node.id,
+      basename: basenameOfPath(node.id, isDir),
       absolutePath,
       searchText: `${node.id} ${absolutePath}`,
-      kind: node.type === 'directory' ? 'dir-mention' : 'file-mention',
-      icon: node.type === 'directory' ? 'i-carbon-folder' : 'i-carbon-document',
-      displayPath: node.type === 'directory' ? `${node.id}/` : node.id,
+      kind: isDir ? 'dir-mention' : 'file-mention',
+      icon: isDir ? 'i-carbon-folder' : 'i-carbon-document',
+      displayPath: isDir ? `${node.id}/` : node.id,
     })
 
     if (node.children?.length)

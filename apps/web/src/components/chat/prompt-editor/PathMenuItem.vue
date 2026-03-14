@@ -12,12 +12,12 @@ defineProps<{
     class="path-menu-item"
     :value="item.searchText"
   >
-    <div class="flex items-center gap-2 px-2.5 py-1.5">
+    <div class="flex items-center gap-1.5 px-2 py-1">
       <div
-        class="h-4 w-4 flex-shrink-0 text-muted-foreground"
+        class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
         :class="item.icon"
       />
-      <span class="truncate text-sm text-foreground font-mono">{{ item.label }}</span>
+      <span class="truncate text-xs text-foreground font-mono">{{ item.label }}</span>
     </div>
   </AutocompleteItem>
 </template>
@@ -25,7 +25,7 @@ defineProps<{
 <style>
 .path-menu-item {
   cursor: pointer;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   transition: background-color 0.1s;
 }
 

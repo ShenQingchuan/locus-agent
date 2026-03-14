@@ -42,10 +42,16 @@ export async function openWorkspace(path: string): Promise<WorkspaceTreeResponse
   return request<WorkspaceTreeResponse>(`/workspace/tree?${query.toString()}`)
 }
 
-export async function fetchMentionSearch(query: string, basePath?: string): Promise<MentionSearchResponse> {
+export async function fetchMentionSearch(
+  query: string,
+  basePath?: string,
+  includeHidden = true,
+): Promise<MentionSearchResponse> {
   const params = new URLSearchParams({ query })
   if (basePath)
     params.set('basePath', basePath)
+  if (includeHidden)
+    params.set('includeHidden', 'true')
   return request<MentionSearchResponse>(`/workspace/mention-search?${params.toString()}`)
 }
 

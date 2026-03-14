@@ -85,7 +85,14 @@ function extractPlainText(doc: any): string {
       return
     }
     if (node.type?.name === 'mention') {
-      parts.push(node.attrs?.value || '')
+      const kind = node.attrs?.kind
+      const id = node.attrs?.id
+      if ((kind === 'file-mention' || kind === 'dir-mention') && id) {
+        parts.push(kind === 'dir-mention' ? `@${id}/` : `@${id}`)
+      }
+      else {
+        parts.push(node.attrs?.value || '')
+      }
       return
     }
     if (node.type?.name === 'hardBreak') {

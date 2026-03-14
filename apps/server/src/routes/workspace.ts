@@ -6,10 +6,12 @@ import type {
   WorkspaceTreeNode,
 } from '@univedge/locus-agent-sdk'
 import { watch as fsWatch } from 'node:fs'
-import { readdir, readFile, realpath } from 'node:fs/promises'
+import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, join, relative, sep } from 'node:path'
+import { basename, join, relative, resolve, sep } from 'node:path'
+import { Glob } from 'bun'
 import { Hono } from 'hono'
+import { getGitignoreFilter } from '../agent/tools/gitignore-filter.js'
 import { getAllowedRoots, resolveAllowedDirectory } from '../services/workspace-access.js'
 
 export const workspaceRoutes = new Hono()
@@ -157,12 +159,29 @@ workspaceRoutes.get('/tree', async (c) => {
 })
 
 const MAX_MENTION_ENTRIES = 200
+const MAX_FUZZY_SCAN = 15000
 const HIDDEN_DIR_RE = /^\./
+const LEADING_SLASH_RE = /^\//
+
+/** Fuzzy match: query chars appear in order in path (case-insensitive). */
+function fuzzyMatch(query: string, path: string): boolean {
+  const q = query.toLowerCase()
+  const p = path.toLowerCase()
+  let j = 0
+  for (let i = 0; i < q.length; i++) {
+    const found = p.indexOf(q[i], j)
+    if (found === -1)
+      return false
+    j = found + 1
+  }
+  return true
+}
 
 workspaceRoutes.get('/mention-search', async (c) => {
   try {
     const query = c.req.query('query') ?? ''
     const basePath = c.req.query('basePath')
+    const includeHidden = c.req.query('includeHidden') === 'true'
 
     let resolvedBase: string
     if (basePath) {
@@ -172,74 +191,90 @@ workspaceRoutes.get('/mention-search', async (c) => {
       resolvedBase = await realpath(homedir())
     }
 
-    const isAbsolute = query.startsWith('/')
-    let dirToList: string
-    let filter: string
-
-    if (isAbsolute) {
-      const absQuery = query
-      const lastSlash = absQuery.lastIndexOf('/')
-      const dirPart = absQuery.slice(0, lastSlash + 1) || '/'
-      filter = absQuery.slice(lastSlash + 1).toLowerCase()
-      try {
-        dirToList = await realpath(dirPart)
-        const allowedRoots = await getAllowedRoots()
-        if (!allowedRoots.some(root => dirToList === root || dirToList.startsWith(`${root}${sep}`))) {
-          return c.json({ basePath: resolvedBase, resolvedDir: dirPart, entries: [], truncated: false })
-        }
-      }
-      catch {
-        return c.json({ basePath: resolvedBase, resolvedDir: dirPart, entries: [], truncated: false })
-      }
-    }
-    else {
-      const lastSlash = query.lastIndexOf('/')
-      if (lastSlash >= 0) {
-        const dirPart = query.slice(0, lastSlash + 1)
-        filter = query.slice(lastSlash + 1).toLowerCase()
-        dirToList = join(resolvedBase, dirPart)
-      }
-      else {
-        filter = query.toLowerCase()
-        dirToList = resolvedBase
-      }
-    }
-
-    let dirents: import('node:fs').Dirent[]
-    try {
-      dirents = await readdir(dirToList, { withFileTypes: true, encoding: 'utf-8' })
-    }
-    catch {
-      return c.json({ basePath: resolvedBase, resolvedDir: dirToList, entries: [], truncated: false })
-    }
-
+    const filter = query.toLowerCase().replace(LEADING_SLASH_RE, '')
     const raw: MentionSearchEntry[] = []
-    for (const entry of dirents) {
-      if (HIDDEN_DIR_RE.test(entry.name))
-        continue
-      if (entry.name === 'node_modules')
-        continue
-      if (filter && !entry.name.toLowerCase().includes(filter))
-        continue
-      const absPath = join(dirToList, entry.name)
-      raw.push({
-        name: entry.name,
-        absolutePath: absPath,
-        relativePath: relative(resolvedBase, absPath).split(sep).join('/'),
-        type: entry.isDirectory() ? 'directory' : 'file',
+
+    if (filter) {
+      const glob = new Glob('**/*')
+      const isIgnored = await getGitignoreFilter(resolvedBase)
+      let scanned = 0
+
+      for await (const relPath of glob.scan({
+        cwd: resolvedBase,
+        dot: includeHidden,
+        onlyFiles: false,
+        followSymlinks: false,
+      })) {
+        if (++scanned > MAX_FUZZY_SCAN)
+          break
+        if (relPath.includes('node_modules'))
+          continue
+        if (!fuzzyMatch(filter, relPath))
+          continue
+        const absPath = resolve(resolvedBase, relPath)
+        let st: Awaited<ReturnType<typeof stat>>
+        try {
+          st = await stat(absPath)
+        }
+        catch {
+          continue
+        }
+        if (isIgnored(absPath, st.isDirectory()))
+          continue
+        raw.push({
+          name: basename(relPath),
+          absolutePath: absPath,
+          relativePath: relative(resolvedBase, absPath).split(sep).join('/'),
+          type: st.isDirectory() ? 'directory' : 'file',
+        })
+        if (raw.length >= MAX_MENTION_ENTRIES * 2)
+          break
+      }
+
+      raw.sort((a, b) => {
+        if (a.type !== b.type)
+          return a.type === 'directory' ? -1 : 1
+        const lenA = a.relativePath.length
+        const lenB = b.relativePath.length
+        if (lenA !== lenB)
+          return lenA - lenB
+        return sortDirentNames(a.name, b.name)
       })
     }
+    else {
+      let dirents: import('node:fs').Dirent[]
+      try {
+        dirents = await readdir(resolvedBase, { withFileTypes: true, encoding: 'utf-8' })
+      }
+      catch {
+        return c.json({ basePath: resolvedBase, resolvedDir: resolvedBase, entries: [], truncated: false })
+      }
 
-    raw.sort((a, b) => {
-      if (a.type !== b.type)
-        return a.type === 'directory' ? -1 : 1
-      return sortDirentNames(a.name, b.name)
-    })
+      for (const entry of dirents) {
+        if (!includeHidden && HIDDEN_DIR_RE.test(entry.name))
+          continue
+        if (entry.name === 'node_modules')
+          continue
+        const absPath = join(resolvedBase, entry.name)
+        raw.push({
+          name: entry.name,
+          absolutePath: absPath,
+          relativePath: relative(resolvedBase, absPath).split(sep).join('/'),
+          type: entry.isDirectory() ? 'directory' : 'file',
+        })
+      }
+
+      raw.sort((a, b) => {
+        if (a.type !== b.type)
+          return a.type === 'directory' ? -1 : 1
+        return sortDirentNames(a.name, b.name)
+      })
+    }
 
     const truncated = raw.length > MAX_MENTION_ENTRIES
     const entries = truncated ? raw.slice(0, MAX_MENTION_ENTRIES) : raw
 
-    return c.json({ basePath: resolvedBase, resolvedDir: dirToList, entries, truncated })
+    return c.json({ basePath: resolvedBase, resolvedDir: resolvedBase, entries, truncated })
   }
   catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)

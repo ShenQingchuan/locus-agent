@@ -85,6 +85,33 @@ function defineMentionGuard() {
 }
 
 /**
+ * Clipboard: serialize file/dir mentions with full path (id) for copy,
+ * while the editor displays basename (value) in the tag.
+ */
+function defineMentionClipboard() {
+  return definePlugin(() => {
+    return new Plugin({
+      props: {
+        clipboardTextSerializer(slice, _view) {
+          const { content } = slice
+          return content.textBetween(0, content.size, '\n\n', (node) => {
+            if (node.type.name === 'mention') {
+              const kind = node.attrs?.kind as string | undefined
+              const id = node.attrs?.id as string | undefined
+              if ((kind === 'file-mention' || kind === 'dir-mention') && id)
+                return kind === 'dir-mention' ? `@${id}/` : `@${id}`
+              return (node.attrs?.value as string) ?? ''
+            }
+            const leafText = node.type.spec?.leafText
+            return typeof leafText === 'function' ? leafText(node) : ''
+          })
+        },
+      },
+    })
+  })
+}
+
+/**
  * When backspacing into a mention, delete the mention (and its guard space)
  * in one step so the guard plugin doesn't re-insert the space endlessly.
  */
@@ -166,6 +193,7 @@ export function definePromptExtension(options: PromptExtensionOptions = {}): Ext
     defineHardBreak(),
     defineMention(),
     defineMentionGuard(),
+    defineMentionClipboard(),
     defineMentionDeleteKeymap(),
     defineBaseKeymap(),
     defineBaseCommands(),

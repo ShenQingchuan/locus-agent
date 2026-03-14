@@ -18,8 +18,10 @@ export interface SlashMenuCommand {
 export interface WorkspaceMentionItem {
   /** Unique id used as mention attr id */
   id: string
-  /** Display label (file/directory name) */
+  /** Display label in search panel (full path) */
   label: string
+  /** Display in input tag (basename only) */
+  basename: string
   /** Full text used for autocomplete filtering */
   searchText: string
   /** Absolute path on disk */

@@ -23,7 +23,8 @@ export function usePathMenuItems(workspaceRoot?: MaybeRef<string | undefined>) {
 
         return {
           id: entry.absolutePath,
-          label: entry.name,
+          label: displayPath,
+          basename: isDir ? `${entry.name}/` : entry.name,
           searchText: displayPath,
           absolutePath: entry.absolutePath,
           displayPath: isDir ? `${displayPath}/` : displayPath,

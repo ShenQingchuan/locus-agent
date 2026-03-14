@@ -47,7 +47,7 @@ function handleListValueChange(selectedValue: string) {
 
     const mentionNode = mentionType.create({
       id: item.absolutePath,
-      value: `@${item.displayPath}`,
+      value: `@${item.basename}`,
       kind: item.kind,
     })
 
@@ -81,12 +81,12 @@ function emptyText() {
       @value-change="handleListValueChange"
     >
       <div v-if="isChatMode" class="path-menu-hint">
-        <div class="i-carbon-information h-3 w-3 flex-shrink-0" />
+        <div class="i-carbon-information h-2.5 w-2.5 flex-shrink-0" />
         <span>会话模式下相对于 HOME 目录搜索</span>
       </div>
 
       <AutocompleteEmpty class="path-menu-empty">
-        <div class="px-3 py-2 text-xs text-muted-foreground">
+        <div class="px-2 py-1.5 text-[11px] text-muted-foreground">
           {{ emptyText() }}
         </div>
       </AutocompleteEmpty>
@@ -133,16 +133,16 @@ prosekit-autocomplete-empty {
   background-color: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
   border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   box-shadow:
     0 4px 16px rgb(0 0 0 / 0.12),
     0 2px 4px rgb(0 0 0 / 0.06);
-  max-height: 280px;
-  max-width: 520px;
-  min-width: 260px;
+  max-height: 240px;
+  max-width: 560px;
+  min-width: 220px;
   overflow: hidden;
   overflow-y: auto;
-  padding: 0 0.25rem 0.25rem;
+  padding: 0 0.125rem 0.125rem;
 }
 
 html.dark .path-menu-list {
@@ -157,9 +157,9 @@ html.dark .path-menu-list {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.625rem;
-  font-size: 0.6875rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
   color: hsl(var(--muted-foreground));
   background-color: hsl(var(--popover));
   border-bottom: 1px solid hsl(var(--border));
