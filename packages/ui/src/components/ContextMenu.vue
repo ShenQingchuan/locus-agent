@@ -41,7 +41,8 @@ function close() {
 
 function clampToViewport() {
   const el = menuRef.value
-  if (!el) return
+  if (!el)
+    return
   const rect = el.getBoundingClientRect()
   const vw = window.innerWidth
   const vh = window.innerHeight
@@ -59,13 +60,15 @@ function handleContextMenu(e: MouseEvent) {
 }
 
 function handleSelect(key: string, item: ContextMenuItem) {
-  if (item.disabled) return
+  if (item.disabled)
+    return
   emit('select', key)
   close()
 }
 
 function moveFocus(step: 1 | -1, items: ContextMenuItem[]) {
-  if (items.length === 0) return
+  if (items.length === 0)
+    return
   let nextIndex = focusedIndex.value
   for (let i = 0; i < items.length; i++) {
     nextIndex = (nextIndex + step + items.length) % items.length
@@ -77,7 +80,8 @@ function moveFocus(step: 1 | -1, items: ContextMenuItem[]) {
 }
 
 function handleKeydown(e: KeyboardEvent, items: ContextMenuItem[]) {
-  if (!isOpen.value) return
+  if (!isOpen.value)
+    return
   switch (e.key) {
     case 'ArrowDown': {
       e.preventDefault()
@@ -93,7 +97,8 @@ function handleKeydown(e: KeyboardEvent, items: ContextMenuItem[]) {
     case ' ': {
       e.preventDefault()
       const focused = focusedIndex.value >= 0 ? items[focusedIndex.value] : undefined
-      if (focused) handleSelect(focused.key, focused)
+      if (focused)
+        handleSelect(focused.key, focused)
       break
     }
     case 'Escape': {
@@ -105,9 +110,11 @@ function handleKeydown(e: KeyboardEvent, items: ContextMenuItem[]) {
 }
 
 function onClickOutside(e: MouseEvent) {
-  if (!isOpen.value) return
+  if (!isOpen.value)
+    return
   const target = e.target as Node
-  if (menuRef.value?.contains(target)) return
+  if (menuRef.value?.contains(target))
+    return
   close()
 }
 

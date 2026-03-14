@@ -104,6 +104,11 @@ const codingScope = computed(() => ({
 const canUseAssistant = computed(() => !!currentProjectKey.value)
 const hasHandledFirstActivation = ref(false)
 
+const isGitStatusUpdating = computed(
+  () => activeSection.value === 'workspace'
+    && (gitStatus.isLoading.value || gitStatus.isRefreshing.value),
+)
+
 provideMarkConversationDirty((conversationId: string) => {
   dirtyConversations.add(conversationId)
 })
@@ -208,6 +213,11 @@ onActivated(async () => {
   }
 
   refreshCodingDataOnActivate()
+
+  // Refresh git status when change review (变更审阅) is the active section
+  if (activeSection.value === 'workspace' && currentProjectKey.value) {
+    gitStatus.refresh()
+  }
 })
 
 onDeactivated(() => {
@@ -498,6 +508,14 @@ watch(manageKanbanResultCount, (current, previous) => {
               </button>
             </header>
 
+            <!-- Git status loading indicator (swinging bar) when on change review -->
+            <div
+              v-if="isGitStatusUpdating"
+              class="git-loading-bar relative h-0.5 w-full overflow-hidden bg-muted"
+            >
+              <div class="git-loading-bar-inner absolute left-0 h-full w-20 rounded-full bg-primary" />
+            </div>
+
             <main class="flex-1 min-h-0">
               <section v-if="activeSection === 'planning'" class="h-full min-h-0">
                 <KanbanBoard
@@ -690,3 +708,19 @@ watch(manageKanbanResultCount, (current, previous) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.git-loading-bar-inner {
+  animation: git-swing 1.2s ease-in-out infinite;
+}
+
+@keyframes git-swing {
+  0%,
+  100% {
+    left: 0;
+  }
+  50% {
+    left: calc(100% - 5rem);
+  }
+}
+</style>
