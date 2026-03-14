@@ -105,13 +105,13 @@ export function useGlobalSearch() {
   function handleCommandSelect(item: CommandItem) {
     const data = item.data as SearchCommandItemData
     if (data.type === 'note' && data.noteId) {
-      router.push({ name: 'memories', query: { id: data.noteId } })
+      router.push({ name: 'MemoriesView', query: { id: data.noteId } })
     }
     else if (data.type === 'tag' && data.tagName) {
-      router.push({ name: 'memories', query: { tag: data.tagName } })
+      router.push({ name: 'MemoriesView', query: { tag: data.tagName } })
     }
     else if (data.type === 'conversation' && data.conversationId) {
-      router.push({ name: 'chat', query: { session: data.conversationId } })
+      router.push({ name: 'ChatView', query: { session: data.conversationId } })
     }
   }
 

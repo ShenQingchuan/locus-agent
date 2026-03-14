@@ -274,7 +274,7 @@ function startEditing(note: NoteWithTags) {
   resetEditorSave()
   isSyncingToUrl.value = true
   router.replace({
-    name: 'memories',
+    name: 'MemoriesView',
     query: {
       ...(store.selectedTagId ? { tag: tagsList.value.find(t => t.id === store.selectedTagId)?.name } : {}),
       id: note.id,
@@ -288,7 +288,7 @@ function cancelEditing() {
   resetEditorSave()
   isSyncingToUrl.value = true
   router.replace({
-    name: 'memories',
+    name: 'MemoriesView',
     query: store.selectedTagId ? { tag: tagsList.value.find(t => t.id === store.selectedTagId)?.name } : {},
   })
   isSyncingToUrl.value = false
@@ -423,7 +423,7 @@ watch(
     if (tagName !== urlTag || (editingNoteId.value ? editingNoteId.value !== urlId : !!urlId)) {
       isSyncingToUrl.value = true
       router.replace({
-        name: 'memories',
+        name: 'MemoriesView',
         query: {
           ...(tagName ? { tag: tagName } : {}),
           ...(editingNoteId.value ? { id: editingNoteId.value } : {}),

@@ -135,7 +135,7 @@ function scrollToSection(id: SettingsSectionId, behavior: ScrollBehavior = 'smoo
 
 async function navigateToSection(id: SettingsSectionId): Promise<void> {
   if (route.hash !== `#${id}`)
-    await router.replace({ name: 'settings', hash: `#${id}` })
+    await router.replace({ name: 'SettingsView', hash: `#${id}` })
 
   await nextTick()
   scrollToSection(id)
@@ -419,7 +419,7 @@ async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, 
           <button
             class="btn-ghost btn-icon"
             title="返回"
-            @click="router.push({ name: 'chat' })"
+            @click="router.push({ name: 'ChatView' })"
           >
             <div class="i-carbon-arrow-left h-4 w-4" />
           </button>

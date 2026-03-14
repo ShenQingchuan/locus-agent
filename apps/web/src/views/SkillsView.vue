@@ -8,6 +8,8 @@ import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { useSkillsManager } from '@/composables/useSkillsManager'
 import { useWorkspaceStore } from '@/stores/workspace'
 
+defineOptions({ name: 'SkillsView' })
+
 const sourceFilterOptions: Array<{ value: 'all' | 'system' | 'project', label: string }> = [
   { value: 'all', label: '所有' },
   { value: 'system', label: '全局' },
@@ -261,7 +263,9 @@ watch(selectedWorkspaceRoot, () => {
 
               <section class="px-6 py-5">
                 <div class="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                  <MarkdownRender :content="previewContent" />
+                  <KeepAlive :max="8">
+                    <MarkdownRender :key="`${selectedSkillId}-${selectedFilePath ?? ''}`" :content="previewContent" />
+                  </KeepAlive>
                 </div>
               </section>
             </template>

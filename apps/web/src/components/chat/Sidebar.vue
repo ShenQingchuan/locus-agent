@@ -30,8 +30,8 @@ watch(conversationsData, (data) => {
 
 /** Navigate back to chat page if currently on a different route */
 function ensureChatRoute() {
-  if (route.name !== 'chat') {
-    router.push({ name: 'chat' })
+  if (route.name !== 'ChatView') {
+    router.push({ name: 'ChatView' })
   }
 }
 const menuItems = computed<DropdownItem[]>(() => [

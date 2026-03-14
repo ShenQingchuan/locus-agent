@@ -12,9 +12,7 @@ const toggleDark = useToggle(isDark)
 const { openSearch } = useGlobalSearch()
 
 const currentModule = computed(() => {
-  if (route.name === 'chat' || route.name === 'memories' || route.name === 'coding' || route.name === 'skills')
-    return route.name
-  return ''
+  return route.name || ''
 })
 
 function navigateTo(name: string) {
@@ -31,22 +29,22 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    key: 'chat',
+    key: 'ChatView',
     icon: 'i-streamline-pixel:email-mail-chat',
     title: '对话',
   },
   {
-    key: 'coding',
+    key: 'CodingView',
     icon: 'i-streamline-pixel:coding-apps-websites-plugin',
     title: '编程',
   },
   {
-    key: 'skills',
+    key: 'SkillsView',
     icon: 'i-streamline-pixel:music-walkman-cassette',
     title: '技能',
   },
   {
-    key: 'memories',
+    key: 'MemoriesView',
     icon: 'i-streamline-pixel:content-files-archive-books-1',
     title: '记忆',
   },
@@ -110,11 +108,11 @@ const navItems: NavItem[] = [
       <!-- Settings -->
       <button
         class="flex-center w-9 h-9 rounded-lg transition-colors duration-150"
-        :class="route.name === 'settings'
+        :class="route.name === 'SettingsView'
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'"
         title="设置"
-        @click="navigateTo('settings')"
+        @click="navigateTo('SettingsView')"
       >
         <div class="i-carbon-settings h-4.5 w-4.5" />
       </button>

@@ -23,6 +23,8 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { runWithLoadingState } from '@/utils/loadingState'
 import { createProjectKey } from '@/utils/projectKey'
 
+defineOptions({ name: 'CodingView' })
+
 type CodingSection = 'planning' | 'workspace'
 
 const activeSection = useLocalStorage<CodingSection>('locus-agent:coding-active-section', 'workspace')

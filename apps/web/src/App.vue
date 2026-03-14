@@ -5,6 +5,7 @@ import { useMagicKeys, whenever } from '@vueuse/core'
 import { computed } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
+import { keepAliveRoutes } from '@/router'
 
 const router = useRouter()
 
@@ -22,16 +23,15 @@ const keys = useMagicKeys()
 const openSettings = computed(() => !!(keys['Cmd+Shift+,']?.value || keys['Ctrl+Shift+,']?.value))
 
 whenever(openSettings, () => {
-  router.push({ name: 'settings' })
+  router.push({ name: 'SettingsView' })
 })
 </script>
 
 <template>
-  <RouterView v-slot="{ Component, route }">
-    <KeepAlive>
-      <component :is="Component" v-if="route.meta.keepAlive" />
+  <RouterView v-slot="{ Component }">
+    <KeepAlive :include="keepAliveRoutes">
+      <component :is="Component" />
     </KeepAlive>
-    <component :is="Component" v-if="!route.meta.keepAlive" />
   </RouterView>
   <ToastContainer />
 
