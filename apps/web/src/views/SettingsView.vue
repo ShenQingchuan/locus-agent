@@ -43,6 +43,7 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const loadError = ref<string | null>(null)
 const requiresRestart = ref(false)
+const embeddingStatusRefreshToken = ref(0)
 
 const runtimeInfo = ref<{ provider: string, model: string, contextWindow: number } | null>(null)
 const apiKeysMasked = ref<Partial<Record<LLMProviderType, string | null>>>({})
@@ -252,6 +253,7 @@ async function loadConfig() {
 
     runtimeInfo.value = config.runtime ?? null
     requiresRestart.value = false
+    embeddingStatusRefreshToken.value++
 
     if (config.codingKimi) {
       codingKimi.value = {
@@ -384,6 +386,7 @@ async function saveConfig() {
       if (result.config.runtime?.contextWindow)
         chatStore.MAX_CONTEXT_TOKENS = result.config.runtime.contextWindow
     }
+    embeddingStatusRefreshToken.value++
   }
   finally {
     isSaving.value = false
@@ -624,7 +627,7 @@ async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, 
                     </p>
                   </div>
 
-                  <SettingsEmbeddingCard />
+                  <SettingsEmbeddingCard :refresh-token="embeddingStatusRefreshToken" />
                 </section>
 
                 <section

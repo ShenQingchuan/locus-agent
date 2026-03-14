@@ -6,8 +6,12 @@ import type {
 } from '@/api/embedding'
 import { Select, useToast } from '@univedge/locus-ui'
 import { useThrottleFn } from '@vueuse/core'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useEmbeddingTasks } from '@/composables/useEmbeddingTasks'
+
+const props = defineProps<{
+  refreshToken?: number
+}>()
 
 const toast = useToast()
 
@@ -266,10 +270,11 @@ watch(modelDownloadCompletedAt, (value, oldValue) => {
     void loadEmbeddingStatus()
 })
 
-onMounted(() => {
-  loadEmbeddingStatus()
-  scrollInstallOutputToBottom()
-})
+watch(() => props.refreshToken, () => {
+  void loadEmbeddingStatus()
+}, { immediate: true })
+
+scrollInstallOutputToBottom()
 </script>
 
 <template>

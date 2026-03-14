@@ -73,10 +73,13 @@ function startDev() {
   const dbPath = getSettingsDbPath()
   initDB({ dbPath })
 
-  // 2. Load config from settings DB (uses Drizzle db instance)
-  const llmSettings = getLLMSettings()
-  if (!llmSettings) {
-    throw new Error('LLM settings not configured. Run `locus-agent config` to set up.')
+  // 2. Load config from settings DB (uses Drizzle db instance).
+  // Allow dev startup without LLM credentials so the server and UI remain usable.
+  const llmSettings = getLLMSettings() ?? {
+    provider: 'openai' as const,
+    apiKey: '',
+    apiBase: undefined,
+    model: undefined,
   }
   const port = getServerPort()
   const yoloMode = isYoloMode()
