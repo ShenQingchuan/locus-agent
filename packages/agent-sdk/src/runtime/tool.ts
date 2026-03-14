@@ -15,6 +15,7 @@ export const BuiltinTool = {
   AskQuestion: 'ask_question',
   Delegate: 'delegate',
   ManageMemory: 'manage_memory',
+  SearchMemory: 'search_memory',
   Skill: 'skill',
   ManageTodos: 'manage_todos',
   ManageKanban: 'manage_kanban',

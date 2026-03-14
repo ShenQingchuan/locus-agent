@@ -5,7 +5,7 @@ import { delegateTool } from './delegate.js'
 import { globTool } from './glob.js'
 import { grepTool } from './grep.js'
 import { manageKanbanTool } from './manage_kanban.js'
-import { manageMemoryTool } from './manage_memory.js'
+import { manageMemoryTool, searchMemoryTool } from './manage_memory.js'
 import { planExitTool, readPlanTool, writePlanTool } from './manage_plans.js'
 import { manageTodosTool } from './manage_todos.js'
 import { readFileTool } from './read.js'
@@ -25,6 +25,7 @@ export const tools = {
   [BuiltinTool.AskQuestion]: askQuestionTool,
   [BuiltinTool.Delegate]: delegateTool,
   [BuiltinTool.ManageMemory]: manageMemoryTool,
+  [BuiltinTool.SearchMemory]: searchMemoryTool,
   [BuiltinTool.Skill]: skillTool,
   [BuiltinTool.ManageTodos]: manageTodosTool,
   [BuiltinTool.ManageKanban]: manageKanbanTool,

@@ -4,7 +4,7 @@ import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
 import { executeGrep, formatGrepResult } from './grep.js'
 import { executeManageKanban, formatManageKanbanResult } from './manage_kanban.js'
-import { executeManageMemory, formatManageMemoryResult } from './manage_memory.js'
+import { executeManageMemory, executeSearchMemory, formatManageMemoryResult, formatSearchMemoryResult } from './manage_memory.js'
 import {
   executePlanExit,
   executeReadPlan,
@@ -84,6 +84,12 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     )
     return formatManageMemoryResult(result)
   },
+  search_memory: async (args) => {
+    const result = await executeSearchMemory(
+      args as Parameters<typeof executeSearchMemory>[0],
+    )
+    return formatSearchMemoryResult(result)
+  },
   skill: async (args, _callbacks, context) => {
     const result = await executeSkill(args as Parameters<typeof executeSkill>[0], context?.skillsWorkspaceRoot)
     return formatSkillResult(result)
@@ -132,6 +138,7 @@ const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
   str_replace: executeStrReplace as ToolExecutor,
   write_file: executeWriteFile as ToolExecutor,
   manage_memory: executeManageMemory as ToolExecutor,
+  search_memory: executeSearchMemory as ToolExecutor,
   skill: executeSkill as ToolExecutor,
   manage_todos: executeManageTodos as ToolExecutor,
   manage_kanban: executeManageKanban as ToolExecutor,

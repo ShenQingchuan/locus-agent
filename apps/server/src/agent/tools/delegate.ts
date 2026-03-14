@@ -6,6 +6,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { getDelegateSession, upsertDelegateSession } from '../../services/delegate-session.js'
 import { runAgentLoop } from '../loop.js'
+import { MEMORY_TAGGER_SYSTEM_PROMPT } from '../prompts/memory-tagger.js'
 
 interface DelegateSessionState {
   taskId: string
@@ -39,6 +40,13 @@ For implementation requests, provide findings and actionable recommendations.`,
         BuiltinTool.ReadPlan,
         BuiltinTool.AskQuestion,
       ],
+    }
+  }
+
+  if (normalized === 'memory_tagger' || normalized === 'memory-tagger') {
+    return {
+      systemPrompt: MEMORY_TAGGER_SYSTEM_PROMPT,
+      tools: [BuiltinTool.SearchMemory],
     }
   }
 

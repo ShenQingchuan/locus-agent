@@ -10,6 +10,52 @@ import {
   updateNote,
 } from '../../services/note.js'
 
+// ==================== search_memory (read-only) ====================
+
+export const searchMemoryTool = tool({
+  description:
+    'Read-only access to persistent memories. '
+    + 'Use "list" to browse all memories (paginated). '
+    + 'Use "read" to search by natural language query and/or tags. '
+    + 'This tool CANNOT create, update, or delete memories.',
+  inputSchema: z.object({
+    action: z.enum(['list', 'read']).describe(
+      '"list" to browse all memories, "read" to search by query/tags.',
+    ),
+    query: z.string().optional().describe(
+      'For "read". Natural language search query. Uses semantic vector search.',
+    ),
+    tags: z.array(z.string()).optional().describe(
+      'For "read": filter by tag names (prefix matching). '
+      + 'Format: ["preference/tools/editor", "project/locus-agent/stack"].',
+    ),
+    page: z.number().int().min(1).optional().describe(
+      'For "list". Page number (1-based). Defaults to 1.',
+    ),
+    page_size: z.number().int().min(1).max(50).optional().describe(
+      'For "list". Number of memories per page (1-50). Defaults to 20.',
+    ),
+  }),
+})
+
+export type SearchMemoryInput
+  = | { action: 'list', page?: number, page_size?: number }
+    | { action: 'read', query?: string, tags?: string[] }
+
+export type SearchMemoryResult = ManageMemoryListResult | ManageMemoryReadResult
+
+export async function executeSearchMemory(
+  args: SearchMemoryInput,
+): Promise<SearchMemoryResult> {
+  return executeManageMemory(args as ManageMemoryInput) as Promise<SearchMemoryResult>
+}
+
+export function formatSearchMemoryResult(result: SearchMemoryResult): string {
+  return formatManageMemoryResult(result)
+}
+
+// ==================== manage_memory (full CRUD) ====================
+
 const memoryItemSchema = z.object({
   content: z.string().describe('The memory content, 1-3 sentences. Be specific and factual.'),
   tags: z.array(z.string()).describe(
