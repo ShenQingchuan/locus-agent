@@ -479,12 +479,41 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function toggleYoloMode() {
-    yoloMode.value = !yoloMode.value
-    // Persist to DB if we have a conversation
-    if (currentConversationId.value) {
-      await updateConversation(currentConversationId.value, {
-        confirmMode: !yoloMode.value,
-      })
+    const previousYoloMode = yoloMode.value
+    const nextYoloMode = !previousYoloMode
+    const conversationId = currentConversationId.value
+
+    yoloMode.value = nextYoloMode
+
+    // Persist to DB if we have a conversation.
+    // When switching to YOLO during an active approval pause, also sync the
+    // current UI state so pending tools immediately resume visually.
+    if (!conversationId)
+      return
+
+    const pendingToolCallIds = nextYoloMode
+      ? [...pendingApprovals.value.keys()]
+      : []
+
+    const updated = await updateConversation(conversationId, {
+      confirmMode: !nextYoloMode,
+    })
+
+    if (!updated) {
+      yoloMode.value = previousYoloMode
+      return
+    }
+
+    const conversationIndex = conversations.value.findIndex(c => c.id === conversationId)
+    if (conversationIndex !== -1) {
+      conversations.value[conversationIndex] = updated
+    }
+
+    if (nextYoloMode && pendingToolCallIds.length > 0) {
+      for (const toolCallId of pendingToolCallIds) {
+        setToolCallExecuting(toolCallId, conversationId)
+      }
+      clearPendingApprovals(conversationId)
     }
   }
 
