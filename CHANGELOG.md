@@ -1,3 +1,11 @@
+## [0.1.6] - 2026-03-14
+
+### Features
+
+- Add memory tagger system prompt and integrate into agent tools
+
+- Enhance tool management and UI for delegate tools
+
 ## [0.1.5] - 2026-03-14
 
 ### Features
