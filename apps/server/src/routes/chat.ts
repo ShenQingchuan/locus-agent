@@ -13,9 +13,10 @@ import type { AddMessageInput } from '../services/message.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel } from '@univedge/locus-agent-sdk'
+import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isA2ACodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import { runLocalClaudeCode } from '../agent/a2a/local-claude-code.js'
 import {
   getPendingApproval,
   requestApproval,
@@ -478,7 +479,7 @@ chatRoutes.post('/', async (c) => {
     space,
     projectKey,
     workspaceRoot: workspaceRootInput,
-    codingProvider,
+    codingExecutor,
   } = body
 
   const conversationSpace = space === 'coding' ? 'coding' : 'chat'
@@ -591,8 +592,10 @@ chatRoutes.post('/', async (c) => {
 
     try {
       const runtimeModelInfo = getCurrentModelInfo()
-      const assistantModel = codingProvider
-        ? `${codingProvider}/${CODING_PROVIDERS.find(cp => cp.value === codingProvider)?.defaultModel || 'unknown'}`
+      const assistantModel = codingExecutor
+        ? (isCodingModelProvider(codingExecutor)
+            ? `${codingExecutor}/${CODING_PROVIDERS.find(cp => cp.value === codingExecutor)?.defaultModel || 'unknown'}`
+            : `a2a/${codingExecutor}`)
         : `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
@@ -616,42 +619,22 @@ chatRoutes.post('/', async (c) => {
 
       const effectiveThinkingMode = thinkingMode ?? true
       // Use coding provider model if requested, otherwise use main LLM model
-      const model = codingProvider
-        ? await createCodingModel(codingProvider)
-        : createLLMModel(runtimeModelInfo.model, effectiveThinkingMode)
-
-      const result = await runAgentLoop({
-        model,
-        messages,
-        abortSignal: abortController.signal,
-        confirmMode: () => confirmModeState.value,
-        thinkingMode: effectiveThinkingMode,
-        space: conversationSpace,
-        codingMode: conversationSpace === 'coding' ? codingMode : undefined,
-        conversationId,
-        projectKey: conversationProjectKey,
-        workspaceRoot: resolvedWorkspaceRoot,
-
-        // 思考过程增量回调
-        onReasoningDelta: async (delta) => {
+      const streamCallbacks = {
+        onReasoningDelta: async (delta: string) => {
           assistantReasoning += delta
           await stream.writeSSE(createSSEEvent({
             type: 'reasoning-delta',
             reasoningDelta: delta,
           }))
         },
-
-        // 文本增量回调
-        onTextDelta: async (delta) => {
+        onTextDelta: async (delta: string) => {
           assistantText += delta
           await stream.writeSSE(createSSEEvent({
             type: 'text-delta',
             textDelta: delta,
           }))
         },
-
-        // 工具调用开始回调
-        onToolCallStart: async (toolCallId, toolName, args) => {
+        onToolCallStart: async (toolCallId: string, toolName: string, args: unknown) => {
           const toolCall: ToolCall = {
             toolCallId,
             toolName,
@@ -662,10 +645,7 @@ chatRoutes.post('/', async (c) => {
             toolCall,
           }))
         },
-
-        // 工具调用结果回调
-        onToolCallResult: async (toolCallId, toolName, result, isError, isInterrupted) => {
-          // Persist delegate results (with deltas) for DB storage later
+        onToolCallResult: async (toolCallId: string, toolName: string, result: unknown, isError: boolean, isInterrupted?: boolean) => {
           if (result && typeof result === 'object' && (result as { isSubAgentResult?: boolean }).isSubAgentResult) {
             delegateFullResults.set(toolCallId, result)
           }
@@ -682,9 +662,7 @@ chatRoutes.post('/', async (c) => {
             toolResult,
           }))
         },
-
-        // 工具等待确认回调（确认模式下使用）
-        onToolPendingApproval: async (toolCallId, toolName, args) => {
+        onToolPendingApproval: async (toolCallId: string, toolName: string, args: unknown) => {
           const argsRecord = args as Record<string, unknown>
           const suggestedPattern = extractDefaultPattern(toolName, argsRecord)
           const riskLevel = getRiskLevel(toolName, suggestedPattern)
@@ -697,9 +675,7 @@ chatRoutes.post('/', async (c) => {
             riskLevel,
           }))
         },
-
-        // 工具执行流式输出回调（如 bash 的 stdout/stderr）
-        onToolOutputDelta: async (toolCallId, streamType, delta) => {
+        onToolOutputDelta: async (toolCallId: string, streamType: 'stdout' | 'stderr', delta: string) => {
           await stream.writeSSE(createSSEEvent({
             type: 'tool-output-delta',
             toolCallId,
@@ -707,28 +683,14 @@ chatRoutes.post('/', async (c) => {
             delta,
           }))
         },
-
-        // 获取工具确认结果（确认模式下使用）
-        getToolApproval: async (toolCallId, toolName, args) => {
-          return requestApproval(conversationId, toolCallId, toolName, args)
-        },
-
-        // 提问等待回答回调（ask_question 工具使用）
-        onQuestionPending: async (toolCallId, questions) => {
+        onQuestionPending: async (toolCallId: string, questions: Parameters<typeof requestQuestionAnswer>[1]) => {
           await stream.writeSSE(createSSEEvent({
             type: 'question-pending',
             toolCallId,
             questions,
           }))
         },
-
-        // 获取用户对提问的回答（ask_question 工具使用）
-        getQuestionAnswer: async (toolCallId, questions) => {
-          return requestQuestionAnswer(toolCallId, questions)
-        },
-
-        // Delegate 子代理状态流式回调
-        onDelegateDelta: async (toolCallId, delta) => {
+        onDelegateDelta: async (toolCallId: string, delta: SSEEvent extends never ? never : any) => {
           const event: SSEEvent = {
             type: 'delegate-delta',
             toolCallId,
@@ -736,21 +698,72 @@ chatRoutes.post('/', async (c) => {
           }
           await stream.writeSSE(createSSEEvent(event))
         },
+      }
 
-        // 完成回调
-        onFinish: async (_finishReason, usage) => {
-          await stream.writeSSE(createSSEEvent({
-            type: 'done',
-            messageId,
-            model: assistantModel,
-            usage: {
-              promptTokens: usage.inputTokens,
-              completionTokens: usage.outputTokens,
-              totalTokens: usage.inputTokens + usage.outputTokens,
-            },
-          }))
-        },
-      })
+      let result
+      if (codingExecutor && isA2ACodingProvider(codingExecutor)) {
+        const a2aResult = await runLocalClaudeCode({
+          prompt: effectiveUserMessage,
+          conversationId,
+          workspaceRoot: resolvedWorkspaceRoot,
+          abortSignal: abortController.signal,
+          ...streamCallbacks,
+        })
+
+        result = {
+          finishReason: a2aResult.finishReason,
+          usage: a2aResult.usage,
+          generatedMessages: [] as ModelMessage[],
+        }
+
+        await stream.writeSSE(createSSEEvent({
+          type: 'done',
+          messageId,
+          model: a2aResult.model ? `a2a/${codingExecutor}/${a2aResult.model}` : assistantModel,
+          usage: {
+            promptTokens: a2aResult.usage.inputTokens,
+            completionTokens: a2aResult.usage.outputTokens,
+            totalTokens: a2aResult.usage.totalTokens,
+          },
+        }))
+      }
+      else {
+        const model = codingExecutor && isCodingModelProvider(codingExecutor)
+          ? await createCodingModel(codingExecutor)
+          : createLLMModel(runtimeModelInfo.model, effectiveThinkingMode)
+
+        result = await runAgentLoop({
+          model,
+          messages,
+          abortSignal: abortController.signal,
+          confirmMode: () => confirmModeState.value,
+          thinkingMode: effectiveThinkingMode,
+          space: conversationSpace,
+          codingMode: conversationSpace === 'coding' ? codingMode : undefined,
+          conversationId,
+          projectKey: conversationProjectKey,
+          workspaceRoot: resolvedWorkspaceRoot,
+          ...streamCallbacks,
+          getToolApproval: async (toolCallId, toolName, args) => {
+            return requestApproval(conversationId, toolCallId, toolName, args)
+          },
+          getQuestionAnswer: async (toolCallId, questions) => {
+            return requestQuestionAnswer(toolCallId, questions)
+          },
+          onFinish: async (_finishReason, usage) => {
+            await stream.writeSSE(createSSEEvent({
+              type: 'done',
+              messageId,
+              model: assistantModel,
+              usage: {
+                promptTokens: usage.inputTokens,
+                completionTokens: usage.outputTokens,
+                totalTokens: usage.inputTokens + usage.outputTokens,
+              },
+            }))
+          },
+        })
+      }
 
       // 保存 AI 响应消息到数据库
       if (result.finishReason !== 'aborted') {

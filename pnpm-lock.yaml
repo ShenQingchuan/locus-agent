@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   ai-sdk:
+    '@a2a-js/sdk':
+      specifier: ^0.3.13
+      version: 0.3.13
     '@ai-sdk/anthropic':
       specifier: ^3.0.58
       version: 3.0.58
@@ -24,6 +27,9 @@ catalogs:
     '@ai-sdk/openai-compatible':
       specifier: ^2.0.35
       version: 2.0.35
+    '@anthropic-ai/claude-agent-sdk':
+      specifier: ^0.2.81
+      version: 0.2.81
     '@openrouter/ai-sdk-provider':
       specifier: ^2.2.5
       version: 2.2.5
@@ -226,6 +232,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@a2a-js/sdk':
+        specifier: catalog:ai-sdk
+        version: 0.3.13
       '@ai-sdk/anthropic':
         specifier: catalog:ai-sdk
         version: 3.0.58(zod@4.3.6)
@@ -244,6 +253,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: catalog:ai-sdk
         version: 2.0.35(zod@4.3.6)
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: catalog:ai-sdk
+        version: 0.2.81(zod@4.3.6)
       '@huggingface/transformers':
         specifier: catalog:embedding
         version: 3.8.1
@@ -428,6 +440,21 @@ importers:
 
 packages:
 
+  '@a2a-js/sdk@0.3.13':
+    resolution: {integrity: sha512-BZr0f9JVNQs3GKOM9xINWCh6OKIJWZFPyqqVqTym5mxO2Eemc6I/0zL7zWnljHzGdaf5aZQyQN5xa6PSH62q+A==, tarball: https://registry.npmjs.org/@a2a-js/sdk/-/sdk-0.3.13.tgz}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.10.2
+      '@grpc/grpc-js': ^1.11.0
+      express: ^4.21.2 || ^5.1.0
+    peerDependenciesMeta:
+      '@bufbuild/protobuf':
+        optional: true
+      '@grpc/grpc-js':
+        optional: true
+      express:
+        optional: true
+
   '@ai-sdk/anthropic@3.0.58':
     resolution: {integrity: sha512-/53SACgmVukO4bkms4dpxpRlYhW8Ct6QZRe6sj1Pi5H00hYhxIrqfiLbZBGxkdRvjsBQeP/4TVGsXgH5rQeb8Q==, tarball: https://registry.npmjs.org/@ai-sdk/anthropic/-/anthropic-3.0.58.tgz}
     engines: {node: '>=18'}
@@ -562,6 +589,12 @@ packages:
 
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==, tarball: https://registry.npmjs.org/@antfu/install-pkg/-/install-pkg-1.1.0.tgz}
+
+  '@anthropic-ai/claude-agent-sdk@0.2.81':
+    resolution: {integrity: sha512-CBeebgibBEN/DWOQGZN67vhuTG55RbI1hlsFSSoZ4uA/Io3lw04eHTE2ISCmdbqyJaefYTt6GKZei1nP0TQMNw==, tarball: https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.2.81.tgz}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^4.0.0
 
   '@aria-ui/collection@0.0.6':
     resolution: {integrity: sha512-mx1lh6rcWqPKl84DJsngI52kFrGZp0fidI24zFPHfAf02shbRyLKgYFF4yupgSinhcQPEK8A6M2ebqfcS5M1Cw==, tarball: https://registry.npmjs.org/@aria-ui/collection/-/collection-0.0.6.tgz}
@@ -4832,6 +4865,10 @@ packages:
 
 snapshots:
 
+  '@a2a-js/sdk@0.3.13':
+    dependencies:
+      uuid: 11.1.0
+
   '@ai-sdk/anthropic@3.0.58(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
@@ -4962,6 +4999,20 @@ snapshots:
     dependencies:
       package-manager-detector: 1.6.0
       tinyexec: 1.0.2
+
+  '@anthropic-ai/claude-agent-sdk@0.2.81(zod@4.3.6)':
+    dependencies:
+      zod: 4.3.6
+    optionalDependencies:
+      '@img/sharp-darwin-arm64': 0.34.5
+      '@img/sharp-darwin-x64': 0.34.5
+      '@img/sharp-linux-arm': 0.34.5
+      '@img/sharp-linux-arm64': 0.34.5
+      '@img/sharp-linux-x64': 0.34.5
+      '@img/sharp-linuxmusl-arm64': 0.34.5
+      '@img/sharp-linuxmusl-x64': 0.34.5
+      '@img/sharp-win32-arm64': 0.34.5
+      '@img/sharp-win32-x64': 0.34.5
 
   '@aria-ui/collection@0.0.6': {}
 

@@ -1,6 +1,6 @@
-import type { AddToWhitelistPayload, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@univedge/locus-agent-sdk'
+import type { AddToWhitelistPayload, CodingExecutorType, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@univedge/locus-agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -232,25 +232,27 @@ export const useChatStore = defineStore('chat', () => {
   const customMode = ref<CustomProviderMode>('openai-compatible')
   const isSavingModelSettings = ref(false)
 
-  // Coding provider selection (kimi-code / null = use default model)
-  const codingProvider = ref<'kimi-code' | null>(null)
+  // Coding executor selection (model provider or A2A executor / null = use default model)
+  const codingExecutor = ref<CodingExecutorType | null>(null)
 
-  // Clear coding provider when switching to a provider that doesn't have one
+  // Clear provider-affine coding executors when switching to a provider
+  // that doesn't expose one. A2A executors are independent.
   watch(provider, (newProvider) => {
-    if (codingProvider.value && !getCodingProviderForParent(newProvider)) {
-      codingProvider.value = null
+    if (codingExecutor.value && isCodingModelProvider(codingExecutor.value) && !getCodingProviderForParent(newProvider)) {
+      codingExecutor.value = null
     }
   })
 
-  // Auto-enable coding provider when entering coding space; clear when leaving
+  // Auto-enable the provider-affine coding executor when entering coding space;
+  // clear all coding executors when leaving.
   watch(conversationScope, (scope) => {
     if (scope.space === 'coding') {
       const meta = getCodingProviderForParent(provider.value)
-      if (meta && !codingProvider.value)
-        codingProvider.value = meta.value
+      if (meta && !codingExecutor.value)
+        codingExecutor.value = meta.value
     }
     else {
-      codingProvider.value = null
+      codingExecutor.value = null
     }
   })
 
@@ -564,7 +566,7 @@ export const useChatStore = defineStore('chat', () => {
     yoloMode,
     thinkMode,
     codingMode,
-    codingProvider,
+    codingExecutor,
     provider,
     modelName,
     conversations,
@@ -763,7 +765,7 @@ export const useChatStore = defineStore('chat', () => {
     modelName,
     customMode,
     isSavingModelSettings,
-    codingProvider,
+    codingExecutor,
 
     // Current conversation state
     messages,

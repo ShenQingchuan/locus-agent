@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageImageAttachment, MessageMetadata, ParsedDelegateDelta, PendingApproval, PendingQuestion, PlanBinding, SSEEvent, SSEEventHandlers } from '@univedge/locus-agent-sdk'
+import type { CodingExecutorType, CoreMessage, MessageImageAttachment, MessageMetadata, ParsedDelegateDelta, PendingApproval, PendingQuestion, PlanBinding, SSEEvent, SSEEventHandlers } from '@univedge/locus-agent-sdk'
 
 export type { PendingApproval, PendingQuestion, SSEEvent }
 export type { ParsedDelegateDelta as DelegateDeltaEvent }
@@ -19,7 +19,7 @@ export interface ChatStreamOptions extends SSEEventHandlers {
   confirmMode?: boolean
   thinkingMode?: boolean
   codingMode?: 'build' | 'plan'
-  codingProvider?: 'kimi-code'
+  codingExecutor?: CodingExecutorType
   planBinding?: PlanBinding
   messageMetadata?: MessageMetadata
 }

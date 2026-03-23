@@ -36,13 +36,15 @@ export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEnt
  * Custom provider keeps the model name as-is.
  */
 // ---------------------------------------------------------------------------
-// Coding provider types (Kimi Code under Moonshot)
+// Coding executor types
 // ---------------------------------------------------------------------------
 
-export type CodingProviderType = 'kimi-code'
+export type CodingModelProviderType = 'kimi-code'
+export type A2ACodingProviderType = 'local-claude-code'
+export type CodingExecutorType = CodingModelProviderType | A2ACodingProviderType
 
 export interface CodingProviderMeta {
-  value: CodingProviderType
+  value: CodingModelProviderType
   label: string
   /** Which main LLM provider tab this coding provider lives under */
   parentProvider: LLMProviderType
@@ -54,7 +56,14 @@ export interface CodingProviderMeta {
   apiFormat: 'anthropic'
 }
 
-export const CODING_PROVIDERS: CodingProviderMeta[] = [
+export interface A2ACodingProviderMeta {
+  value: A2ACodingProviderType
+  label: string
+  transport: 'local-cli' | 'remote-http'
+  icon?: string
+}
+
+export const CODING_MODEL_PROVIDERS: CodingProviderMeta[] = [
   {
     value: 'kimi-code',
     label: 'Kimi Code',
@@ -66,9 +75,32 @@ export const CODING_PROVIDERS: CodingProviderMeta[] = [
   },
 ]
 
+export const A2A_CODING_PROVIDERS: A2ACodingProviderMeta[] = [
+  {
+    value: 'local-claude-code',
+    label: '本地 Claude Code',
+    transport: 'local-cli',
+    icon: 'i-simple-icons:claude',
+  },
+]
+
+export const CODING_PROVIDERS = CODING_MODEL_PROVIDERS
+
 /** Look up which coding provider belongs to a given main provider tab */
 export function getCodingProviderForParent(parent: LLMProviderType): CodingProviderMeta | undefined {
-  return CODING_PROVIDERS.find(cp => cp.parentProvider === parent)
+  return CODING_MODEL_PROVIDERS.find(cp => cp.parentProvider === parent)
+}
+
+export function isCodingModelProvider(value: string): value is CodingModelProviderType {
+  return CODING_MODEL_PROVIDERS.some(cp => cp.value === value)
+}
+
+export function isA2ACodingProvider(value: string): value is A2ACodingProviderType {
+  return A2A_CODING_PROVIDERS.some(cp => cp.value === value)
+}
+
+export function isCodingExecutor(value: string): value is CodingExecutorType {
+  return isCodingModelProvider(value) || isA2ACodingProvider(value)
 }
 
 export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {

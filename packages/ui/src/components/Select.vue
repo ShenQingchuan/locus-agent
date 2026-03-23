@@ -8,6 +8,10 @@ export interface SelectOption {
   label: string
   /** UnoCSS icon class */
   icon?: string
+  /** Render a separator line above this option */
+  separator?: boolean
+  /** Optional group label shown above this option */
+  groupLabel?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -203,26 +207,30 @@ onBeforeUnmount(() => {
         :class="placementClasses"
         @keydown="handleKeydown"
       >
-        <button
-          v-for="(option, index) in options"
-          :key="option.value"
-          role="option"
-          :aria-selected="option.value === modelValue"
-          class="w-full flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus:outline-none"
-          :class="[
-            focusedIndex === index ? 'bg-accent text-accent-foreground' : '',
-            option.value === modelValue ? 'text-accent-foreground' : '',
-          ]"
-          @click="handleSelect(option.value)"
-          @mouseenter="focusedIndex = index"
-        >
-          <div v-if="option.icon" :class="option.icon" class="h-3.5 w-3.5 flex-shrink-0 opacity-70" />
-          <span class="flex-1 text-left whitespace-nowrap">{{ option.label }}</span>
-          <div
-            class="i-carbon-checkmark h-3 w-3 flex-shrink-0 transition-opacity duration-100"
-            :class="option.value === modelValue ? 'opacity-100' : 'opacity-0'"
-          />
-        </button>
+        <template v-for="(option, index) in options" :key="option.value">
+          <div v-if="option.separator" class="mx-1 my-1 h-px bg-border" />
+          <div v-if="option.groupLabel" class="px-2.5 pb-0.5 pt-1 text-[10px] uppercase tracking-[0.04em] text-muted-foreground">
+            {{ option.groupLabel }}
+          </div>
+          <button
+            role="option"
+            :aria-selected="option.value === modelValue"
+            class="w-full flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus:outline-none"
+            :class="[
+              focusedIndex === index ? 'bg-accent text-accent-foreground' : '',
+              option.value === modelValue ? 'text-accent-foreground' : '',
+            ]"
+            @click="handleSelect(option.value)"
+            @mouseenter="focusedIndex = index"
+          >
+            <div v-if="option.icon" :class="option.icon" class="h-3.5 w-3.5 flex-shrink-0 opacity-70" />
+            <span class="flex-1 text-left whitespace-nowrap">{{ option.label }}</span>
+            <div
+              class="i-carbon-checkmark h-3 w-3 flex-shrink-0 transition-opacity duration-100"
+              :class="option.value === modelValue ? 'opacity-100' : 'opacity-0'"
+            />
+          </button>
+        </template>
       </div>
     </Transition>
   </div>

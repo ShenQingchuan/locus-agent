@@ -45,12 +45,14 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@a2a-js/sdk": "catalog:ai-sdk",
     "@ai-sdk/anthropic": "catalog:ai-sdk",
     "@ai-sdk/deepseek": "catalog:ai-sdk",
     "@ai-sdk/mcp": "catalog:ai-sdk",
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
+    "@anthropic-ai/claude-agent-sdk": "catalog:ai-sdk",
     "@huggingface/transformers": "catalog:embedding",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "@univedge/locus-agent-sdk": "workspace:*",

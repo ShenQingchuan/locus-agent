@@ -1,4 +1,4 @@
-import type { CodingProviderType } from '@univedge/locus-agent-sdk'
+import type { CodingModelProviderType } from '@univedge/locus-agent-sdk'
 import type { LanguageModel } from 'ai'
 import type { LLMProviderType } from './config-store.js'
 import { createAnthropic } from '@ai-sdk/anthropic'
@@ -115,7 +115,7 @@ export function createLLMModel(
 // ---------------------------------------------------------------------------
 
 export async function createCodingModel(
-  codingProvider: CodingProviderType,
+  codingProvider: CodingModelProviderType,
   modelId?: string,
 ): Promise<LanguageModel> {
   const meta = CODING_PROVIDERS.find(cp => cp.value === codingProvider)

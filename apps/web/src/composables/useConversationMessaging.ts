@@ -1,8 +1,8 @@
-import type { Conversation, CoreMessage, LLMProviderType, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
+import type { CodingExecutorType, Conversation, CoreMessage, LLMProviderType, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
 import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
-import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
+import { A2A_CODING_PROVIDERS, CODING_PROVIDERS, DEFAULT_MODELS, isA2ACodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { abortChat } from '@/api/chat'
 import { truncateMessages } from '@/api/conversations'
 import { streamAssistantReply } from '@/composables/useAssistantStreaming'
@@ -31,7 +31,7 @@ interface CreateConversationMessagingOptions {
   yoloMode: Ref<boolean>
   thinkMode: Ref<boolean>
   codingMode: Ref<'build' | 'plan'>
-  codingProvider: Ref<'kimi-code' | null>
+  codingExecutor: Ref<CodingExecutorType | null>
   provider: Ref<LLMProviderType>
   modelName: Ref<string>
   conversations: Ref<Conversation[]>
@@ -134,7 +134,16 @@ export function createConversationMessagingActions(options: CreateConversationMe
     }, conversationId)
 
     const selectedModel = (options.modelName.value || DEFAULT_MODELS[options.provider.value] || 'unknown').trim()
-    const assistantModel = `${options.provider.value}/${selectedModel}`
+    const assistantModel = (() => {
+      const executor = options.codingExecutor.value
+      if (options.conversationScope.value.space === 'coding' && executor) {
+        if (isCodingModelProvider(executor))
+          return `${executor}/${CODING_PROVIDERS.find(cp => cp.value === executor)?.defaultModel || 'unknown'}`
+        if (isA2ACodingProvider(executor))
+          return `a2a/${A2A_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
+      }
+      return `${options.provider.value}/${selectedModel}`
+    })()
     const isPlanningTurn = options.conversationScope.value.space === 'coding' && options.codingMode.value === 'plan'
 
     if (isPlanningTurn)
@@ -160,7 +169,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
       confirmMode: !options.yoloMode.value,
       thinkingMode: options.thinkMode.value,
       codingMode: options.conversationScope.value.space === 'coding' ? options.codingMode.value : undefined,
-      codingProvider: options.codingProvider.value || undefined,
+      codingExecutor: options.codingExecutor.value || undefined,
       planBinding: options.conversationScope.value.space === 'coding' && options.codingMode.value === 'build'
         ? options.getPlanBinding?.(conversationId)
         : undefined,

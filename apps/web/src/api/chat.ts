@@ -19,7 +19,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     confirmMode = true,
     thinkingMode,
     codingMode,
-    codingProvider,
+    codingExecutor,
     planBinding,
     messageMetadata,
     ...handlers
@@ -48,7 +48,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
         confirmMode,
         thinkingMode,
         codingMode,
-        codingProvider,
+        codingExecutor,
         planBinding,
         messageMetadata,
       }),

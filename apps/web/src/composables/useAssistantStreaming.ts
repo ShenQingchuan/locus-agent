@@ -1,4 +1,4 @@
-import type { CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
+import type { CodingExecutorType, CoreMessage, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
 import { streamChat } from '@/api/chat'
@@ -13,7 +13,7 @@ interface StreamAssistantReplyOptions {
   confirmMode: boolean
   thinkingMode: boolean
   codingMode?: 'build' | 'plan'
-  codingProvider?: 'kimi-code'
+  codingExecutor?: CodingExecutorType
   planBinding?: PlanBinding
   messageMetadata?: MessageMetadata
   onReasoningDelta: (delta: string) => void
@@ -43,7 +43,7 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
       confirmMode: options.confirmMode,
       thinkingMode: options.thinkingMode,
       codingMode: options.codingMode,
-      codingProvider: options.codingProvider,
+      codingExecutor: options.codingExecutor,
       planBinding: options.planBinding,
       messageMetadata: options.messageMetadata,
       onReasoningDelta: options.onReasoningDelta,

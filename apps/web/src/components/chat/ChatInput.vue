@@ -2,7 +2,7 @@
 import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { DropdownItem } from '@univedge/locus-ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { A2A_CODING_PROVIDERS, getCodingProviderForParent, isA2ACodingProvider } from '@univedge/locus-agent-sdk'
 import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@univedge/locus-ui'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -67,6 +67,37 @@ const {
   handleCustomModeChange,
   handleModelInput,
 } = useModelSelector()
+
+const activeA2AExecutor = computed(() =>
+  chatStore.codingExecutor && isA2ACodingProvider(chatStore.codingExecutor)
+    ? A2A_CODING_PROVIDERS.find(p => p.value === chatStore.codingExecutor)
+    : undefined,
+)
+
+const codingExecutorSelectValue = computed(() => {
+  if (props.showCodingMode && activeA2AExecutor.value)
+    return `a2a:${activeA2AExecutor.value.value}`
+  return chatStore.provider
+})
+
+const codingProviderOptions = computed(() => {
+  if (!props.showCodingMode)
+    return providerOptions
+
+  return [
+    ...providerOptions.map((option, index) => ({
+      ...option,
+      groupLabel: index === 0 ? '模型提供商' : undefined,
+    })),
+    ...A2A_CODING_PROVIDERS.map((provider, index) => ({
+      value: `a2a:${provider.value}`,
+      label: provider.label,
+      icon: provider.icon,
+      separator: index === 0,
+      groupLabel: index === 0 ? 'A2A' : undefined,
+    })),
+  ]
+})
 
 const isEditing = computed(() => chatStore.editingMessageId !== null)
 const hasComposerContent = computed(() => editorText.value.trim().length > 0 || selectedAttachments.value.length > 0)
@@ -144,10 +175,10 @@ const modeItems = computed<DropdownItem[]>(() => {
   const codingMeta = props.showCodingMode ? getCodingProviderForParent(chatStore.provider) : undefined
   if (codingMeta) {
     items.push({
-      key: `coding-provider:${codingMeta.value}`,
+      key: `coding-executor:${codingMeta.value}`,
       label: `${codingMeta.label} 编码`,
       icon: codingMeta.parentProvider === 'openai' ? 'i-simple-icons:openai' : 'i-custom:moonshot',
-      active: chatStore.codingProvider === codingMeta.value,
+      active: chatStore.codingExecutor === codingMeta.value,
       separator: true,
     })
   }
@@ -218,10 +249,21 @@ function handleModeSelect(key: string) {
   else if (key === 'whitelist') {
     whitelistOpen.value = !whitelistOpen.value
   }
-  else if (key.startsWith('coding-provider:')) {
-    const provider = key.replace('coding-provider:', '') as 'kimi-code'
-    chatStore.codingProvider = chatStore.codingProvider === provider ? null : provider
+  else if (key.startsWith('coding-executor:')) {
+    const provider = key.replace('coding-executor:', '')
+    chatStore.codingExecutor = chatStore.codingExecutor === provider ? null : provider as typeof chatStore.codingExecutor
   }
+}
+
+async function handleCodingExecutorSelect(value: string) {
+  if (!props.showCodingMode || !value.startsWith('a2a:')) {
+    chatStore.codingExecutor = getCodingProviderForParent(chatStore.provider)?.value ?? null
+    await handleProviderChange(value)
+    return
+  }
+
+  const provider = value.replace('a2a:', '')
+  chatStore.codingExecutor = provider as typeof chatStore.codingExecutor
 }
 
 function handleCurrentPlanSelect(key: string) {
@@ -597,15 +639,15 @@ function handleShiftTab() {
         <div class="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background/55 px-2 py-1.5">
           <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
             <Select
-              :options="providerOptions"
-              :model-value="chatStore.provider"
+              :options="codingProviderOptions"
+              :model-value="codingExecutorSelectValue"
               placement="top-start"
               size="sm"
               arrow-direction="up"
-              @update:model-value="handleProviderChange"
+              @update:model-value="handleCodingExecutorSelect"
             />
 
-            <template v-if="isCustomProvider">
+            <template v-if="isCustomProvider && !activeA2AExecutor">
               <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
               <Select
                 :options="customModeOptions"
@@ -617,23 +659,25 @@ function handleShiftTab() {
               />
             </template>
 
-            <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
-            <input
-              id="model-name-input"
-              v-model="localModel"
-              class="min-w-[10ch] flex-1 bg-transparent border-b border-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:border-border focus:text-foreground focus:outline-none transition-colors duration-150 py-0.5 font-mono"
-              :style="{ width: modelInputWidth }"
-              type="text"
-              :placeholder="modelPlaceholder"
-              spellcheck="false"
-              autocomplete="off"
-              @input="handleModelInput"
-            >
-            <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+            <template v-if="!activeA2AExecutor">
+              <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
+              <input
+                id="model-name-input"
+                v-model="localModel"
+                class="min-w-[10ch] flex-1 bg-transparent border-b border-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:border-border focus:text-foreground focus:outline-none transition-colors duration-150 py-0.5 font-mono"
+                :style="{ width: modelInputWidth }"
+                type="text"
+                :placeholder="modelPlaceholder"
+                spellcheck="false"
+                autocomplete="off"
+                @input="handleModelInput"
+              >
+              <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+            </template>
 
-            <template v-if="showCodingMode && chatStore.codingProvider">
+            <template v-if="showCodingMode && chatStore.codingExecutor">
               <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-mono">
-                {{ chatStore.codingProvider }}
+                {{ chatStore.codingExecutor }}
               </span>
             </template>
           </div>

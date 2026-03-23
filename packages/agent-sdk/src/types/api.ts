@@ -1,5 +1,6 @@
 import type { Conversation } from './conversation.js'
 import type { CoreMessage, Message, MessageImageAttachment, MessageMetadata } from './message.js'
+import type { CodingExecutorType } from './provider.js'
 import type { AddToWhitelistPayload } from './whitelist.js'
 
 export interface PlanBinding {
@@ -34,8 +35,8 @@ export interface ChatRequest {
   planBinding?: PlanBinding
   /** 用户消息元数据（携带 trigger 时该消息不在 UI 渲染） */
   messageMetadata?: MessageMetadata
-  /** 使用编码 provider（kimi-code），为空则使用默认模型 */
-  codingProvider?: 'kimi-code'
+  /** 使用编码 Agent（如 kimi-code、local-claude-code），为空则使用默认模型 */
+  codingExecutor?: CodingExecutorType
 }
 
 /**

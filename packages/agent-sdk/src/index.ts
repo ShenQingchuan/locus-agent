@@ -37,7 +37,19 @@ export {
 } from './sse/index.js'
 
 export type * from './types/index.js'
-export { CODING_PROVIDERS, DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, LLM_PROVIDERS, normalizeModelForProvider } from './types/index.js'
+export {
+  A2A_CODING_PROVIDERS,
+  CODING_MODEL_PROVIDERS,
+  CODING_PROVIDERS,
+  DEFAULT_API_BASES,
+  DEFAULT_MODELS,
+  getCodingProviderForParent,
+  isA2ACodingProvider,
+  isCodingExecutor,
+  isCodingModelProvider,
+  LLM_PROVIDERS,
+  normalizeModelForProvider,
+} from './types/index.js'
 
 export {
   DANGEROUS_COMMAND_PREFIXES,
