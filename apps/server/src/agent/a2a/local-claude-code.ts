@@ -4,8 +4,9 @@ import type {
   SDKTaskProgressMessage,
   SDKTaskStartedMessage,
   SDKToolProgressMessage,
+  SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { DelegateDelta } from '@univedge/locus-agent-sdk'
+import type { DelegateDelta, MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import { spawn } from 'node:child_process'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
@@ -21,6 +22,7 @@ export interface LocalClaudeCodeCallbacks {
 
 export interface RunLocalClaudeCodeOptions extends LocalClaudeCodeCallbacks {
   prompt: string
+  attachments?: MessageImageAttachment[]
   conversationId: string
   workspaceRoot: string
   abortSignal?: AbortSignal
@@ -40,6 +42,43 @@ export interface LocalClaudeCodeResult {
 
 const LOCAL_CLAUDE_CODE_EXECUTABLE = '/Users/admin/.bun/bin/claude'
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
+const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
+
+/**
+ * Build an async iterable prompt containing text + image content blocks
+ * for the Claude Agent SDK's `query()`.
+ */
+async function* buildMultimodalPrompt(
+  text: string,
+  attachments: MessageImageAttachment[],
+  sessionId: string,
+): AsyncGenerator<SDKUserMessage> {
+  const content: unknown[] = []
+
+  if (text.trim())
+    content.push({ type: 'text', text })
+
+  for (const attachment of attachments) {
+    const match = attachment.dataUrl.match(RE_BASE64_DATA_URL)
+    if (!match?.[1])
+      continue
+    content.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: attachment.mimeType,
+        data: match[1],
+      },
+    })
+  }
+
+  yield {
+    type: 'user',
+    message: { role: 'user', content } as any,
+    parent_tool_use_id: null,
+    session_id: sessionId,
+  }
+}
 
 const sessionIdsByConversation = new Map<string, string>()
 
@@ -297,8 +336,13 @@ export async function runLocalClaudeCode(options: RunLocalClaudeCodeOptions): Pr
     subAgentToolIds: new Set(),
   }
 
+  const hasAttachments = options.attachments && options.attachments.length > 0
+  const prompt = hasAttachments
+    ? buildMultimodalPrompt(options.prompt, options.attachments!, existingSessionId ?? '')
+    : options.prompt
+
   const stream = query({
-    prompt: options.prompt,
+    prompt,
     options: {
       cwd: options.workspaceRoot,
       resume: existingSessionId,

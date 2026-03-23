@@ -704,6 +704,7 @@ chatRoutes.post('/', async (c) => {
       if (codingExecutor && isA2ACodingProvider(codingExecutor)) {
         const a2aResult = await runLocalClaudeCode({
           prompt: effectiveUserMessage,
+          attachments,
           conversationId,
           workspaceRoot: resolvedWorkspaceRoot,
           abortSignal: abortController.signal,
