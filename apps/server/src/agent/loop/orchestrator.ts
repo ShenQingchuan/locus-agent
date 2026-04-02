@@ -317,11 +317,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           ),
         )
 
-        for (const { tc, result } of parallelResults) {
-          const msg = await handleToolResult(tc, result)
-          messages.push(msg)
-          generatedMessages.push(msg)
-        }
+        const toolMessages = await Promise.all(
+          parallelResults.map(({ tc, result }) => handleToolResult(tc, result)),
+        )
+        messages.push(...toolMessages)
+        generatedMessages.push(...toolMessages)
       }
 
       // 2. 串行执行写入类和交互式工具
