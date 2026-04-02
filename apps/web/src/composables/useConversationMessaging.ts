@@ -25,7 +25,7 @@ export interface SendMessageOptions {
   attachments?: MessageImageAttachment[]
 }
 
-interface CreateConversationMessagingOptions {
+interface StateContext {
   currentConversationId: Ref<string | null>
   conversationScope: Ref<ConversationScope>
   yoloMode: Ref<boolean>
@@ -35,6 +35,9 @@ interface CreateConversationMessagingOptions {
   provider: Ref<LLMProviderType>
   modelName: Ref<string>
   conversations: Ref<Conversation[]>
+}
+
+interface RuntimeActions {
   getConversationRuntimeState: (conversationId?: string | null) => RuntimeState
   messagesToCoreMessages: (messages: Message[]) => CoreMessage[]
   clearError: (conversationId?: string | null) => void
@@ -52,12 +55,21 @@ interface CreateConversationMessagingOptions {
   setToolCallAwaitingQuestion: (messageId: string, toolCallId: string, conversationId?: string | null) => void
   appendToolCallOutput: (toolCallId: string, delta: string, conversationId?: string | null) => void
   appendDelegateDelta: (toolCallId: string, delta: Parameters<Parameters<typeof streamAssistantReply>[0]['onDelegateDelta']>[0]['delta'], conversationId?: string | null) => void
+}
+
+interface MessagingCallbacks {
   generateTitle: (conversationId: string) => Promise<void>
   onWritePlanDetected?: (conversationId: string, filename: string, content: string) => void
   getPlanBinding?: (conversationId: string) => PlanBinding | undefined
   onPlanPreviewStart?: (conversationId: string) => void
   onPlanPreviewDelta?: (conversationId: string, delta: string) => void
   onPlanPreviewDone?: (conversationId: string) => void
+}
+
+interface CreateConversationMessagingOptions {
+  state: StateContext
+  runtime: RuntimeActions
+  callbacks: MessagingCallbacks
 }
 
 function computeBackendKeepCount(history: Message[]): number {
@@ -72,6 +84,8 @@ function computeBackendKeepCount(history: Message[]): number {
 }
 
 export function createConversationMessagingActions(options: CreateConversationMessagingOptions) {
+  const { state, runtime, callbacks } = options
+
   async function sendMessage(
     content: string,
     historyMessages?: CoreMessage[],
@@ -85,14 +99,14 @@ export function createConversationMessagingActions(options: CreateConversationMe
     if (!trimmedContent && !hasAttachments)
       return null
 
-    let conversationId = targetConversationId ?? options.currentConversationId.value
+    let conversationId = targetConversationId ?? state.currentConversationId.value
     let isNewConversation = false
 
     if (!conversationId) {
       conversationId = crypto.randomUUID()
       isNewConversation = true
       if (!targetConversationId) {
-        options.currentConversationId.value = conversationId
+        state.currentConversationId.value = conversationId
       }
 
       const now = new Date()
@@ -101,16 +115,16 @@ export function createConversationMessagingActions(options: CreateConversationMe
         title: trimmedContent
           ? (trimmedContent.length > 50 ? `${trimmedContent.substring(0, 50)}...` : trimmedContent)
           : '图片对话',
-        space: options.conversationScope.value.space,
-        projectKey: options.conversationScope.value.projectKey ?? null,
-        confirmMode: !options.yoloMode.value,
+        space: state.conversationScope.value.space,
+        projectKey: state.conversationScope.value.projectKey ?? null,
+        confirmMode: !state.yoloMode.value,
         createdAt: now,
         updatedAt: now,
       }
-      options.conversations.value = [optimisticConversation, ...options.conversations.value]
+      state.conversations.value = [optimisticConversation, ...state.conversations.value]
     }
 
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     if (runtimeState.isLoading && !historyMessages) {
       runtimeState.messageQueue.push({
         id: crypto.randomUUID(),
@@ -120,44 +134,44 @@ export function createConversationMessagingActions(options: CreateConversationMe
       return conversationId
     }
 
-    options.clearError(conversationId)
+    runtime.clearError(conversationId)
 
     // 后端从 DB 加载历史，正常发送时不需要传 messages
     // 仅 edit/retry 场景会传入 historyMessages（用于 truncate 后的状态同步）
     const historyToSend = historyMessages
 
-    options.addMessage({
+    runtime.addMessage({
       role: 'user',
       content,
       attachments,
       metadata: optionsOverride?.metadata,
     }, conversationId)
 
-    const selectedModel = (options.modelName.value || DEFAULT_MODELS[options.provider.value] || 'unknown').trim()
+    const selectedModel = (state.modelName.value || DEFAULT_MODELS[state.provider.value] || 'unknown').trim()
     const assistantModel = (() => {
-      const executor = options.codingExecutor.value
-      if (options.conversationScope.value.space === 'coding' && executor) {
+      const executor = state.codingExecutor.value
+      if (state.conversationScope.value.space === 'coding' && executor) {
         if (isCodingModelProvider(executor))
           return `${executor}/${CODING_PROVIDERS.find(cp => cp.value === executor)?.defaultModel || 'unknown'}`
         if (isACPCodingProvider(executor))
           return `acp/${ACP_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
       }
-      return `${options.provider.value}/${selectedModel}`
+      return `${state.provider.value}/${selectedModel}`
     })()
-    const isPlanningTurn = options.conversationScope.value.space === 'coding' && options.codingMode.value === 'plan'
+    const isPlanningTurn = state.conversationScope.value.space === 'coding' && state.codingMode.value === 'plan'
 
     if (isPlanningTurn)
-      options.onPlanPreviewStart?.(conversationId)
+      callbacks.onPlanPreviewStart?.(conversationId)
 
-    const assistantMessageId = options.addMessage({
+    const assistantMessageId = runtime.addMessage({
       role: 'assistant',
       content: '',
       model: assistantModel,
       isStreaming: true,
     }, conversationId)
 
-    options.setLoading(true, conversationId)
-    options.getConversationRuntimeState(conversationId).currentStreamingMessageId = assistantMessageId
+    runtime.setLoading(true, conversationId)
+    runtime.getConversationRuntimeState(conversationId).currentStreamingMessageId = assistantMessageId
 
     await streamAssistantReply({
       conversationId,
@@ -165,53 +179,53 @@ export function createConversationMessagingActions(options: CreateConversationMe
       message: content,
       attachments,
       messages: historyToSend,
-      scope: options.conversationScope.value,
-      confirmMode: !options.yoloMode.value,
-      thinkingMode: options.thinkMode.value,
-      codingMode: options.conversationScope.value.space === 'coding' ? options.codingMode.value : undefined,
-      codingExecutor: options.codingExecutor.value || undefined,
-      planBinding: options.conversationScope.value.space === 'coding' && options.codingMode.value === 'build'
-        ? options.getPlanBinding?.(conversationId)
+      scope: state.conversationScope.value,
+      confirmMode: !state.yoloMode.value,
+      thinkingMode: state.thinkMode.value,
+      codingMode: state.conversationScope.value.space === 'coding' ? state.codingMode.value : undefined,
+      codingExecutor: state.codingExecutor.value || undefined,
+      planBinding: state.conversationScope.value.space === 'coding' && state.codingMode.value === 'build'
+        ? callbacks.getPlanBinding?.(conversationId)
         : undefined,
       messageMetadata: optionsOverride?.metadata,
       onReasoningDelta: (delta) => {
-        options.appendReasoningToMessage(assistantMessageId, delta, conversationId)
+        runtime.appendReasoningToMessage(assistantMessageId, delta, conversationId)
       },
       onTextDelta: (delta) => {
         if (!isPlanningTurn) {
-          options.appendToMessage(assistantMessageId, delta, conversationId)
+          runtime.appendToMessage(assistantMessageId, delta, conversationId)
         }
         // Plan 模式：丢弃 text delta（含 provider 会话废话），
         // 计划内容统一由 onWritePlanDetected 从 write_plan tool args 获取
       },
       onToolCallStart: (toolCall) => {
-        options.addToolCallToMessage(assistantMessageId, toolCall, conversationId)
+        runtime.addToolCallToMessage(assistantMessageId, toolCall, conversationId)
 
         if (conversationId && toolCall.toolName === 'write_plan') {
           const filename = typeof toolCall.args?.filename === 'string' ? toolCall.args.filename.trim() : ''
           const content = typeof toolCall.args?.content === 'string' ? toolCall.args.content : ''
           if (filename && content) {
-            options.onWritePlanDetected?.(conversationId, filename, content)
+            callbacks.onWritePlanDetected?.(conversationId, filename, content)
           }
         }
       },
       onToolCallResult: (toolResult) => {
-        options.updateToolCallResult(assistantMessageId, toolResult, conversationId)
+        runtime.updateToolCallResult(assistantMessageId, toolResult, conversationId)
       },
       onToolPendingApproval: (approval) => {
-        options.addPendingApproval(approval, conversationId)
-        options.setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId, conversationId)
+        runtime.addPendingApproval(approval, conversationId)
+        runtime.setToolCallAwaitingApproval(assistantMessageId, approval.toolCallId, conversationId)
       },
       onQuestionPending: (question) => {
-        options.addPendingQuestion(question, conversationId)
-        options.setToolCallAwaitingQuestion(assistantMessageId, question.toolCallId, conversationId)
+        runtime.addPendingQuestion(question, conversationId)
+        runtime.setToolCallAwaitingQuestion(assistantMessageId, question.toolCallId, conversationId)
       },
       onToolOutputDelta: (toolCallId, stream, delta) => {
         void stream
-        options.appendToolCallOutput(toolCallId, delta, conversationId)
+        runtime.appendToolCallOutput(toolCallId, delta, conversationId)
       },
       onDelegateDelta: (event) => {
-        options.appendDelegateDelta(event.toolCallId, event.delta, conversationId)
+        runtime.appendDelegateDelta(event.toolCallId, event.delta, conversationId)
       },
       onDone: (usage, model) => {
         const updates: Partial<Message> = { isStreaming: false }
@@ -220,35 +234,35 @@ export function createConversationMessagingActions(options: CreateConversationMe
         if (usage && usage.totalTokens > 0)
           updates.usage = usage
 
-        options.updateMessage(assistantMessageId, updates, conversationId)
-        const doneState = options.getConversationRuntimeState(conversationId)
+        runtime.updateMessage(assistantMessageId, updates, conversationId)
+        const doneState = runtime.getConversationRuntimeState(conversationId)
         doneState.currentStreamingMessageId = null
         doneState.isLoading = false
 
         if (isNewConversation && conversationId)
-          void options.generateTitle(conversationId)
+          void callbacks.generateTitle(conversationId)
         if (isPlanningTurn)
-          options.onPlanPreviewDone?.(conversationId)
+          callbacks.onPlanPreviewDone?.(conversationId)
       },
       onError: (code, message) => {
-        options.setError({ code, message }, conversationId)
-        const errorState = options.getConversationRuntimeState(conversationId)
-        options.updateMessage(assistantMessageId, {
+        runtime.setError({ code, message }, conversationId)
+        const errorState = runtime.getConversationRuntimeState(conversationId)
+        runtime.updateMessage(assistantMessageId, {
           isStreaming: false,
           content: errorState.messages.find(m => m.id === assistantMessageId)?.content || '',
         }, conversationId)
         errorState.currentStreamingMessageId = null
         errorState.isLoading = false
         if (isPlanningTurn)
-          options.onPlanPreviewDone?.(conversationId)
+          callbacks.onPlanPreviewDone?.(conversationId)
       },
       onMissingTerminalEvent: () => {
-        options.updateMessage(assistantMessageId, { isStreaming: false }, conversationId)
-        const fallbackState = options.getConversationRuntimeState(conversationId)
+        runtime.updateMessage(assistantMessageId, { isStreaming: false }, conversationId)
+        const fallbackState = runtime.getConversationRuntimeState(conversationId)
         fallbackState.currentStreamingMessageId = null
         fallbackState.isLoading = false
         if (isPlanningTurn)
-          options.onPlanPreviewDone?.(conversationId)
+          callbacks.onPlanPreviewDone?.(conversationId)
       },
     })
 
@@ -256,11 +270,11 @@ export function createConversationMessagingActions(options: CreateConversationMe
     return conversationId
   }
 
-  async function processMessageQueue(conversationId: string | null = options.currentConversationId.value) {
+  async function processMessageQueue(conversationId: string | null = state.currentConversationId.value) {
     if (!conversationId)
       return
 
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     if (runtimeState.isProcessingQueue || runtimeState.isLoading || runtimeState.messageQueue.length === 0)
       return
 
@@ -276,30 +290,30 @@ export function createConversationMessagingActions(options: CreateConversationMe
     }
   }
 
-  function removeFromQueue(id: string, conversationId: string | null = options.currentConversationId.value) {
-    const queue = options.getConversationRuntimeState(conversationId).messageQueue
+  function removeFromQueue(id: string, conversationId: string | null = state.currentConversationId.value) {
+    const queue = runtime.getConversationRuntimeState(conversationId).messageQueue
     const index = queue.findIndex(m => m.id === id)
     if (index !== -1)
       queue.splice(index, 1)
   }
 
-  function editQueueItem(id: string, newContent: string, conversationId: string | null = options.currentConversationId.value) {
-    const item = options.getConversationRuntimeState(conversationId).messageQueue.find(m => m.id === id)
+  function editQueueItem(id: string, newContent: string, conversationId: string | null = state.currentConversationId.value) {
+    const item = runtime.getConversationRuntimeState(conversationId).messageQueue.find(m => m.id === id)
     if (item)
       item.content = newContent
   }
 
   async function stopGeneration() {
-    const conversationId = options.currentConversationId.value
+    const conversationId = state.currentConversationId.value
     if (!conversationId)
       return
 
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     if (!runtimeState.currentStreamingMessageId)
       return
 
     await abortChat(conversationId)
-    options.updateMessage(runtimeState.currentStreamingMessageId, { isStreaming: false }, conversationId)
+    runtime.updateMessage(runtimeState.currentStreamingMessageId, { isStreaming: false }, conversationId)
     runtimeState.currentStreamingMessageId = null
     runtimeState.isLoading = false
 
@@ -307,8 +321,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
   }
 
   async function saveEditMessage(messageId: string, newContent: string, attachments?: MessageImageAttachment[]): Promise<string | null> {
-    const conversationId = options.currentConversationId.value
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const conversationId = state.currentConversationId.value
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
@@ -333,7 +347,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
     runtimeState.messages = historyBeforeEdit
     await sendMessage(
       newContent,
-      options.messagesToCoreMessages(historyBeforeEdit),
+      runtime.messagesToCoreMessages(historyBeforeEdit),
       conversationId ?? undefined,
       { attachments },
     )
@@ -341,8 +355,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
   }
 
   async function retryFromMessage(messageId: string): Promise<string | null> {
-    const conversationId = options.currentConversationId.value
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const conversationId = state.currentConversationId.value
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
     const message = messageIndex !== -1 ? runtimeState.messages[messageIndex] : undefined
     if (!message) {
@@ -364,7 +378,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
     runtimeState.messages = historyBeforeRetry
     await sendMessage(
       message.content,
-      options.messagesToCoreMessages(historyBeforeRetry),
+      runtime.messagesToCoreMessages(historyBeforeRetry),
       conversationId ?? undefined,
       { attachments: message.attachments },
     )
@@ -372,13 +386,13 @@ export function createConversationMessagingActions(options: CreateConversationMe
   }
 
   async function deleteMessagesFrom(messageId: string): Promise<boolean> {
-    const conversationId = options.currentConversationId.value
+    const conversationId = state.currentConversationId.value
     if (!conversationId) {
       console.warn('[deleteMessagesFrom] 没有活动的会话')
       return false
     }
 
-    const runtimeState = options.getConversationRuntimeState(conversationId)
+    const runtimeState = runtime.getConversationRuntimeState(conversationId)
     const messageIndex = runtimeState.messages.findIndex(m => m.id === messageId)
     if (messageIndex === -1) {
       console.warn('[deleteMessagesFrom] 未找到消息:', messageId)

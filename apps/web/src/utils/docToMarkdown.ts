@@ -1,5 +1,15 @@
-import type { Node } from 'prosemirror-model'
+import type { MarkdownSerializerState } from 'prosemirror-markdown'
+import type { Mark, Node } from 'prosemirror-model'
 import { MarkdownSerializer } from 'prosemirror-markdown'
+
+/**
+ * Internal properties of MarkdownSerializerState that are used at runtime
+ * but not exposed in the public type declarations.
+ */
+interface SerializerStateInternal extends MarkdownSerializerState {
+  flushClose: (size: number) => void
+  inAutolink?: boolean
+}
 
 const RE_TRIPLE_BACKTICKS = /`{3,}/g
 const RE_PARENS = /[()]/g
@@ -40,7 +50,7 @@ const serializer = new MarkdownSerializer(
     list(state, node, parent, index) {
       // prosemirror-flat-list: single "list" node with attrs.kind
       if (index > 0 && parent.child(index - 1).type.name === 'list')
-        (state as any).flushClose(1)
+        (state as SerializerStateInternal).flushClose(1)
 
       const kind = node.attrs.kind as string
       let marker: string
@@ -79,7 +89,7 @@ const serializer = new MarkdownSerializer(
       }
     },
     text(state, node) {
-      state.text(node.text!, !(state as any).inAutolink)
+      state.text(node.text!, !(state as SerializerStateInternal).inAutolink)
     },
   },
   {
@@ -94,12 +104,14 @@ const serializer = new MarkdownSerializer(
     },
     link: {
       open(state, mark, parent, index) {
-        ;(state as any).inAutolink = isPlainURL(mark, parent, index)
-        return (state as any).inAutolink ? '<' : '['
+        const s = state as SerializerStateInternal
+        s.inAutolink = isPlainURL(mark, parent, index)
+        return s.inAutolink ? '<' : '['
       },
       close(state, mark) {
-        const { inAutolink } = state as any
-        ;(state as any).inAutolink = undefined
+        const s = state as SerializerStateInternal
+        const { inAutolink } = s
+        s.inAutolink = undefined
         if (inAutolink)
           return '>'
         return `](${mark.attrs.href.replace(RE_LINK_SPECIAL, '\\$&')}${
@@ -148,7 +160,7 @@ function backticksFor(node: Node, side: number) {
   return result
 }
 
-function isPlainURL(link: any, parent: Node, index: number) {
+function isPlainURL(link: Mark, parent: Node, index: number) {
   if (link.attrs.title || !RE_PROTOCOL_PREFIX.test(link.attrs.href))
     return false
   const content = parent.child(index)

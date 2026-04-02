@@ -26,7 +26,36 @@ function requireCodingSpace(toolName: string, space?: 'chat' | 'coding') {
   }
 }
 
-const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = {
+/**
+ * Raw executor for each built-in tool. Shared as the single source of truth.
+ * Each function accepts a narrow args type, but we only ever call them with
+ * a single `args` argument via `executeToolCallRaw`, so the wrapper
+ * normalises the signature to `ToolExecutor`.
+ */
+const rawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
+  bash: args => executeBash(args as Parameters<typeof executeBash>[0]),
+  read_file: args => executeReadFile(args as Parameters<typeof executeReadFile>[0]),
+  glob: args => executeGlob(args as Parameters<typeof executeGlob>[0]),
+  grep: args => executeGrep(args as Parameters<typeof executeGrep>[0]),
+  tree: args => executeTree(args as Parameters<typeof executeTree>[0]),
+  str_replace: args => executeStrReplace(args as Parameters<typeof executeStrReplace>[0]),
+  write_file: args => executeWriteFile(args as Parameters<typeof executeWriteFile>[0]),
+  manage_memory: args => executeManageMemory(args as Parameters<typeof executeManageMemory>[0]),
+  search_memory: args => executeSearchMemory(args as Parameters<typeof executeSearchMemory>[0]),
+  skill: args => executeSkill(args as Parameters<typeof executeSkill>[0]),
+  manage_todos: args => executeManageTodos(args as Parameters<typeof executeManageTodos>[0]),
+  manage_kanban: args => executeManageKanban(args as Parameters<typeof executeManageKanban>[0]),
+  write_plan: args => executeWritePlan(args as Parameters<typeof executeWritePlan>[0]),
+  read_plan: args => executeReadPlan(args as Parameters<typeof executeReadPlan>[0]),
+  plan_exit: () => executePlanExit(),
+}
+
+/**
+ * Formatted (streaming-aware) executors with context/callback wiring.
+ * Only tools that need custom formatting or context handling are listed here;
+ * the rest are auto-generated from rawExecutors below.
+ */
+const formattedOverrides: Partial<Record<ToolName, StreamingToolExecutor>> = {
   bash: async (args, callbacks, context) => {
     const result = await executeBash(
       {
@@ -41,10 +70,6 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
         : undefined,
     )
     return formatBashResult(result)
-  },
-  read_file: async (args) => {
-    const result = await executeReadFile(args as { file_path: string, offset?: number, limit?: number })
-    return formatReadResult(result)
   },
   glob: async (args, _callbacks, context) => {
     const normalizedArgs = args as Parameters<typeof executeGlob>[0]
@@ -62,18 +87,6 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
     })
     return formatGrepResult(result)
   },
-  tree: async (args) => {
-    const result = await executeTree(args as Parameters<typeof executeTree>[0])
-    return formatTreeResult(result)
-  },
-  str_replace: async (args) => {
-    const result = await executeStrReplace(args as Parameters<typeof executeStrReplace>[0])
-    return formatStrReplaceResult(result)
-  },
-  write_file: async (args) => {
-    const result = await executeWriteFile(args as Parameters<typeof executeWriteFile>[0])
-    return formatWriteResult(result)
-  },
   manage_memory: async (args, _callbacks, context) => {
     // Only apply workspace scope in coding space; chat space memories are always global
     const workspacePath = context?.space === 'coding' ? context?.workspaceRoot : undefined
@@ -83,12 +96,6 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
       workspacePath,
     )
     return formatManageMemoryResult(result)
-  },
-  search_memory: async (args) => {
-    const result = await executeSearchMemory(
-      args as Parameters<typeof executeSearchMemory>[0],
-    )
-    return formatSearchMemoryResult(result)
   },
   skill: async (args, _callbacks, context) => {
     const result = await executeSkill(args as Parameters<typeof executeSkill>[0], context?.skillsWorkspaceRoot)
@@ -129,23 +136,29 @@ const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>
   },
 }
 
-const builtinRawExecutors: Partial<Record<ToolName, ToolExecutor>> = {
-  bash: executeBash as ToolExecutor,
-  read_file: executeReadFile as ToolExecutor,
-  glob: executeGlob as ToolExecutor,
-  grep: executeGrep as ToolExecutor,
-  tree: executeTree as ToolExecutor,
-  str_replace: executeStrReplace as ToolExecutor,
-  write_file: executeWriteFile as ToolExecutor,
-  manage_memory: executeManageMemory as ToolExecutor,
-  search_memory: executeSearchMemory as ToolExecutor,
-  skill: executeSkill as ToolExecutor,
-  manage_todos: executeManageTodos as ToolExecutor,
-  manage_kanban: executeManageKanban as ToolExecutor,
-  write_plan: executeWritePlan as ToolExecutor,
-  read_plan: executeReadPlan as ToolExecutor,
-  plan_exit: executePlanExit as ToolExecutor,
+/** Mapping from tool name to its format function for simple execute→format tools. */
+const simpleFormatters: Partial<Record<ToolName, (result: any) => string>> = {
+  read_file: formatReadResult,
+  tree: formatTreeResult,
+  str_replace: formatStrReplaceResult,
+  write_file: formatWriteResult,
+  search_memory: formatSearchMemoryResult,
 }
+
+/** Build the full formatted executors map: overrides + auto-generated simple wrappers. */
+const builtinFormattedExecutors: Partial<Record<ToolName, StreamingToolExecutor>> = { ...formattedOverrides }
+for (const [name, formatter] of Object.entries(simpleFormatters)) {
+  const toolName = name as ToolName
+  const rawFn = rawExecutors[toolName]
+  if (rawFn && !builtinFormattedExecutors[toolName]) {
+    builtinFormattedExecutors[toolName] = async (args) => {
+      const result = await rawFn(args)
+      return formatter!(result)
+    }
+  }
+}
+
+const builtinRawExecutors = rawExecutors
 
 export function getBuiltinFormattedExecutor(toolName: string): StreamingToolExecutor | undefined {
   return builtinFormattedExecutors[toolName as ToolName]

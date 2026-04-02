@@ -11,7 +11,7 @@ import SettingsEmbeddingCard from '@/components/settings/SettingsEmbeddingCard.v
 import SettingsLLMCard from '@/components/settings/SettingsLLMCard.vue'
 import SettingsMCPCard from '@/components/settings/SettingsMCPCard.vue'
 import SettingsWhitelistCard from '@/components/settings/SettingsWhitelistCard.vue'
-import { useChatStore } from '@/stores/chat'
+import { useModelSettingsStore } from '@/stores/modelSettings'
 
 type SettingsSectionId = 'llm' | 'server' | 'whitelist' | 'embedding' | 'mcp'
 
@@ -33,7 +33,7 @@ const SETTINGS_SECTIONS: Array<{
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
-const chatStore = useChatStore()
+const modelSettings = useModelSettingsStore()
 
 // ---------------------------------------------------------------------------
 // LLM config state (owned here because header save button + page loading)
@@ -380,11 +380,11 @@ async function saveConfig() {
     if (result.config) {
       apiKeysMasked.value = result.config.apiKeys ?? apiKeysMasked.value
       runtimeInfo.value = result.config.runtime ?? runtimeInfo.value
-      chatStore.provider = result.config.provider
-      chatStore.modelName = result.config.model ?? ''
-      chatStore.customMode = result.config.customMode ?? 'openai-compatible'
+      modelSettings.provider = result.config.provider
+      modelSettings.modelName = result.config.model ?? ''
+      modelSettings.customMode = result.config.customMode ?? 'openai-compatible'
       if (result.config.runtime?.contextWindow)
-        chatStore.MAX_CONTEXT_TOKENS = result.config.runtime.contextWindow
+        modelSettings.MAX_CONTEXT_TOKENS = result.config.runtime.contextWindow
     }
     embeddingStatusRefreshToken.value++
   }

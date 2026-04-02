@@ -1,5 +1,7 @@
 import type {
   Client,
+  ContentBlock,
+  PlanEntry,
   ReadTextFileRequest,
   ReadTextFileResponse,
   RequestPermissionRequest,
@@ -60,6 +62,18 @@ let acpProcess: ReturnType<typeof spawn> | null = null
 let acpConnection: ClientSideConnection | null = null
 let connectionReady: Promise<void> | null = null
 
+/** Per-prompt handler callbacks, swapped by runLocalClaudeCode() for each prompt turn. */
+let activeUpdateHandler: ((params: SessionNotification) => Promise<void>) | null = null
+let activePermissionHandler: ((params: RequestPermissionRequest) => Promise<RequestPermissionResponse>) | null = null
+
+function setUpdateHandler(h: typeof activeUpdateHandler): void {
+  activeUpdateHandler = h
+}
+
+function setPermissionHandler(h: typeof activePermissionHandler): void {
+  activePermissionHandler = h
+}
+
 /** Map Locus conversationId → ACP sessionId */
 const sessionByConversation = new Map<string, string>()
 
@@ -116,10 +130,6 @@ async function getConnection(cwd: string): Promise<ClientSideConnection> {
     Readable.toWeb(acpProcess.stdout!) as unknown as ReadableStream<Uint8Array>,
   )
 
-  // We'll set the actual client handler per-prompt via the update callback
-  let activeUpdateHandler: ((params: SessionNotification) => Promise<void>) | null = null
-  let activePermissionHandler: ((params: RequestPermissionRequest) => Promise<RequestPermissionResponse>) | null = null
-
   acpConnection = new ClientSideConnection(
     _agent => ({
       async requestPermission(params) {
@@ -151,14 +161,6 @@ async function getConnection(cwd: string): Promise<ClientSideConnection> {
     } satisfies Client),
     stream,
   )
-
-  // Store the handler setter on the module level so prompt() can swap it
-  ;(acpConnection as any)._setUpdateHandler = (h: typeof activeUpdateHandler) => {
-    activeUpdateHandler = h
-  }
-  ;(acpConnection as any)._setPermissionHandler = (h: typeof activePermissionHandler) => {
-    activePermissionHandler = h
-  }
 
   connectionReady = acpConnection.initialize({
     protocolVersion: PROTOCOL_VERSION,
@@ -197,7 +199,7 @@ async function ensureSession(conn: ClientSideConnection, conversationId: string,
           allowDangerouslySkipPermissions: true,
         },
       },
-    } as any,
+    },
   })
 
   sessionByConversation.set(conversationId, response.sessionId)
@@ -254,13 +256,14 @@ async function mapSessionUpdate(
       // ACP fires tool_call at content_block_start — input may still be empty.
       // Buffer it: fire onToolCallStart only when we get the complete rawInput
       // from the subsequent tool_call_update refinement event.
-      const toolName = (update as any)._meta?.claudeCode?.toolName ?? update.title ?? 'unknown'
-      const rawInput = (update as any).rawInput as Record<string, unknown> | undefined
+      const meta = update._meta as { claudeCode?: { toolName?: string } } | null | undefined
+      const toolName = meta?.claudeCode?.toolName ?? update.title ?? 'unknown'
+      const rawInput = update.rawInput as Record<string, unknown> | undefined
       const hasCompleteArgs = rawInput != null && Object.keys(rawInput).length > 0
 
       if (hasCompleteArgs) {
         // Already have args (non-streaming case) — fire immediately
-        state.pendingTools.set(update.toolCallId, { toolName, args: rawInput!, started: true })
+        state.pendingTools.set(update.toolCallId, { toolName, args: rawInput, started: true })
         await callbacks.onToolCallStart?.(update.toolCallId, toolName, rawInput)
       }
       else {
@@ -271,8 +274,9 @@ async function mapSessionUpdate(
     }
 
     case 'tool_call_update': {
-      const toolName = (update as any)._meta?.claudeCode?.toolName ?? 'unknown'
-      const rawInput = (update as any).rawInput as Record<string, unknown> | undefined
+      const updateMeta = update._meta as { claudeCode?: { toolName?: string } } | null | undefined
+      const toolName = updateMeta?.claudeCode?.toolName ?? 'unknown'
+      const rawInput = update.rawInput as Record<string, unknown> | undefined
       const isTerminal = update.status === 'completed' || update.status === 'failed'
       const pending = state.pendingTools.get(update.toolCallId)
 
@@ -302,7 +306,7 @@ async function mapSessionUpdate(
       await callbacks.onToolCallResult?.(
         update.toolCallId,
         pending?.toolName ?? toolName,
-        (update as any).rawOutput ?? { status: update.status },
+        update.rawOutput ?? { status: update.status },
         update.status === 'failed',
       )
       state.pendingTools.delete(update.toolCallId)
@@ -310,10 +314,10 @@ async function mapSessionUpdate(
     }
 
     case 'plan': {
-      if ('entries' in update && Array.isArray(update.entries)) {
-        const summary = update.entries
-          .map((e: any) => `[${e.status}] ${e.content ?? e.title}`)
-          .join('\n')
+      const summary = update.entries
+        .map((e: PlanEntry) => `[${e.status}] ${e.content}`)
+        .join('\n')
+      if (summary) {
         await callbacks.onDelegateDelta?.('plan', {
           type: 'text',
           content: summary,
@@ -349,9 +353,6 @@ export async function runLocalClaudeCode(options: RunLocalClaudeCodeOptions): Pr
   state.sessionId = sessionId
 
   // Wire up session update handler for this prompt
-  const setUpdateHandler = (conn as any)._setUpdateHandler as (h: any) => void
-  const setPermissionHandler = (conn as any)._setPermissionHandler as (h: any) => void
-
   setUpdateHandler(async (params: SessionNotification) => {
     await mapSessionUpdate(params.update, options, state)
   })
@@ -366,7 +367,7 @@ export async function runLocalClaudeCode(options: RunLocalClaudeCodeOptions): Pr
   })
 
   // Build prompt content blocks
-  const promptContent: Array<{ type: string, [key: string]: any }> = []
+  const promptContent: ContentBlock[] = []
 
   if (options.prompt.trim()) {
     promptContent.push({ type: 'text', text: options.prompt })
@@ -388,18 +389,17 @@ export async function runLocalClaudeCode(options: RunLocalClaudeCodeOptions): Pr
   try {
     const result = await conn.prompt({
       sessionId,
-      prompt: promptContent as any,
+      prompt: promptContent,
     })
 
     state.finishReason = result.stopReason ?? 'end_turn'
 
     // Extract usage from result if available
-    if ('usage' in result && result.usage) {
-      const u = result.usage as any
+    if (result.usage) {
       state.usage = {
-        inputTokens: u.inputTokens ?? u.input_tokens ?? 0,
-        outputTokens: u.outputTokens ?? u.output_tokens ?? 0,
-        totalTokens: (u.inputTokens ?? u.input_tokens ?? 0) + (u.outputTokens ?? u.output_tokens ?? 0),
+        inputTokens: result.usage.inputTokens ?? 0,
+        outputTokens: result.usage.outputTokens ?? 0,
+        totalTokens: result.usage.totalTokens ?? 0,
       }
     }
   }

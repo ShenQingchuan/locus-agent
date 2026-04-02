@@ -6,13 +6,23 @@ interface ToolCallPart { type: 'tool-call', toolCallId: string, toolName: string
 interface FinishPart { type: 'finish', finishReason: string }
 interface ErrorPart { type: 'error', error: unknown }
 
+/** AI SDK stream part types that this consumer does not act on but may encounter. */
+type IgnoredStreamPartType =
+  | 'text-start' | 'text-end'
+  | 'reasoning-start' | 'reasoning-end'
+  | 'tool-input-start' | 'tool-input-end' | 'tool-input-delta'
+  | 'tool-result' | 'tool-error' | 'tool-output-denied' | 'tool-approval-request'
+  | 'source' | 'file' | 'raw'
+  | 'start' | 'start-step' | 'finish-step'
+  | 'abort'
+
 type StreamPart
   = | ReasoningDeltaPart
     | TextDeltaPart
     | ToolCallPart
     | FinishPart
     | ErrorPart
-    | Record<string, unknown> // Allow other stream part types from AI SDK
+    | { type: IgnoredStreamPartType }
 
 interface StreamConsumeOptions {
   response: { fullStream: AsyncIterable<StreamPart> }

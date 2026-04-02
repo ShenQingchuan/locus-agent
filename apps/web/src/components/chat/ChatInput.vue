@@ -10,6 +10,7 @@ import { useEscConfirm } from '@/composables/useEscConfirm'
 import { useImageAttachments } from '@/composables/useImageAttachments'
 import { useModelSelector } from '@/composables/useModelSelector'
 import { useChatStore } from '@/stores/chat'
+import { useModelSettingsStore } from '@/stores/modelSettings'
 import ContextUsageRing from './ContextUsageRing.vue'
 import PromptEditor from './prompt-editor/PromptEditor.vue'
 import SessionWhitelistPopover from './SessionWhitelistPopover.vue'
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const chatStore = useChatStore()
+const modelSettings = useModelSettingsStore()
 const toast = useToast()
 const markDirty = useMarkConversationDirty()
 
@@ -69,15 +71,15 @@ const {
 } = useModelSelector()
 
 const activeACPExecutor = computed(() =>
-  chatStore.codingExecutor && isACPCodingProvider(chatStore.codingExecutor)
-    ? ACP_CODING_PROVIDERS.find(p => p.value === chatStore.codingExecutor)
+  modelSettings.codingExecutor && isACPCodingProvider(modelSettings.codingExecutor)
+    ? ACP_CODING_PROVIDERS.find(p => p.value === modelSettings.codingExecutor)
     : undefined,
 )
 
 const codingExecutorSelectValue = computed(() => {
   if (props.showCodingMode && activeACPExecutor.value)
     return `acp:${activeACPExecutor.value.value}`
-  return chatStore.provider
+  return modelSettings.provider
 })
 
 const codingProviderOptions = computed(() => {
@@ -161,7 +163,7 @@ const modeItems = computed<DropdownItem[]>(() => {
       key: 'think',
       label: '思考模式',
       icon: 'i-ri:brain-line',
-      active: chatStore.thinkMode,
+      active: modelSettings.thinkMode,
     },
     {
       key: 'yolo',
@@ -172,13 +174,13 @@ const modeItems = computed<DropdownItem[]>(() => {
   ]
 
   // Only show the coding provider toggle in coding space
-  const codingMeta = props.showCodingMode ? getCodingProviderForParent(chatStore.provider) : undefined
+  const codingMeta = props.showCodingMode ? getCodingProviderForParent(modelSettings.provider) : undefined
   if (codingMeta) {
     items.push({
       key: `coding-executor:${codingMeta.value}`,
       label: `${codingMeta.label} 编码`,
       icon: codingMeta.parentProvider === 'openai' ? 'i-simple-icons:openai' : 'i-custom:moonshot',
-      active: chatStore.codingExecutor === codingMeta.value,
+      active: modelSettings.codingExecutor === codingMeta.value,
       separator: true,
     })
   }
@@ -241,7 +243,7 @@ const codingModeButtonLabel = computed(() => currentCodingModeItem.value?.label 
 
 function handleModeSelect(key: string) {
   if (key === 'think') {
-    chatStore.toggleThinkMode()
+    modelSettings.toggleThinkMode()
   }
   else if (key === 'yolo') {
     chatStore.toggleYoloMode()
@@ -251,19 +253,19 @@ function handleModeSelect(key: string) {
   }
   else if (key.startsWith('coding-executor:')) {
     const provider = key.replace('coding-executor:', '')
-    chatStore.codingExecutor = chatStore.codingExecutor === provider ? null : provider as typeof chatStore.codingExecutor
+    modelSettings.codingExecutor = modelSettings.codingExecutor === provider ? null : provider as typeof modelSettings.codingExecutor
   }
 }
 
 async function handleCodingExecutorSelect(value: string) {
   if (!props.showCodingMode || !value.startsWith('acp:')) {
-    chatStore.codingExecutor = getCodingProviderForParent(chatStore.provider)?.value ?? null
+    modelSettings.codingExecutor = getCodingProviderForParent(modelSettings.provider)?.value ?? null
     await handleProviderChange(value)
     return
   }
 
   const provider = value.replace('acp:', '')
-  chatStore.codingExecutor = provider as typeof chatStore.codingExecutor
+  modelSettings.codingExecutor = provider as typeof modelSettings.codingExecutor
 }
 
 function handleCurrentPlanSelect(key: string) {
@@ -651,7 +653,7 @@ function handleShiftTab() {
               <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
               <Select
                 :options="customModeOptions"
-                :model-value="chatStore.customMode"
+                :model-value="modelSettings.customMode"
                 placement="top-start"
                 size="sm"
                 arrow-direction="up"
@@ -672,12 +674,12 @@ function handleShiftTab() {
                 autocomplete="off"
                 @input="handleModelInput"
               >
-              <div v-if="chatStore.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
+              <div v-if="modelSettings.isSavingModelSettings" class="i-carbon-circle-dash h-3 w-3 animate-spin text-muted-foreground/40 flex-shrink-0" />
             </template>
 
-            <template v-if="showCodingMode && chatStore.codingExecutor">
+            <template v-if="showCodingMode && modelSettings.codingExecutor">
               <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-mono">
-                {{ chatStore.codingExecutor }}
+                {{ modelSettings.codingExecutor }}
               </span>
             </template>
           </div>
@@ -685,7 +687,7 @@ function handleShiftTab() {
           <div class="flex items-center gap-2 flex-shrink-0">
             <ContextUsageRing
               :used="chatStore.contextTokensUsed"
-              :total="chatStore.MAX_CONTEXT_TOKENS"
+              :total="modelSettings.MAX_CONTEXT_TOKENS"
             />
 
             <button

@@ -6,10 +6,12 @@ import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
 import { ImageAttachmentStrip, Modal, Tooltip, useToast } from '@univedge/locus-ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
+import { useReasoningBlockState } from '@/composables/useReasoningBlockState'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
+import { useModelSettingsStore } from '@/stores/modelSettings'
 import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 import ToolCallItem from './ToolCallItem.vue'
 
@@ -18,54 +20,10 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const modelSettings = useModelSettingsStore()
 const toast = useToast()
 
-// 每个 reasoning 块独立的展开/折叠状态
-// - 思考中自动展开，思考一结束（后续出现非 reasoning 的 part）立即自动折叠
-// - 用户手动操作后该块不再自动折叠
-const expandedBlocks = reactive(new Set<number>())
-const userToggledBlocks = reactive(new Set<number>())
-
-// 当前仍在生成中的 reasoning 块索引（parts 末尾的 reasoning）
-const activeReasoningIdx = computed<number | null>(() => {
-  if (!props.message.isStreaming)
-    return null
-  const parts = props.message.parts
-  if (!parts || parts.length === 0)
-    return null
-  const lastIdx = parts.length - 1
-  return parts[lastIdx]?.type === 'reasoning' ? lastIdx : null
-})
-
-watch(activeReasoningIdx, (newIdx, oldIdx) => {
-  if (oldIdx != null && oldIdx !== newIdx && !userToggledBlocks.has(oldIdx))
-    expandedBlocks.delete(oldIdx)
-  if (newIdx != null && newIdx !== oldIdx) {
-    expandedBlocks.add(newIdx)
-    userToggledBlocks.delete(newIdx)
-  }
-}, { immediate: true })
-
-function isBlockDone(partIdx: number): boolean {
-  if (!props.message.isStreaming)
-    return true
-  const parts = props.message.parts
-  return !parts || partIdx + 1 < parts.length
-}
-
-function isBlockExpanded(partIdx: number): boolean {
-  return expandedBlocks.has(partIdx)
-}
-
-function handleReasoningToggle(partIdx: number) {
-  userToggledBlocks.add(partIdx)
-  if (expandedBlocks.has(partIdx)) {
-    expandedBlocks.delete(partIdx)
-  }
-  else {
-    expandedBlocks.add(partIdx)
-  }
-}
+const { isBlockDone, isBlockExpanded, handleReasoningToggle } = useReasoningBlockState(props.message)
 const markDirty = useMarkConversationDirty()
 
 const isUser = computed(() => props.message.role === 'user')
@@ -191,7 +149,7 @@ function isLastTextPart(partIndex: number): boolean {
 const estimateModelHint = computed(() => {
   if (props.message.role === 'assistant' && props.message.model)
     return props.message.model
-  const selectedModel = (chatStore.modelName || DEFAULT_MODELS[chatStore.provider] || '').trim()
+  const selectedModel = (modelSettings.modelName || DEFAULT_MODELS[modelSettings.provider] || '').trim()
   return selectedModel || undefined
 })
 

@@ -31,7 +31,7 @@ export interface MCPStatusChangeEvent {
 }
 
 interface ServerEntry {
-  client: MCPClient
+  client: MCPClient | null
   tools: Record<string, Tool>
   executors: Map<string, (args: unknown) => Promise<unknown>>
   status: MCPServerConnectionStatus
@@ -213,7 +213,7 @@ class MCPManager extends EventEmitter {
 
     if (config.disabled) {
       this.servers.set(name, {
-        client: null as unknown as MCPClient,
+        client: null,
         tools: {},
         executors: new Map(),
         status: 'disconnected',
@@ -226,7 +226,7 @@ class MCPManager extends EventEmitter {
     }
 
     const entry: ServerEntry = this.servers.get(name) ?? {
-      client: null as unknown as MCPClient,
+      client: null,
       tools: {},
       executors: new Map(),
       status: 'disconnected' as MCPServerConnectionStatus,
@@ -325,7 +325,7 @@ class MCPManager extends EventEmitter {
       this.logServer('warn', name, `close error: ${this.formatErrorMessage(error)}`)
     }
 
-    entry.client = null as unknown as MCPClient
+    entry.client = null
     entry.executors.clear()
     entry.lastActiveAt = Date.now()
     entry.error = undefined

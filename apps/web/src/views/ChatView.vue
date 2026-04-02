@@ -10,8 +10,10 @@ import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { getConversationListQueryKey, useConversationQuery } from '@/composables/queries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
 import { useChatStore } from '@/stores/chat'
+import { useModelSettingsStore } from '@/stores/modelSettings'
 
 const chatStore = useChatStore()
+const modelSettings = useModelSettingsStore()
 const route = useRoute()
 const router = useRouter()
 const queryCache = useQueryCache()
@@ -94,7 +96,7 @@ onMounted(async () => {
 
   // 加载模型设置
   chatStore.setConversationScope(chatScope)
-  await chatStore.loadModelSettings()
+  await modelSettings.loadModelSettings()
 })
 
 // 监听 store 中的会话 ID 变化，同步到 URL

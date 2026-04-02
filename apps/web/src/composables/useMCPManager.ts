@@ -118,10 +118,10 @@ export function useMCPManager() {
   }
 
   // --- SSE ---
-  function handleStatusChange(event: { name: string, status: string, error?: string, tools: string[], disabled: boolean }) {
+  function handleStatusChange(event: { name: string, status: MCPServerConnectionStatus, error?: string, tools: string[], disabled: boolean }) {
     const existing = mcpStatus.value.find(s => s.name === event.name)
     if (existing) {
-      existing.status = event.status as any
+      existing.status = event.status
       existing.error = event.error
       existing.tools = event.tools
       existing.disabled = event.disabled

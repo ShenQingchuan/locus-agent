@@ -18,6 +18,7 @@
   },
   "include": [
     "packages/*/src/**/*",
+    "apps/*/src/**/*",
     "scripts/**/*"
   ],
   "exclude": [

@@ -19,6 +19,8 @@ import { provideMarkConversationDirty } from '@/composables/useDirtyConversation
 import { useGitStatus } from '@/composables/useGitStatus'
 import { useResizePanel } from '@/composables/useResizePanel'
 import { useChatStore } from '@/stores/chat'
+import { useModelSettingsStore } from '@/stores/modelSettings'
+import { usePlanStore } from '@/stores/plan'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { runWithLoadingState } from '@/utils/loadingState'
 import { createProjectKey } from '@/utils/projectKey'
@@ -37,6 +39,8 @@ const dirtyConversations = new Set<string>()
 
 const toast = useToast()
 const chatStore = useChatStore()
+const modelSettings = useModelSettingsStore()
+const planStore = usePlanStore()
 const workspaceStore = useWorkspaceStore()
 const queryCache = useQueryCache()
 const isCodingViewActive = ref(true)
@@ -197,7 +201,7 @@ watch(() => workspaceStore.currentWorkspacePath, async (newPath) => {
 })
 
 onMounted(async () => {
-  await chatStore.loadModelSettings()
+  await modelSettings.loadModelSettings()
   await initWorkspaceProjectKey()
 })
 
@@ -414,12 +418,12 @@ watch(manageKanbanResultCount, (current, previous) => {
               isLeftSidebarCollapsed
                 ? 'h-8 w-8 inline-flex items-center justify-center'
                 : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'workspace' && !chatStore.viewingPlan
+              activeSection === 'workspace' && !planStore.viewingPlan
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
             ]"
             :title="isLeftSidebarCollapsed ? '编码工作台' : undefined"
-            @click="activeSection = 'workspace'; chatStore.closePlan()"
+            @click="activeSection = 'workspace'; planStore.closePlan()"
           >
             <div v-if="isLeftSidebarCollapsed" class="i-lucide:git-pull-request-arrow h-4 w-4" />
             <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
@@ -434,12 +438,12 @@ watch(manageKanbanResultCount, (current, previous) => {
               isLeftSidebarCollapsed
                 ? 'h-8 w-8 inline-flex items-center justify-center'
                 : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'planning' && !chatStore.viewingPlan
+              activeSection === 'planning' && !planStore.viewingPlan
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
             ]"
             :title="isLeftSidebarCollapsed ? '任务编排' : undefined"
-            @click="activeSection = 'planning'; chatStore.closePlan()"
+            @click="activeSection = 'planning'; planStore.closePlan()"
           >
             <div v-if="isLeftSidebarCollapsed" class="i-bi:kanban-fill h-4 w-4" />
             <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
@@ -481,10 +485,10 @@ watch(manageKanbanResultCount, (current, previous) => {
         <div class="flex-1 min-w-0 flex flex-col border-r border-border">
           <!-- Plan viewer (replaces normal content when a plan is open) -->
           <PlanViewer
-            v-if="chatStore.viewingPlan"
-            :filename="chatStore.viewingPlan.filename"
-            :content="chatStore.viewingPlan.content"
-            @close="chatStore.closePlan()"
+            v-if="planStore.viewingPlan"
+            :filename="planStore.viewingPlan.filename"
+            :content="planStore.viewingPlan.content"
+            @close="planStore.closePlan()"
           />
 
           <!-- Normal content -->

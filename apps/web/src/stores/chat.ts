@@ -1,17 +1,17 @@
-import type { AddToWhitelistPayload, CodingExecutorType, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding } from '@univedge/locus-agent-sdk'
+import type { AddToWhitelistPayload, Conversation, MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, isCodingModelProvider } from '@univedge/locus-agent-sdk'
-import { useToggle } from '@vueuse/core'
-import { defineStore } from 'pinia'
+import type { Message as RuntimeMessage } from '@/composables/useAssistantRuntime'
+import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { answerQuestion, approveToolCall, fetchConversationPlans } from '@/api/chat'
+import { answerQuestion, approveToolCall } from '@/api/chat'
 import { deleteConversation, generateConversationTitle, updateConversation } from '@/api/conversations'
-import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
 import { createAssistantRuntimeManager } from '@/composables/useAssistantRuntime'
 import { createConversationMessagingActions } from '@/composables/useConversationMessaging'
 import { createConversationScopeState } from '@/composables/useConversationScopeState'
+import { useModelSettingsStore } from '@/stores/modelSettings'
+import { usePlanStore } from '@/stores/plan'
 import { useWhitelistStore } from '@/stores/whitelist'
-import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 
 export const useChatStore = defineStore('chat', () => {
   // Conversation management
@@ -105,143 +105,71 @@ export const useChatStore = defineStore('chat', () => {
   const isSidebarCollapsed = ref(false)
   const sidebarWidth = ref(getStoredSidebarWidth())
 
-  // Think mode state
-  const [thinkMode, toggleThinkMode] = useToggle(true)
+  // Delegated stores
+  const modelSettingsStore = useModelSettingsStore()
+  const planStore = usePlanStore()
 
-  // Coding mode: build (直接编码) / plan (先规划再编码) — 仅 Coding 空间可用
-  const codingMode = ref<'build' | 'plan'>('build')
-  const currentPlan = ref<{ filename: string, content: string } | null>(null)
-  const isLoadingPlan = ref(false)
-  const planBindings = ref<Record<string, { mode: 'auto' | 'none' }>>({})
-  const latestPlanByConversation = ref<Record<string, { filename: string, content: string }>>({})
-  // Plan viewer state — Coding 页面中间面板展示实现计划
-  const viewingPlan = ref<{ filename: string, content: string } | null>(null)
-  function openPlan(filename: string, content: string) {
-    viewingPlan.value = { filename, content }
-  }
-  function closePlan() {
-    viewingPlan.value = null
-  }
+  const {
+    thinkMode,
+    provider,
+    modelName,
+    customMode,
+    isSavingModelSettings,
+    codingExecutor,
+    MAX_CONTEXT_TOKENS,
+  } = storeToRefs(modelSettingsStore)
+  const {
+    toggleThinkMode,
+    estimateCoreMessageTokens,
+    loadModelSettings,
+    saveModelSettings,
+  } = modelSettingsStore
 
-  function getPlanBindingForConversation(conversationId?: string | null): { mode: 'auto' | 'none' } {
-    if (!conversationId)
-      return { mode: 'auto' }
-    return planBindings.value[conversationId] ?? { mode: 'auto' }
-  }
+  const {
+    codingMode,
+    currentPlan,
+    isLoadingPlan,
+    viewingPlan,
+  } = storeToRefs(planStore)
+  const {
+    openPlan,
+    closePlan,
+    toggleCodingMode,
+    setCodingMode,
+    getPlanBindingPayload,
+  } = planStore
 
-  function setPlanBinding(mode: 'auto' | 'none') {
-    const conversationId = currentConversationId.value
-    if (!conversationId)
-      return
-    planBindings.value[conversationId] = { mode }
-  }
-
-  function unbindPlan() {
-    setPlanBinding('none')
-  }
-
-  function useAutoPlanBinding() {
-    setPlanBinding('auto')
-  }
-
-  async function refreshConversationPlans(conversationId?: string | null) {
-    const targetConversationId = conversationId ?? currentConversationId.value
-    if (!targetConversationId) {
-      currentPlan.value = null
-      return
-    }
-
-    isLoadingPlan.value = true
-    try {
-      const payload = await fetchConversationPlans(targetConversationId)
-      if (!payload) {
-        currentPlan.value = null
-        return
-      }
-      currentPlan.value = payload.currentPlan
-    }
-    finally {
-      isLoadingPlan.value = false
-    }
-  }
-
-  const currentPlanBinding = computed(() => getPlanBindingForConversation(currentConversationId.value))
+  // Bridge plan methods that need currentConversationId
+  const currentPlanBinding = computed(() => planStore.getPlanBindingForConversation(currentConversationId.value))
   const activeBoundPlanFilename = computed(() => (currentPlanBinding.value.mode === 'none' ? null : currentPlan.value?.filename ?? null))
 
-  function getPlanBindingPayload(conversationId: string): PlanBinding | undefined {
-    const state = getPlanBindingForConversation(conversationId)
-    if (state.mode === 'none')
-      return { mode: 'none' }
-    return { mode: 'auto' }
+  function setPlanBinding(mode: 'auto' | 'none') {
+    planStore.setPlanBinding(mode, currentConversationId.value)
   }
-
+  function unbindPlan() {
+    planStore.unbindPlan(currentConversationId.value)
+  }
+  function useAutoPlanBinding() {
+    planStore.useAutoPlanBinding(currentConversationId.value)
+  }
+  function refreshConversationPlans(conversationId?: string | null) {
+    return planStore.refreshConversationPlans(conversationId ?? currentConversationId.value)
+  }
   function openCurrentPlan(): boolean {
-    if (currentPlanBinding.value.mode === 'none')
-      return false
-    if (!currentPlan.value)
-      return false
-    openPlan(currentPlan.value.filename, currentPlan.value.content)
-    return true
+    return planStore.openCurrentPlan(currentConversationId.value)
   }
-
   function onWritePlanDetected(conversationId: string, filename: string, content: string) {
-    const snapshot = { filename, content }
-    latestPlanByConversation.value[conversationId] = snapshot
-    if (conversationId === currentConversationId.value) {
-      currentPlan.value = snapshot
-      openPlan(filename, content)
-    }
+    planStore.onWritePlanDetected(conversationId, currentConversationId.value, filename, content)
   }
-
-  const planGeneratingPlaceholder = '计划生成中 ...'
   function onPlanPreviewStart(conversationId: string) {
-    if (conversationId !== currentConversationId.value)
-      return
-    openPlan(planGeneratingPlaceholder, '')
+    planStore.onPlanPreviewStart(conversationId, currentConversationId.value)
   }
-
   function onPlanPreviewDelta(conversationId: string, delta: string) {
-    if (conversationId !== currentConversationId.value)
-      return
-    const existing = viewingPlan.value
-    if (!existing || existing.filename !== planGeneratingPlaceholder) {
-      openPlan(planGeneratingPlaceholder, delta)
-      return
-    }
-    viewingPlan.value = {
-      ...existing,
-      content: `${existing.content}${delta}`,
-    }
+    planStore.onPlanPreviewDelta(conversationId, currentConversationId.value, delta)
   }
-
-  function onPlanPreviewDone(_conversationId: string) {
-    // Keep preview open. If write_plan succeeds, onWritePlanDetected will replace it
-    // with the persisted plan filename/content.
+  function onPlanPreviewDone(conversationId: string) {
+    planStore.onPlanPreviewDone(conversationId, currentConversationId.value)
   }
-
-  function toggleCodingMode() {
-    codingMode.value = codingMode.value === 'build' ? 'plan' : 'build'
-  }
-  function setCodingMode(mode: 'build' | 'plan') {
-    codingMode.value = mode
-  }
-
-  // Model provider & model name (synced with server settings)
-  const provider = ref<LLMProviderType>('anthropic')
-  const modelName = ref('')
-  const customMode = ref<CustomProviderMode>('openai-compatible')
-  const isSavingModelSettings = ref(false)
-
-  // Coding executor selection (model provider or A2A executor / null = use default model)
-  const codingExecutor = ref<CodingExecutorType | null>(null)
-
-  // Clear provider-affine coding executors when switching to a provider
-  // that doesn't expose one. A2A executors are independent.
-  watch(provider, (newProvider) => {
-    if (codingExecutor.value && isCodingModelProvider(codingExecutor.value) && !getCodingProviderForParent(newProvider)) {
-      codingExecutor.value = null
-    }
-  })
 
   // Auto-enable the provider-affine coding executor when entering coding space;
   // clear all coding executors when leaving.
@@ -277,67 +205,48 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value.find(c => c.id === currentConversationId.value),
   )
 
-  // 模型上下文窗口配置（动态从 API 获取，默认：128K）
-  const MAX_CONTEXT_TOKENS = ref(128_000)
-
+  // 计算当前会话中使用的总 token 数（增量缓存优化）
   const BASE_CONTEXT_OVERHEAD_TOKENS = 250
-  const MESSAGE_OVERHEAD_TOKENS = 6
-  const TOOL_CALL_OVERHEAD_TOKENS = 20
-  const TOOL_RESULT_OVERHEAD_TOKENS = 12
-
-  const activeTokenizerModel = computed(() => {
-    const selectedModel = (modelName.value || DEFAULT_MODELS[provider.value] || '').trim()
-    return selectedModel || undefined
-  })
-
-  function estimateTextTokens(text: string): number {
-    return countTextTokens(text, activeTokenizerModel.value)
-  }
-
-  function estimateUnknownTokens(value: unknown): number {
-    return countUnknownTokens(value, activeTokenizerModel.value)
-  }
-
-  function estimateCoreMessageTokens(message: CoreMessage): number {
-    switch (message.role) {
-      case 'user':
-      case 'system':
-        return MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content)
-      case 'assistant': {
-        let total = MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content)
-        if (message.toolCalls && message.toolCalls.length > 0) {
-          for (const toolCall of message.toolCalls) {
-            total += TOOL_CALL_OVERHEAD_TOKENS
-            total += estimateTextTokens(toolCall.toolCallId)
-            total += estimateTextTokens(toolCall.toolName)
-            total += estimateUnknownTokens(toolCall.args)
-          }
-        }
-        return total
-      }
-      case 'tool': {
-        let total = MESSAGE_OVERHEAD_TOKENS
-        for (const toolResult of message.toolResults) {
-          total += TOOL_RESULT_OVERHEAD_TOKENS
-          total += estimateTextTokens(toolResult.toolCallId)
-          total += estimateTextTokens(toolResult.toolName)
-          total += estimateUnknownTokens(toolResult.result)
-        }
-        return total
-      }
-    }
-  }
-
-  // 计算当前会话中使用的总 token 数
+  const _tokenCache = new Map<string, { ref: RuntimeMessage, tokens: number }>()
   const contextTokensUsed = computed(() => {
-    const history = messagesToCoreMessages(messages.value)
-    if (history.length === 0)
+    const msgs = messages.value
+    if (msgs.length === 0) {
+      _tokenCache.clear()
       return 0
-
-    let total = BASE_CONTEXT_OVERHEAD_TOKENS
-    for (const message of history) {
-      total += estimateCoreMessageTokens(message)
     }
+
+    // Build set of current message IDs for cache eviction
+    const currentIds = new Set<string>()
+    let total = BASE_CONTEXT_OVERHEAD_TOKENS
+
+    for (const msg of msgs) {
+      currentIds.add(msg.id)
+      const cached = _tokenCache.get(msg.id)
+
+      // Cache hit: same object reference means content hasn't changed
+      if (cached && cached.ref === msg) {
+        total += cached.tokens
+        continue
+      }
+
+      // Cache miss: convert this single message and estimate tokens
+      const coreMessages = messagesToCoreMessages([msg])
+      let msgTokens = 0
+      for (const cm of coreMessages) {
+        msgTokens += estimateCoreMessageTokens(cm)
+      }
+      _tokenCache.set(msg.id, { ref: msg, tokens: msgTokens })
+      total += msgTokens
+    }
+
+    // Evict stale entries (deleted messages)
+    if (_tokenCache.size > currentIds.size) {
+      for (const key of _tokenCache.keys()) {
+        if (!currentIds.has(key))
+          _tokenCache.delete(key)
+      }
+    }
+
     return total
   })
 
@@ -348,70 +257,6 @@ export const useChatStore = defineStore('chat', () => {
       return 0
     return Math.min(100, (contextTokensUsed.value / total) * 100)
   })
-
-  async function loadModelSettings() {
-    try {
-      const config = await fetchSettingsConfig()
-      if (config) {
-        provider.value = config.provider
-        modelName.value = config.model ?? ''
-        customMode.value = config.customMode ?? 'openai-compatible'
-        if (config.runtime?.contextWindow)
-          MAX_CONTEXT_TOKENS.value = config.runtime.contextWindow
-      }
-    }
-    catch (err) {
-      console.warn('[chat store] Failed to load model settings:', err)
-    }
-  }
-
-  async function saveModelSettings(
-    newProvider: LLMProviderType,
-    newModel: string,
-    newCustomMode?: CustomProviderMode,
-  ): Promise<{ success: boolean, message?: string }> {
-    if (isSavingModelSettings.value)
-      return { success: false, message: '正在保存中' }
-    isSavingModelSettings.value = true
-    try {
-      const providerChanged = newProvider !== provider.value
-      const payload: Parameters<typeof updateSettingsConfig>[0] = {
-        provider: newProvider,
-        model: newModel,
-      }
-
-      if (providerChanged) {
-        payload.apiBase = DEFAULT_API_BASES[newProvider] ?? ''
-      }
-
-      // 自定义提供商时保存兼容模式
-      if (newProvider === 'custom' && newCustomMode) {
-        payload.customMode = newCustomMode
-      }
-
-      const result = await updateSettingsConfig(payload)
-
-      if (result.success) {
-        provider.value = newProvider
-        modelName.value = newModel
-        if (newCustomMode)
-          customMode.value = newCustomMode
-        if (result.config?.customMode)
-          customMode.value = result.config.customMode
-        if (result.config?.runtime?.contextWindow)
-          MAX_CONTEXT_TOKENS.value = result.config.runtime.contextWindow
-        return { success: true }
-      }
-      return { success: false, message: result.message }
-    }
-    catch (err) {
-      const msg = err instanceof Error ? err.message : '未知错误'
-      return { success: false, message: msg }
-    }
-    finally {
-      isSavingModelSettings.value = false
-    }
-  }
 
   // Conversation management actions
   function switchConversation(id: string) {
@@ -561,38 +406,44 @@ export const useChatStore = defineStore('chat', () => {
    * 计划退出时切换到 Build 模式
    */
   const messaging = createConversationMessagingActions({
-    currentConversationId,
-    conversationScope,
-    yoloMode,
-    thinkMode,
-    codingMode,
-    codingExecutor,
-    provider,
-    modelName,
-    conversations,
-    getConversationRuntimeState,
-    messagesToCoreMessages,
-    clearError,
-    setError,
-    setLoading,
-    addMessage,
-    updateMessage,
-    appendReasoningToMessage,
-    appendToMessage,
-    addToolCallToMessage,
-    updateToolCallResult,
-    addPendingApproval,
-    setToolCallAwaitingApproval,
-    addPendingQuestion,
-    setToolCallAwaitingQuestion,
-    appendToolCallOutput,
-    appendDelegateDelta,
-    generateTitle,
-    onWritePlanDetected,
-    onPlanPreviewStart,
-    onPlanPreviewDelta,
-    onPlanPreviewDone,
-    getPlanBinding: getPlanBindingPayload,
+    state: {
+      currentConversationId,
+      conversationScope,
+      yoloMode,
+      thinkMode,
+      codingMode,
+      codingExecutor,
+      provider,
+      modelName,
+      conversations,
+    },
+    runtime: {
+      getConversationRuntimeState,
+      messagesToCoreMessages,
+      clearError,
+      setError,
+      setLoading,
+      addMessage,
+      updateMessage,
+      appendReasoningToMessage,
+      appendToMessage,
+      addToolCallToMessage,
+      updateToolCallResult,
+      addPendingApproval,
+      setToolCallAwaitingApproval,
+      addPendingQuestion,
+      setToolCallAwaitingQuestion,
+      appendToolCallOutput,
+      appendDelegateDelta,
+    },
+    callbacks: {
+      generateTitle,
+      onWritePlanDetected,
+      onPlanPreviewStart,
+      onPlanPreviewDelta,
+      onPlanPreviewDone,
+      getPlanBinding: getPlanBindingPayload,
+    },
   })
 
   const {
@@ -611,7 +462,7 @@ export const useChatStore = defineStore('chat', () => {
       return
 
     const snapshot = { filename, content }
-    latestPlanByConversation.value[conversationId] = snapshot
+    planStore.latestPlanByConversation[conversationId] = snapshot
     currentPlan.value = snapshot
 
     useAutoPlanBinding()

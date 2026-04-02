@@ -30,7 +30,7 @@ export async function updateMCPConfig(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     })
-    const json = await response.json().catch(() => null) as any
+    const json = await response.json().catch(() => null) as { success?: boolean, message?: string, status?: MCPServerStatus[] } | null
     if (!response.ok || json?.success === false) {
       return { success: false, message: json?.message || 'Failed to update MCP config' }
     }
@@ -77,7 +77,7 @@ export async function restartMCPServer(
   try {
     const url = name ? `/api/mcp/restart/${encodeURIComponent(name)}` : '/api/mcp/restart'
     const response = await fetch(url, { method: 'POST' })
-    const json = await response.json().catch(() => null) as any
+    const json = await response.json().catch(() => null) as { success?: boolean, message?: string, status?: MCPServerStatus[] } | null
     if (!response.ok || json?.success === false) {
       return { success: false, message: json?.message || 'Failed to restart MCP server' }
     }

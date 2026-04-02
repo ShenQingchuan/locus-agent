@@ -199,67 +199,72 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
     set: value => (getConversationRuntimeState().isProcessingQueue = value),
   })
 
-  function applyConversationData(
-    data: { conversation: Conversation, messages: ApiMessage[] },
-    conversationId: string | null = options.currentConversationId.value,
-  ) {
-    if (!conversationId)
-      return
+  function reconstructToolCallStates(
+    toolCalls: ToolCall[],
+    nextMessage: ApiMessage | undefined,
+  ): { toolCallStates: ToolCallState[], parts: MessagePart[], todos: TodoTask[] } {
+    const parts: MessagePart[] = []
+    let todos: TodoTask[] = []
 
-    const convertedMessages: Message[] = []
-    let reconstructedTodos: TodoTask[] = []
+    const toolCallStates: ToolCallState[] = toolCalls.map((tc, idx) => {
+      parts.push({ type: 'tool-call', toolCallIndex: idx })
+      return { toolCall: tc, status: 'completed' as const }
+    })
 
-    for (let i = 0; i < data.messages.length; i++) {
-      const m = data.messages[i]!
-      if (m.role === 'tool')
-        continue
+    if (nextMessage && nextMessage.role === 'tool' && nextMessage.toolResults) {
+      for (const toolResult of nextMessage.toolResults) {
+        const toolCallIndex = toolCallStates.findIndex(
+          tc => tc.toolCall.toolCallId === toolResult.toolCallId,
+        )
+        const existingTc = toolCallIndex !== -1 ? toolCallStates[toolCallIndex] : undefined
+        if (existingTc) {
+          const output = existingTc.toolCall.toolName === 'bash' && toolResult.result
+            ? (typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result))
+            : undefined
+          toolCallStates[toolCallIndex] = {
+            ...existingTc,
+            result: toolResult,
+            status: toolResult.isError ? 'error' : 'completed',
+            output,
+          }
 
-      const parts: MessagePart[] = []
-      let toolCallStates: ToolCallState[] | undefined
-
-      if (m.role === 'assistant' && m.reasoning) {
-        parts.push({ type: 'reasoning', content: m.reasoning })
-      }
-
-      if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
-        toolCallStates = m.toolCalls.map((tc, idx) => {
-          parts.push({ type: 'tool-call', toolCallIndex: idx })
-          return { toolCall: tc, status: 'completed' as const }
-        })
-
-        const nextMessage = data.messages[i + 1]
-        if (nextMessage && nextMessage.role === 'tool' && nextMessage.toolResults) {
-          for (const toolResult of nextMessage.toolResults) {
-            const toolCallIndex = toolCallStates.findIndex(
-              tc => tc.toolCall.toolCallId === toolResult.toolCallId,
-            )
-            const existingTc = toolCallIndex !== -1 ? toolCallStates[toolCallIndex] : undefined
-            if (existingTc) {
-              const output = existingTc.toolCall.toolName === 'bash' && toolResult.result
-                ? (typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result))
-                : undefined
-              toolCallStates[toolCallIndex] = {
-                ...existingTc,
-                result: toolResult,
-                status: toolResult.isError ? 'error' : 'completed',
-                output,
-              }
-
-              if (!toolResult.isError && existingTc.toolCall.toolName === 'manage_todos') {
-                const parsed = parseManageTodosResult(toolResult.result)
-                if (parsed)
-                  reconstructedTodos = parsed
-              }
-            }
+          if (!toolResult.isError && existingTc.toolCall.toolName === 'manage_todos') {
+            const parsed = parseManageTodosResult(toolResult.result)
+            if (parsed)
+              todos = parsed
           }
         }
       }
+    }
 
-      if (m.content) {
-        parts.push({ type: 'text', content: m.content })
-      }
+    return { toolCallStates, parts, todos }
+  }
 
-      convertedMessages.push({
+  function convertApiMessageToUIMessage(
+    m: ApiMessage,
+    nextMessage: ApiMessage | undefined,
+  ): { message: Message, todos: TodoTask[] } {
+    const parts: MessagePart[] = []
+    let toolCallStates: ToolCallState[] | undefined
+    let todos: TodoTask[] = []
+
+    if (m.role === 'assistant' && m.reasoning) {
+      parts.push({ type: 'reasoning', content: m.reasoning })
+    }
+
+    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+      const result = reconstructToolCallStates(m.toolCalls, nextMessage)
+      toolCallStates = result.toolCallStates
+      parts.push(...result.parts)
+      todos = result.todos
+    }
+
+    if (m.content) {
+      parts.push({ type: 'text', content: m.content })
+    }
+
+    return {
+      message: {
         id: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
@@ -277,12 +282,35 @@ export function createAssistantRuntimeManager(options: CreateAssistantRuntimeMan
         timestamp: new Date(m.createdAt).getTime(),
         toolCalls: toolCallStates,
         parts: parts.length > 0 ? parts : undefined,
-      })
+      },
+      todos,
+    }
+  }
+
+  function applyConversationData(
+    data: { conversation: Conversation, messages: ApiMessage[] },
+    conversationId: string | null = options.currentConversationId.value,
+  ) {
+    if (!conversationId)
+      return
+
+    const convertedMessages: Message[] = []
+    let latestTodos: TodoTask[] = []
+
+    for (let i = 0; i < data.messages.length; i++) {
+      const m = data.messages[i]!
+      if (m.role === 'tool')
+        continue
+
+      const { message, todos } = convertApiMessageToUIMessage(m, data.messages[i + 1])
+      convertedMessages.push(message)
+      if (todos.length > 0)
+        latestTodos = todos
     }
 
     const runtimeState = getConversationRuntimeState(conversationId)
     runtimeState.messages = convertedMessages
-    runtimeState.todoTasks = reconstructedTodos
+    runtimeState.todoTasks = latestTodos
     options.onConversationDataApplied?.({ conversationId, conversation: data.conversation })
   }
 

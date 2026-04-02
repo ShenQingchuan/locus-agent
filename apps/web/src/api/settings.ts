@@ -94,7 +94,12 @@ export async function updateSettingsConfig(
       body: JSON.stringify(data),
     })
 
-    const json = await response.json().catch(() => null) as any
+    const json = await response.json().catch(() => null) as {
+      success?: boolean
+      message?: string
+      requiresRestart?: boolean
+      config?: SettingsConfigResponse
+    } | null
 
     if (!response.ok) {
       const msg = json?.message || response.statusText || 'Request failed'
@@ -115,7 +120,7 @@ export async function updateSettingsConfig(
     return {
       success: true,
       requiresRestart: !!json?.requiresRestart,
-      config: json?.config as SettingsConfigResponse | undefined,
+      config: json?.config,
     }
   }
   catch (error) {
@@ -141,7 +146,11 @@ export async function updateKimiCodeSettings(data: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    const json = await res.json().catch(() => null) as any
+    const json = await res.json().catch(() => null) as {
+      success?: boolean
+      message?: string
+      config?: SettingsConfigResponse
+    } | null
     if (!res.ok || json?.success === false) {
       return { success: false, message: json?.message || 'Failed to save Kimi Code settings' }
     }
