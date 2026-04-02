@@ -38,10 +38,11 @@ export type {
   ToolPolicyConfig,
 } from './tool-policy.js'
 export { classifyTool } from './tool-policy.js'
-export { BuiltinTool } from './tool.js'
+export { BuiltinTool, ClaudeCodeTool } from './tool.js'
 
 export type {
   BuiltinToolName,
+  ClaudeCodeToolName,
   StreamingToolExecutor,
   ToolExecutionContext,
   ToolExecutor,

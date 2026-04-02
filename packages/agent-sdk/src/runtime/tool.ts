@@ -1,6 +1,7 @@
 /**
- * Canonical names for all built-in tools.
+ * Canonical names for all Locus built-in tools.
  *
+ * These are Locus's own agent loop tool names (lowercase/snake_case).
  * Use these constants instead of string literals when referencing tool names
  * across the codebase (policy checks, pipeline branching, allowlists, etc.).
  */
@@ -25,6 +26,63 @@ export const BuiltinTool = {
 } as const
 
 export type BuiltinToolName = typeof BuiltinTool[keyof typeof BuiltinTool]
+
+/**
+ * Canonical names for Claude Code built-in tools (via ACP / local-claude-code).
+ *
+ * Claude Code uses PascalCase tool names. Use these constants when handling
+ * tool events from the ACP integration (onToolCallStart, onToolCallResult, etc.).
+ */
+export const ClaudeCodeTool = {
+  // File I/O
+  Bash: 'Bash',
+  Read: 'Read',
+  Write: 'Write',
+  Edit: 'Edit',
+  Glob: 'Glob',
+  Grep: 'Grep',
+  NotebookEdit: 'NotebookEdit',
+  // Web
+  WebFetch: 'WebFetch',
+  WebSearch: 'WebSearch',
+  // Agent & Multi-agent
+  Agent: 'Agent',
+  SendMessage: 'SendMessage',
+  TeamCreate: 'TeamCreate',
+  TeamDelete: 'TeamDelete',
+  // Tasks
+  TaskCreate: 'TaskCreate',
+  TaskList: 'TaskList',
+  TaskUpdate: 'TaskUpdate',
+  TaskGet: 'TaskGet',
+  TaskStop: 'TaskStop',
+  TaskOutput: 'TaskOutput',
+  // Worktree
+  EnterWorktree: 'EnterWorktree',
+  ExitWorktree: 'ExitWorktree',
+  // Planning
+  EnterPlanMode: 'EnterPlanMode',
+  ExitPlanMode: 'ExitPlanMode',
+  // User interaction
+  AskUserQuestion: 'AskUserQuestion',
+  // Discovery
+  ToolSearch: 'ToolSearch',
+  // MCP Resources
+  ListMcpResources: 'ListMcpResources',
+  ReadMcpResource: 'ReadMcpResource',
+  // Scheduling
+  CronCreate: 'CronCreate',
+  CronDelete: 'CronDelete',
+  CronList: 'CronList',
+  RemoteTrigger: 'RemoteTrigger',
+  // IDE / LSP
+  LSP: 'LSP',
+  // Config & Todo
+  Config: 'Config',
+  TodoWrite: 'TodoWrite',
+} as const
+
+export type ClaudeCodeToolName = typeof ClaudeCodeTool[keyof typeof ClaudeCodeTool]
 
 export interface ToolExecutionContext {
   conversationId?: string

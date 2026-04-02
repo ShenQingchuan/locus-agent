@@ -24,7 +24,11 @@ export { createPromptBuilder } from './prompt/index.js'
 
 // Runtime contracts
 export type * from './runtime/index.js'
-export { BuiltinTool, classifyTool } from './runtime/index.js'
+export {
+  BuiltinTool,
+  classifyTool,
+  ClaudeCodeTool,
+} from './runtime/index.js'
 
 // SSE protocol
 export type * from './sse/index.js'

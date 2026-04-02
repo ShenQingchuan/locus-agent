@@ -2,7 +2,7 @@
  * 工具调用白名单类型定义
  * 用于在确认模式下自动放行匹配的工具调用
  */
-import { BuiltinTool } from '../runtime/tool.js'
+import { BuiltinTool, ClaudeCodeTool } from '../runtime/tool.js'
 
 /**
  * 风险等级
@@ -111,14 +111,51 @@ export const MULTI_WORD_COMMANDS: string[] = [
 
 /**
  * 工具级别的默认风险映射
+ * 同时覆盖 Locus 内置工具（snake_case）和 Claude Code 工具（PascalCase）。
  */
 export const TOOL_DEFAULT_RISK: Record<string, RiskLevel> = {
+  // Locus native tools
   [BuiltinTool.ReadFile]: 'safe',
   [BuiltinTool.Glob]: 'safe',
   [BuiltinTool.Grep]: 'safe',
   [BuiltinTool.StrReplace]: 'moderate',
   [BuiltinTool.WriteFile]: 'moderate',
   [BuiltinTool.Bash]: 'moderate', // bash 需要进一步看 pattern
+  // Claude Code tools (via ACP)
+  [ClaudeCodeTool.Read]: 'safe',
+  [ClaudeCodeTool.Glob]: 'safe',
+  [ClaudeCodeTool.Grep]: 'safe',
+  [ClaudeCodeTool.WebFetch]: 'safe',
+  [ClaudeCodeTool.WebSearch]: 'safe',
+  [ClaudeCodeTool.TodoWrite]: 'safe',
+  [ClaudeCodeTool.TaskCreate]: 'safe',
+  [ClaudeCodeTool.TaskList]: 'safe',
+  [ClaudeCodeTool.TaskGet]: 'safe',
+  [ClaudeCodeTool.TaskUpdate]: 'safe',
+  [ClaudeCodeTool.TaskStop]: 'safe',
+  [ClaudeCodeTool.TaskOutput]: 'safe',
+  [ClaudeCodeTool.SendMessage]: 'safe',
+  [ClaudeCodeTool.ListMcpResources]: 'safe',
+  [ClaudeCodeTool.ReadMcpResource]: 'safe',
+  [ClaudeCodeTool.CronList]: 'safe',
+  [ClaudeCodeTool.ToolSearch]: 'safe',
+  [ClaudeCodeTool.Edit]: 'moderate',
+  [ClaudeCodeTool.Write]: 'moderate',
+  [ClaudeCodeTool.NotebookEdit]: 'moderate',
+  [ClaudeCodeTool.Bash]: 'moderate', // further refined by getCommandRiskLevel
+  [ClaudeCodeTool.CronCreate]: 'moderate',
+  [ClaudeCodeTool.CronDelete]: 'moderate',
+  [ClaudeCodeTool.RemoteTrigger]: 'moderate',
+  [ClaudeCodeTool.TeamCreate]: 'moderate',
+  [ClaudeCodeTool.TeamDelete]: 'moderate',
+  [ClaudeCodeTool.EnterWorktree]: 'moderate',
+  [ClaudeCodeTool.ExitWorktree]: 'moderate',
+  [ClaudeCodeTool.Agent]: 'moderate',
+  [ClaudeCodeTool.EnterPlanMode]: 'safe',
+  [ClaudeCodeTool.ExitPlanMode]: 'safe',
+  [ClaudeCodeTool.AskUserQuestion]: 'safe',
+  [ClaudeCodeTool.Config]: 'moderate',
+  [ClaudeCodeTool.LSP]: 'safe',
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +204,7 @@ export function getCommandRiskLevel(command: string): RiskLevel {
  * @param pattern 匹配模式（仅 bash）
  */
 export function getRiskLevel(toolName: string, pattern?: string): RiskLevel {
-  if (toolName === BuiltinTool.Bash && pattern) {
+  if ((toolName === BuiltinTool.Bash || toolName === ClaudeCodeTool.Bash) && pattern) {
     return getCommandRiskLevel(pattern)
   }
   return TOOL_DEFAULT_RISK[toolName] ?? 'moderate'
@@ -181,7 +218,7 @@ export function getRiskLevel(toolName: string, pattern?: string): RiskLevel {
  * - 其余取第一个词
  */
 export function extractDefaultPattern(toolName: string, args: Record<string, unknown>): string | undefined {
-  if (toolName !== BuiltinTool.Bash)
+  if (toolName !== BuiltinTool.Bash && toolName !== ClaudeCodeTool.Bash)
     return undefined
 
   const command = String(args.command ?? '').trim()
