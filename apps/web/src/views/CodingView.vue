@@ -34,7 +34,7 @@ const currentProjectKey = ref<string | undefined>()
 const isWorkspaceLoading = ref(false)
 const kanbanBoardRef = ref<InstanceType<typeof KanbanBoard> | null>(null)
 const isHistoryOpen = ref(false)
-const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-collapsed', false)
+const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-collapsed', true)
 const dirtyConversations = new Set<string>()
 
 const toast = useToast()

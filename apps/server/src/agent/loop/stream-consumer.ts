@@ -7,14 +7,14 @@ interface FinishPart { type: 'finish', finishReason: string }
 interface ErrorPart { type: 'error', error: unknown }
 
 /** AI SDK stream part types that this consumer does not act on but may encounter. */
-type IgnoredStreamPartType =
-  | 'text-start' | 'text-end'
-  | 'reasoning-start' | 'reasoning-end'
-  | 'tool-input-start' | 'tool-input-end' | 'tool-input-delta'
-  | 'tool-result' | 'tool-error' | 'tool-output-denied' | 'tool-approval-request'
-  | 'source' | 'file' | 'raw'
-  | 'start' | 'start-step' | 'finish-step'
-  | 'abort'
+type IgnoredStreamPartType
+  = | 'text-start' | 'text-end'
+    | 'reasoning-start' | 'reasoning-end'
+    | 'tool-input-start' | 'tool-input-end' | 'tool-input-delta'
+    | 'tool-result' | 'tool-error' | 'tool-output-denied' | 'tool-approval-request'
+    | 'source' | 'file' | 'raw'
+    | 'start' | 'start-step' | 'finish-step'
+    | 'abort'
 
 type StreamPart
   = | ReasoningDeltaPart
