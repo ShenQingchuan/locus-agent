@@ -26,6 +26,7 @@
     "@clack/prompts": "catalog:cli-tools",
     "@univedge/locus-agent-sdk": "workspace:*",
     "@univedge/locus-server": "workspace:*",
+    "citty": "catalog:cli-tools",
     "hono": "catalog:hono-family"
   },
   "devDependencies": {
