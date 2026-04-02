@@ -6,8 +6,10 @@ import { pluginManager } from './agent/plugins/index.js'
 import { setLLMConfig } from './agent/providers/index.js'
 import { setServerConfig } from './config.js'
 import { initDB } from './db/index.js'
+import { approvalRoutes } from './routes/approval.js'
 import { chatRoutes } from './routes/chat.js'
 import { conversationsRoutes } from './routes/conversations.js'
+import { whitelistRoutes } from './routes/whitelist.js'
 import { embeddingRoutes } from './routes/embedding.js'
 import { foldersRoutes } from './routes/folders.js'
 import { mcpRoutes } from './routes/mcp.js'
@@ -50,6 +52,8 @@ export function createApp(): Hono {
 
   // Routes
   app.route('/api/chat', chatRoutes)
+  app.route('/api/chat', approvalRoutes)
+  app.route('/api/chat/whitelist', whitelistRoutes)
   app.route('/api/conversations', conversationsRoutes)
   app.route('/api/notes', notesRoutes)
   app.route('/api/folders', foldersRoutes)

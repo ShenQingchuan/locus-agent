@@ -4,11 +4,9 @@ import type {
   SSEEvent,
   ToolCall,
   ToolResult,
-  WhitelistRule,
 } from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
 import type { AddMessageInput } from '../services/message.js'
-import { z } from 'zod'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -17,23 +15,14 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
 import {
-  getPendingApproval,
   requestApproval,
-  resolveApproval,
-  resolvePendingApprovalsForConversation,
 } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
 import { normalizeToolCallMessageSequence } from '../agent/loop/message-utils.js'
 import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
-import { requestQuestionAnswer, resolveQuestionAnswer } from '../agent/question.js'
+import { requestQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
 import { getWorkspaceRoot } from '../agent/tools/workspace-root.js'
-import {
-  addGlobalRule,
-  addSessionRule,
-  getAllRules,
-  removeRule,
-} from '../agent/whitelist.js'
 import { config } from '../config.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
 import { addMessage, addMessages, getLastNMessages, getMessages } from '../services/message.js'
@@ -43,29 +32,6 @@ const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
 const RE_NON_WORD_OR_HYPHEN = /[^\w-]/g
 const RE_PLAN_TAG = /<plan\b[^>]*>[\s\S]*?<\/plan>/gi
 const RE_PLAN_REF_TAG = /<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi
-
-const AbortSchema = z.object({
-  conversationId: z.string().min(1),
-})
-
-const ApproveSchema = z.object({
-  conversationId: z.string().min(1),
-  toolCallId: z.string().min(1),
-  approved: z.boolean(),
-  switchToYolo: z.boolean().optional(),
-  addToWhitelist: z.object({
-    pattern: z.string(),
-    scope: z.enum(['session', 'global']),
-  }).optional(),
-})
-
-const AnswerSchema = z.object({
-  toolCallId: z.string().min(1),
-  answers: z.array(z.object({
-    question: z.string(),
-    answer: z.string(),
-  })),
-})
 
 export const chatRoutes = new Hono()
 
@@ -150,6 +116,32 @@ export function updateActiveConfirmMode(conversationId: string, confirmMode: boo
   if (state) {
     state.value = confirmMode
   }
+}
+
+/**
+ * 获取活跃会话的 confirmMode 可变引用（供 approval 路由直接修改）
+ */
+export function getActiveConfirmModeState(conversationId: string): { value: boolean } | undefined {
+  return activeConfirmModes.get(conversationId)
+}
+
+/**
+ * 中止指定会话的活跃流并清理状态
+ * @returns 是否成功中止（false 表示没有活跃的流）
+ */
+export function abortSession(conversationId: string): boolean {
+  const controller = activeAbortControllers.get(conversationId)
+  if (controller) {
+    try {
+      controller.abort()
+    }
+    catch {
+      // 忽略已中止的控制器错误
+    }
+    cleanupSession(conversationId)
+    return true
+  }
+  return false
 }
 
 const createSSEEvent = createSSEEventPayload
@@ -910,197 +902,4 @@ chatRoutes.post('/', async (c) => {
       cleanupSession(conversationId)
     }
   })
-})
-
-// POST /api/chat/abort - Abort current stream
-chatRoutes.post('/abort', async (c) => {
-  let body: unknown
-  try {
-    body = await c.req.json()
-  }
-  catch {
-    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
-  }
-
-  const parsed = AbortSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json(
-      { success: false, error: { code: 'INVALID_REQUEST', message: 'conversationId is required' } },
-      400,
-    )
-  }
-
-  const { conversationId } = parsed.data
-
-  const controller = activeAbortControllers.get(conversationId)
-  if (controller) {
-    try {
-      controller.abort()
-    }
-    catch {
-      // 忽略已中止的控制器错误
-    }
-    cleanupSession(conversationId)
-    return c.json({ success: true, aborted: true })
-  }
-
-  return c.json({ success: true, aborted: false })
-})
-
-// POST /api/chat/approve - Approve or reject tool execution
-chatRoutes.post('/approve', async (c) => {
-  let body: unknown
-  try {
-    body = await c.req.json()
-  }
-  catch {
-    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
-  }
-
-  const parsed = ApproveSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'conversationId, toolCallId, and approved are required',
-        },
-      },
-      400,
-    )
-  }
-
-  const { conversationId, toolCallId, approved, switchToYolo, addToWhitelist } = parsed.data
-
-  // 实时切换当前运行中 loop 的 confirmMode
-  if (switchToYolo && approved) {
-    const state = activeConfirmModes.get(conversationId)
-    if (state) {
-      state.value = false
-    }
-  }
-
-  // 处理"加入白名单"请求
-  if (addToWhitelist && approved) {
-    const ruleId = `wl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-    // 从 pending approval 中获取工具名称
-    const pending = getPendingApproval(toolCallId)
-    if (pending) {
-      const rule: WhitelistRule = {
-        id: ruleId,
-        toolName: pending.toolName,
-        pattern: addToWhitelist.pattern,
-        scope: addToWhitelist.scope,
-        createdAt: Date.now(),
-      }
-
-      if (addToWhitelist.scope === 'global') {
-        const result = addGlobalRule(rule)
-        if (!result.success) {
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: 'WHITELIST_DENIED',
-                message: result.error ?? '无法添加至全局白名单',
-              },
-            },
-            400,
-          )
-        }
-      }
-      else {
-        addSessionRule(conversationId, rule)
-      }
-    }
-  }
-
-  const resolved = resolveApproval(toolCallId, approved)
-
-  if (!resolved) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'No pending approval found for this toolCallId',
-        },
-      },
-      404,
-    )
-  }
-
-  if (switchToYolo && approved) {
-    resolvePendingApprovalsForConversation(conversationId, true, toolCallId)
-  }
-
-  return c.json({ success: true, approved })
-})
-
-// POST /api/chat/answer - Submit answers to ask_question tool
-chatRoutes.post('/answer', async (c) => {
-  let body: unknown
-  try {
-    body = await c.req.json()
-  }
-  catch {
-    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
-  }
-
-  const parsed = AnswerSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'toolCallId and answers are required',
-        },
-      },
-      400,
-    )
-  }
-
-  const { toolCallId, answers } = parsed.data
-
-  const resolved = resolveQuestionAnswer(toolCallId, answers)
-
-  if (!resolved) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'No pending question found for this toolCallId',
-        },
-      },
-      404,
-    )
-  }
-
-  return c.json({ success: true })
-})
-
-// GET /api/chat/whitelist - Get whitelist rules
-chatRoutes.get('/whitelist', async (c) => {
-  const conversationId = c.req.query('conversationId')
-  const rules = getAllRules(conversationId || undefined)
-  return c.json({ success: true, rules })
-})
-
-// DELETE /api/chat/whitelist/:id - Delete a whitelist rule
-chatRoutes.delete('/whitelist/:id', async (c) => {
-  const ruleId = c.req.param('id')
-  if (!ruleId) {
-    return c.json(
-      {
-        success: false,
-        error: { code: 'INVALID_REQUEST', message: 'Rule ID is required' },
-      },
-      400,
-    )
-  }
-  removeRule(ruleId)
-  return c.json({ success: true })
 })
