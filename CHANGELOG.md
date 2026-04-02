@@ -1,3 +1,58 @@
+## [0.2.0] - 2026-04-02
+
+### Bug Fixes
+
+- Prevent memory leak in chat.ts global state maps
+
+- Add transaction wrapping to DB service operations for atomicity
+
+- Improve ACP session continuity, graceful abort, and reasoning display
+
+
+### Features
+
+- Add Kimi CLI support with shared ACP runner
+
+- *(agent)* Add AI-powered commit message generation
+
+
+### Miscellaneous
+
+- Migrate to tsdown, upgrade Vite 8, switch to tsgo for type checking
+
+
+### Refactor
+
+- Split types/provider.ts into llm-provider and coding-executor modules
+
+- Multi-area code quality improvements
+
+- *(web)* Self-contained stream termination in useAssistantStreaming
+
+- *(server)* Extract executeToolWithTimeout helper in tool-call-pipeline
+
+- *(server)* Clear stale connect promise on MCP connection failure
+
+- *(web)* Replace type assertions with type guards in parsers
+
+- *(server)* Add Zod schema validation to API boundary POST endpoints
+
+- *(server)* Parallelize tool result handling in orchestrator
+
+- *(server)* Optimize N+1 query in getConversationWithMessages
+
+- *(web)* Extract whitelist state into useWhitelistStore
+
+- *(server)* Split chat.ts into separate route modules
+
+- Wire ToolCallBashCard, add ESLint boundary rule
+
+- Enhance TypeScript configurations and improve code structure
+
+- Improve type definitions and default settings
+
+- Rewrite CLI with citty for structured subcommands
+
 ## [0.1.7] - 2026-04-02
 
 ### Bug Fixes
