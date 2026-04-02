@@ -1,114 +1,40 @@
-export type LLMProviderType = 'openai' | 'anthropic' | 'moonshotai' | 'openrouter' | 'deepseek' | 'zhipu' | 'custom'
-
-export type CustomProviderMode = 'openai-compatible' | 'anthropic-compatible'
-
-export interface LLMProviderMeta {
-  value: LLMProviderType
-  label: string
-  icon: string
-  defaultModel: string
-  defaultApiBase: string
-}
-
-export const LLM_PROVIDERS: LLMProviderMeta[] = [
-  { value: 'openai', label: 'OpenAI', icon: 'i-simple-icons:openai', defaultModel: 'gpt-5.4', defaultApiBase: 'https://api.openai.com/v1' },
-  { value: 'anthropic', label: 'Anthropic', icon: 'i-simple-icons:anthropic', defaultModel: 'claude-opus-4.6', defaultApiBase: 'https://api.anthropic.com' },
-  { value: 'moonshotai', label: 'Moonshot AI', icon: 'i-custom:moonshot', defaultModel: 'kimi-k2.5', defaultApiBase: 'https://api.moonshot.cn/v1' },
-  { value: 'openrouter', label: 'OpenRouter', icon: 'i-simple-icons:openrouter', defaultModel: 'moonshotai/kimi-k2.5', defaultApiBase: 'https://openrouter.ai/api/v1' },
-  { value: 'deepseek', label: 'DeepSeek', icon: 'i-ri:deepseek-fill', defaultModel: 'deepseek-chat', defaultApiBase: 'https://api.deepseek.com' },
-  { value: 'zhipu', label: '智谱清言', icon: 'i-custom:zai', defaultModel: 'glm-5', defaultApiBase: 'https://open.bigmodel.cn/api/paas/v4' },
-  { value: 'custom', label: '自定义来源', icon: 'i-tabler:message-chatbot-filled', defaultModel: 'claude-opus-4-6', defaultApiBase: '' },
-]
-
-export const DEFAULT_MODELS: Record<LLMProviderType, string> = Object.fromEntries(
-  LLM_PROVIDERS.map(p => [p.value, p.defaultModel]),
-) as Record<LLMProviderType, string>
-
-export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEntries(
-  LLM_PROVIDERS.map(p => [p.value, p.defaultApiBase]),
-) as Record<LLMProviderType, string>
-
 /**
- * Normalize model name for the given provider.
- * OpenRouter uses provider/model format (e.g. moonshotai/kimi-k2.5).
- * Direct providers use model-only format from DEFAULT_MODELS.
- * Strip provider prefix when using direct provider.
- * Custom provider keeps the model name as-is.
+ * Provider Types - Backward Compatibility Re-exports
+ *
+ * This module re-exports from the split llm-provider and coding-executor modules
+ * for backward compatibility. New code should import directly from the specific modules:
+ *
+ * - For LLM providers: `import { LLMProviderType, ... } from './llm-provider.js'`
+ * - For coding executors: `import { CodingExecutorType, ... } from './coding-executor.js'`
+ *
+ * @deprecated Import from llm-provider.js or coding-executor.js directly
+ * @module types/provider
  */
-// ---------------------------------------------------------------------------
-// Coding executor types
-// ---------------------------------------------------------------------------
 
-export type CodingModelProviderType = 'kimi-code'
-export type ACPCodingProviderType = 'local-claude-code'
-export type CodingExecutorType = CodingModelProviderType | ACPCodingProviderType
+// LLM Provider exports
+export type { LLMProviderType, CustomProviderMode, LLMProviderMeta } from './llm-provider.js'
+export {
+  LLM_PROVIDERS,
+  DEFAULT_MODELS,
+  DEFAULT_API_BASES,
+  normalizeModelForProvider,
+} from './llm-provider.js'
 
-export interface CodingProviderMeta {
-  value: CodingModelProviderType
-  label: string
-  /** Which main LLM provider tab this coding provider lives under */
-  parentProvider: LLMProviderType
-  defaultModel: string
-  defaultApiBase: string
-  /** 'api-key' = normal key input */
-  authMode: 'api-key'
-  /** SDK format used for API calls */
-  apiFormat: 'anthropic'
-}
+// Coding Executor exports
+export type {
+  CodingModelProviderType,
+  ACPCodingProviderType,
+  CodingExecutorType,
+  CodingProviderMeta,
+  ACPCodingProviderMeta,
+} from './coding-executor.js'
+export {
+  CODING_MODEL_PROVIDERS,
+  ACP_CODING_PROVIDERS,
+  CODING_PROVIDERS,
+  getCodingProviderForParent,
+  isCodingModelProvider,
+  isACPCodingProvider,
+  isCodingExecutor,
+} from './coding-executor.js'
 
-export interface ACPCodingProviderMeta {
-  value: ACPCodingProviderType
-  label: string
-  transport: 'local-cli' | 'remote-http'
-  icon?: string
-}
-
-export const CODING_MODEL_PROVIDERS: CodingProviderMeta[] = [
-  {
-    value: 'kimi-code',
-    label: 'Kimi Code',
-    parentProvider: 'moonshotai',
-    defaultModel: 'kimi-k2.5',
-    defaultApiBase: 'https://api.kimi.com/coding/v1',
-    authMode: 'api-key',
-    apiFormat: 'anthropic',
-  },
-]
-
-export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
-  {
-    value: 'local-claude-code',
-    label: '本地 Claude Code',
-    transport: 'local-cli',
-    icon: 'i-simple-icons:claude',
-  },
-]
-
-export const CODING_PROVIDERS = CODING_MODEL_PROVIDERS
-
-/** Look up which coding provider belongs to a given main provider tab */
-export function getCodingProviderForParent(parent: LLMProviderType): CodingProviderMeta | undefined {
-  return CODING_MODEL_PROVIDERS.find(cp => cp.parentProvider === parent)
-}
-
-export function isCodingModelProvider(value: string): value is CodingModelProviderType {
-  return CODING_MODEL_PROVIDERS.some(cp => cp.value === value)
-}
-
-export function isACPCodingProvider(value: string): value is ACPCodingProviderType {
-  return ACP_CODING_PROVIDERS.some(cp => cp.value === value)
-}
-
-export function isCodingExecutor(value: string): value is CodingExecutorType {
-  return isCodingModelProvider(value) || isACPCodingProvider(value)
-}
-
-export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {
-  const trimmed = model.trim()
-  if (provider === 'openrouter' || provider === 'custom')
-    return trimmed
-  const prefix = `${provider}/`
-  if (trimmed.startsWith(prefix))
-    return trimmed.slice(prefix.length).trim() || DEFAULT_MODELS[provider]
-  return trimmed
-}

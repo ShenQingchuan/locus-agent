@@ -4,6 +4,29 @@ export type * from './git.js'
 export type * from './knowledge.js'
 export type * from './mcp.js'
 export type * from './message.js'
+
+// LLM Provider
+export type * from './llm-provider.js'
+export {
+  DEFAULT_API_BASES,
+  DEFAULT_MODELS,
+  LLM_PROVIDERS,
+  normalizeModelForProvider,
+} from './llm-provider.js'
+
+// Coding Executor
+export type * from './coding-executor.js'
+export {
+  ACP_CODING_PROVIDERS,
+  CODING_MODEL_PROVIDERS,
+  CODING_PROVIDERS,
+  getCodingProviderForParent,
+  isACPCodingProvider,
+  isCodingExecutor,
+  isCodingModelProvider,
+} from './coding-executor.js'
+
+// Backward compatibility re-exports
 export type * from './provider.js'
 export {
   ACP_CODING_PROVIDERS,
