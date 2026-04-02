@@ -2,7 +2,7 @@ import type { MessageImageAttachment, ToolCall, ToolResult } from '@univedge/loc
 import type { Message, NewMessage } from '../db/schema.js'
 import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { messages } from '../db/schema.js'
+import { conversations, messages } from '../db/schema.js'
 import { touchConversation } from './conversation.js'
 
 /**
@@ -52,15 +52,27 @@ export async function addMessage(
     createdAt: now,
   }
 
-  await db.insert(messages).values(newMessage)
+  // Wrap in transaction to ensure atomicity:
+  // 1. Insert new message
+  // 2. Update conversation updatedAt
+  // 3. Read back the inserted message
+  // This prevents race conditions and ensures consistency between message and conversation state
+  const [savedMessage] = await db.transaction(async (tx) => {
+    await tx.insert(messages).values(newMessage)
 
-  // 更新会话的 updatedAt 时间
-  await touchConversation(conversationId)
+    // Update conversation's updatedAt timestamp
+    await tx
+      .update(conversations)
+      .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(conversations.id, conversationId))
 
-  const [savedMessage] = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.id, id))
+    const result = await tx
+      .select()
+      .from(messages)
+      .where(eq(messages.id, id))
+
+    return result
+  })
 
   return savedMessage
 }
@@ -89,21 +101,37 @@ export async function addMessages(
     createdAt: now,
   }))
 
-  if (newMessages.length > 0) {
-    await db.insert(messages).values(newMessages)
-    await touchConversation(conversationId)
+  if (newMessages.length === 0) {
+    return []
   }
 
-  // 获取所有插入的消息
-  const ids = newMessages.map(m => m.id!)
-  const savedMessages = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(sql`rowid`))
+  // Wrap in transaction to ensure atomicity:
+  // 1. Insert all new messages
+  // 2. Update conversation updatedAt
+  // 3. Read back all inserted messages
+  // This prevents race conditions and ensures consistency between messages and conversation state
+  const savedMessages = await db.transaction(async (tx) => {
+    await tx.insert(messages).values(newMessages)
 
-  // 只返回刚插入的消息
-  return savedMessages.filter(m => ids.includes(m.id))
+    // Update conversation's updatedAt timestamp
+    await tx
+      .update(conversations)
+      .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(conversations.id, conversationId))
+
+    // Fetch all inserted messages
+    const ids = newMessages.map(m => m.id!)
+    const result = await tx
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(sql`rowid`))
+
+    // Return only the newly inserted messages
+    return result.filter(m => ids.includes(m.id))
+  })
+
+  return savedMessages
 }
 
 /**

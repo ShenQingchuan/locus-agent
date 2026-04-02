@@ -24,12 +24,20 @@ export async function createConversation(title?: string, id?: string): Promise<C
     updatedAt: now,
   }
 
-  await db.insert(conversations).values(newConversation)
+  // Wrap in transaction to ensure atomicity:
+  // 1. Insert new conversation
+  // 2. Read back the inserted conversation
+  // This prevents race conditions where the read might occur before insert completes
+  const [conversation] = await db.transaction(async (tx) => {
+    await tx.insert(conversations).values(newConversation)
 
-  const [conversation] = await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.id, conversationId))
+    const result = await tx
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+
+    return result
+  })
 
   return conversation
 }
@@ -54,12 +62,20 @@ export async function createScopedConversation(
     updatedAt: now,
   }
 
-  await db.insert(conversations).values(newConversation)
+  // Wrap in transaction to ensure atomicity:
+  // 1. Insert new conversation
+  // 2. Read back the inserted conversation
+  // This prevents race conditions where the read might occur before insert completes
+  const [conversation] = await db.transaction(async (tx) => {
+    await tx.insert(conversations).values(newConversation)
 
-  const [conversation] = await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.id, conversationId))
+    const result = await tx
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+
+    return result
+  })
 
   return conversation
 }
