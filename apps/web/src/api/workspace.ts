@@ -103,3 +103,10 @@ export async function pushChanges(path: string): Promise<GitPushResponse> {
     body: JSON.stringify({ path }),
   })
 }
+
+export async function suggestCommitMessage(path: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/workspace/git/suggest-commit-message', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  })
+}

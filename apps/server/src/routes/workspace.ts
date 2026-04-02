@@ -6,6 +6,8 @@ import type {
   WorkspaceTreeNode,
 } from '@univedge/locus-agent-sdk'
 import { watch as fsWatch } from 'node:fs'
+import { generateText } from 'ai'
+import { createLLMModel } from '../agent/providers/model-factory.js'
 import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join, relative, resolve, sep } from 'node:path'
@@ -749,5 +751,113 @@ workspaceRoutes.post('/git/discard', async (c) => {
   }
   catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// POST /git/suggest-commit-message — AI-generated commit message
+// ---------------------------------------------------------------------------
+
+/** Max total diff characters sent to the LLM. ~8 000 chars ≈ 2 000 tokens. */
+const MAX_DIFF_CHARS = 8_000
+/** Max lines kept per individual file diff before truncation. */
+const MAX_LINES_PER_FILE = 80
+
+/**
+ * Trim a full staged diff to stay within MAX_DIFF_CHARS.
+ *
+ * Strategy (large-commit safety):
+ *  1. Always include the `--stat` summary so the model knows the scope.
+ *  2. For each file patch, keep at most MAX_LINES_PER_FILE lines then add
+ *     a `[… N more lines truncated]` marker.
+ *  3. Stop adding file patches once we exceed MAX_DIFF_CHARS.
+ */
+function trimDiffForLLM(stat: string, fullDiff: string): string {
+  const header = stat.trim()
+  if (!fullDiff.trim()) {
+    return header
+  }
+
+  // Split into per-file patches (each starts with "diff --git ...")
+  const patches = fullDiff.split(/(?=^diff --git )/m)
+  const parts: string[] = [header, '']
+  let totalChars = header.length
+
+  for (const patch of patches) {
+    if (!patch.trim())
+      continue
+
+    const lines = patch.split('\n')
+    let trimmed: string
+    if (lines.length > MAX_LINES_PER_FILE) {
+      const kept = lines.slice(0, MAX_LINES_PER_FILE)
+      trimmed = `${kept.join('\n')}\n[… ${lines.length - MAX_LINES_PER_FILE} more lines truncated]`
+    }
+    else {
+      trimmed = patch
+    }
+
+    if (totalChars + trimmed.length > MAX_DIFF_CHARS) {
+      parts.push('[… remaining file diffs omitted due to size limit]')
+      break
+    }
+
+    parts.push(trimmed)
+    totalChars += trimmed.length
+  }
+
+  return parts.join('\n')
+}
+
+workspaceRoutes.post('/git/suggest-commit-message', async (c) => {
+  try {
+    const body = await c.req.json<{ path: string }>()
+    const directoryPath = await resolveAllowedDirectory(body.path)
+
+    if (!await isGitRepo(directoryPath)) {
+      return c.json({ error: 'Not a git repository' }, 400)
+    }
+
+    // Run stat + full staged diff in parallel
+    const [statResult, diffResult] = await Promise.all([
+      runGit(directoryPath, ['diff', '--cached', '--stat']),
+      runGit(directoryPath, ['diff', '--cached']),
+    ])
+
+    if (!statResult.stdout.trim() && !diffResult.stdout.trim()) {
+      return c.json({ error: 'No staged changes to generate a message for' }, 400)
+    }
+
+    const diffContext = trimDiffForLLM(statResult.stdout, diffResult.stdout)
+
+    const model = createLLMModel()
+    const { text } = await generateText({
+      model,
+      maxTokens: 120,
+      messages: [
+        {
+          role: 'user',
+          content: `You are an expert at writing conventional commit messages.
+Write a concise commit message for the following staged changes.
+
+Rules:
+- Format: <type>(<scope>): <subject>
+- Common types: feat, fix, refactor, docs, style, test, chore, perf
+- Subject: imperative mood, ≤72 chars, no trailing period
+- If the scope is obvious from the diff, include it; otherwise omit
+- Output ONLY the commit message line, nothing else
+
+Staged diff:
+\`\`\`
+${diffContext}
+\`\`\``,
+        },
+      ],
+    })
+
+    return c.json({ message: text.trim() })
+  }
+  catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500)
   }
 })

@@ -10,7 +10,7 @@
 import type { LLMProviderType } from './llm-provider.js'
 
 export type CodingModelProviderType = 'kimi-code'
-export type ACPCodingProviderType = 'local-claude-code'
+export type ACPCodingProviderType = 'local-claude-code' | 'kimi-cli'
 export type CodingExecutorType = CodingModelProviderType | ACPCodingProviderType
 
 export interface CodingProviderMeta {
@@ -51,6 +51,12 @@ export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
     label: '本地 Claude Code',
     transport: 'local-cli',
     icon: 'i-simple-icons:claude',
+  },
+  {
+    value: 'kimi-cli',
+    label: 'Kimi CLI',
+    transport: 'local-cli',
+    icon: 'i-custom:moonshot',
   },
 ]
 

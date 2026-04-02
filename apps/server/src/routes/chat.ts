@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import { runKimiCLI } from '../agent/acp/kimi-cli.js'
 import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
 import {
   requestApproval,
@@ -778,7 +779,8 @@ chatRoutes.post('/', async (c) => {
 
       let result
       if (codingExecutor && isACPCodingProvider(codingExecutor)) {
-        const acpResult = await runLocalClaudeCode({
+        const acpRunner = codingExecutor === 'kimi-cli' ? runKimiCLI : runLocalClaudeCode
+        const acpResult = await acpRunner({
           prompt: effectiveUserMessage,
           attachments,
           conversationId,
