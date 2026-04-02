@@ -11,4 +11,16 @@ export default antfu({
     '.agents/**/*.md',
     '.claude/**/*.md',
   ],
+}, {
+  // Prevent web app from importing server internals
+  files: ['apps/web/src/**/*.{ts,vue}'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [
+        '@univedge/locus-server*',
+        '../../../apps/server/*',
+        '../../server/*',
+      ],
+    }],
+  },
 })

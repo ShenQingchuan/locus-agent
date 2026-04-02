@@ -12,6 +12,7 @@ import DelegateCard from './DelegateCard.vue'
 import InlineDelegateModal from './InlineDelegateModal.vue'
 import PlanCard from './PlanCard.vue'
 import QuestionCard from './QuestionCard.vue'
+import ToolCallBashCard from './ToolCallBashCard.vue'
 import ToolCallModal from './ToolCallModal.vue'
 import WhitelistPopover from './WhitelistPopover.vue'
 
@@ -235,14 +236,7 @@ const writePlanStatus = computed<'pending' | 'completed' | 'error'>(() => {
 const isBash = computed(() => props.tool.toolCall.toolName === 'bash')
 const isSilentTool = computed(() => props.tool.toolCall.toolName === 'plan_exit')
 
-const bashExpanded = ref(props.tool.status === 'pending')
 const diffExpanded = ref(true)
-
-watch(() => props.tool.status, (newStatus, oldStatus) => {
-  if (isBash.value && oldStatus === 'pending' && newStatus !== 'pending') {
-    bashExpanded.value = false
-  }
-})
 
 /** Delegate 工具参数 */
 const delegateArgs = computed(() => {
@@ -310,21 +304,6 @@ const hasTerminalOutput = computed(() => hasOutputWidget.value && !!props.tool.o
 /** The terminal output text to display */
 const terminalOutput = computed(() => props.tool.output || '')
 
-/** Bash 命令（用于在终端顶部显示） */
-const bashCommand = computed(() => {
-  if (props.tool.toolCall.toolName !== 'bash')
-    return null
-  return String(props.tool.toolCall.args.command ?? '')
-})
-
-/** 带命令前缀的完整终端输出 */
-const terminalDisplayContent = computed(() => {
-  const cmd = bashCommand.value
-  if (!cmd)
-    return terminalOutput.value
-  return `$ ${cmd}\n\n${terminalOutput.value}`
-})
-
 /** Whether the tool is still running (streaming output) */
 const isToolRunning = computed(() => {
   return hasOutputWidget.value && props.tool.status === 'pending'
@@ -337,16 +316,6 @@ watch(terminalOutput, () => {
       terminalRef.value.scrollTop = terminalRef.value.scrollHeight
     }
   })
-})
-
-watch(bashExpanded, (expanded) => {
-  if (expanded) {
-    nextTick(() => {
-      if (terminalRef.value) {
-        terminalRef.value.scrollTop = terminalRef.value.scrollHeight
-      }
-    })
-  }
 })
 </script>
 
@@ -477,42 +446,11 @@ watch(bashExpanded, (expanded) => {
         @submit="(toolCallId, answers) => emit('questionAnswer', toolCallId, answers)"
       />
 
-      <!-- Bash: collapsible card -->
-      <div
+      <!-- Bash: collapsible card (delegated to ToolCallBashCard) -->
+      <ToolCallBashCard
         v-else-if="isBash"
-        class="rounded-lg border border-border overflow-hidden"
-      >
-        <div
-          class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-muted/50 transition-colors"
-          @click="bashExpanded = !bashExpanded"
-        >
-          <div
-            class="h-3 w-3 flex-shrink-0"
-            :class="[statusIcon, statusIconClass]"
-          />
-          <code class="text-xs font-mono text-muted-foreground truncate">{{ bashCommand }}</code>
-          <div
-            class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 i-carbon-chevron-down flex-shrink-0"
-            :class="[bashExpanded ? 'rotate-180' : '']"
-          />
-        </div>
-        <template v-if="bashExpanded">
-          <div
-            v-if="terminalOutput"
-            ref="terminalRef"
-            class="max-h-[300px] overflow-y-auto border-t border-border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all bg-neutral-100 dark:bg-[#1a1a2e] text-[#3d2b1f] dark:text-[#e0e0e0]"
-          >
-            {{ terminalOutput }}
-          </div>
-          <div
-            v-if="isToolRunning"
-            class="flex items-center gap-1.5 px-3 py-1 border-t border-border/30 text-[10px] text-[#a08060] dark:text-[#888]"
-          >
-            <div class="i-svg-spinners:90-ring-with-bg h-3 w-3" />
-            <span>执行中...</span>
-          </div>
-        </template>
-      </div>
+        :tool="tool"
+      />
 
       <!-- Other states: compact inline (hidden when tool has its own result display) -->
       <div
@@ -541,7 +479,7 @@ watch(bashExpanded, (expanded) => {
           ref="terminalRef"
           class="max-h-[300px] overflow-y-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-[#3d2b1f] dark:text-[#e0e0e0]"
         >
-          {{ terminalDisplayContent }}
+          {{ terminalOutput }}
         </div>
         <div
           v-if="isToolRunning"
