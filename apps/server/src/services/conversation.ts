@@ -1,7 +1,7 @@
-import type { Conversation, NewConversation } from '../db/schema.js'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import type { Conversation, Message, NewConversation } from '../db/schema.js'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
-import { conversations } from '../db/schema.js'
+import { conversations, messages } from '../db/schema.js'
 
 interface ConversationScope {
   space?: 'chat' | 'coding'
@@ -97,16 +97,22 @@ export async function getConversation(id: string): Promise<Conversation | null> 
  */
 export async function getConversationWithMessages(id: string): Promise<{
   conversation: Conversation
-  messages: Awaited<ReturnType<typeof import('./message.js').getMessages>>
+  messages: Message[]
 } | null> {
-  const conversation = await getConversation(id)
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, id))
 
   if (!conversation) {
     return null
   }
 
-  const { getMessages } = await import('./message.js')
-  const conversationMessages = await getMessages(id)
+  const conversationMessages = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.conversationId, id))
+    .orderBy(asc(sql`rowid`))
 
   return {
     conversation,
