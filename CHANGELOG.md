@@ -1,3 +1,29 @@
+## [0.1.7] - 2026-04-02
+
+### Bug Fixes
+
+- A2A supports attachments and compact view for toolcalls
+
+
+### Features
+
+- Introduce Locus UI Style skill and reference materials
+
+- Add A2A local Claude Code integration as coding executor
+
+- Replace A2A with ACP integration and enhance agent-sdk
+
+- *(agent-sdk)* Add ClaudeCodeTool constants and expand risk mapping
+
+- *(agent-sdk)* Add Phase 3 utility modules
+
+- *(agent-sdk)* Add MCP client module (Phase 4)
+
+
+### Refactor
+
+- *(agent-sdk)* Fix some eslint issue.
+
 ## [0.1.6] - 2026-03-14
 
 ### Features
