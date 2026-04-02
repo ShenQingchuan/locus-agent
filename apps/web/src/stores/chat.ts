@@ -1,4 +1,4 @@
-import type { AddToWhitelistPayload, CodingExecutorType, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding, WhitelistRule } from '@univedge/locus-agent-sdk'
+import type { AddToWhitelistPayload, CodingExecutorType, Conversation, CoreMessage, CustomProviderMode, LLMProviderType, MessageImageAttachment, PlanBinding } from '@univedge/locus-agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { useToggle } from '@vueuse/core'
@@ -7,10 +7,10 @@ import { computed, ref, watch } from 'vue'
 import { answerQuestion, approveToolCall, fetchConversationPlans } from '@/api/chat'
 import { deleteConversation, generateConversationTitle, updateConversation } from '@/api/conversations'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
-import { deleteWhitelistRule, fetchWhitelistRules } from '@/api/whitelist'
 import { createAssistantRuntimeManager } from '@/composables/useAssistantRuntime'
 import { createConversationMessagingActions } from '@/composables/useConversationMessaging'
 import { createConversationScopeState } from '@/composables/useConversationScopeState'
+import { useWhitelistStore } from '@/stores/whitelist'
 import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
 
 export const useChatStore = defineStore('chat', () => {
@@ -77,8 +77,8 @@ export const useChatStore = defineStore('chat', () => {
     })
   }
 
-  // Whitelist state
-  const whitelistRules = ref<WhitelistRule[]>([])
+  // Whitelist state (delegated to useWhitelistStore)
+  const whitelistStore = useWhitelistStore()
 
   // Sidebar state
   const STORAGE_KEY_SIDEBAR_WIDTH = 'locus-agent:sidebar-width'
@@ -422,7 +422,7 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId.value = id
     getConversationRuntimeState(id)
     clearError(id)
-    loadWhitelistRules(id)
+    whitelistStore.loadWhitelistRules(id)
     void refreshConversationPlans(id)
   }
 
@@ -670,7 +670,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 成功后刷新白名单列表
     if (success) {
-      await loadWhitelistRules()
+      await whitelistStore.loadWhitelistRules(conversationId)
     }
     return success
   }
@@ -690,26 +690,8 @@ export const useChatStore = defineStore('chat', () => {
     return success
   }
 
-  /**
-   * 加载白名单规则
-   */
-  async function loadWhitelistRules(conversationId: string | null = currentConversationId.value) {
-    const rules = await fetchWhitelistRules(conversationId || undefined)
-    if (conversationId === currentConversationId.value) {
-      whitelistRules.value = rules
-    }
-  }
-
-  /**
-   * 删除白名单规则
-   */
-  async function removeWhitelistRule(ruleId: string) {
-    const success = await deleteWhitelistRule(ruleId)
-    if (success) {
-      whitelistRules.value = whitelistRules.value.filter(r => r.id !== ruleId)
-    }
-    return success
-  }
+  // Whitelist actions delegated to useWhitelistStore
+  const { whitelistRules, loadWhitelistRules, removeWhitelistRule } = whitelistStore
 
   /**
    * 开始编辑消息
