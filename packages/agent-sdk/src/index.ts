@@ -37,20 +37,20 @@ export {
 } from './sse/index.js'
 
 export type * from './types/index.js'
+
 export {
-  A2A_CODING_PROVIDERS,
+  ACP_CODING_PROVIDERS,
   CODING_MODEL_PROVIDERS,
   CODING_PROVIDERS,
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
   getCodingProviderForParent,
-  isA2ACodingProvider,
+  isACPCodingProvider,
   isCodingExecutor,
   isCodingModelProvider,
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './types/index.js'
-
 export {
   DANGEROUS_COMMAND_PREFIXES,
   extractDefaultPattern,
@@ -59,5 +59,19 @@ export {
   MODERATE_COMMAND_PREFIXES,
   MULTI_WORD_COMMANDS,
   TOOL_DEFAULT_RISK,
+} from './types/index.js'
+
+// SDK Message helpers
+export {
+  extractAssistantText,
+  extractResultText,
+  extractToolUseBlocks,
+  isAssistantMessage,
+  isPartialMessage,
+  isResultMessage,
+  isSystemMessage,
+  isToolResultMessage,
+  toRuntimeUsage,
+  toSDKUsage,
 } from './types/index.js'
 export { formatNotePreview, formatRelativeDateShort } from './utils/index.js'

@@ -274,7 +274,7 @@ const assistantModelLabel = computed<string | null>(() => {
   return props.message.model || '未记录模型'
 })
 
-const isA2AMessage = computed(() => !!props.message.model?.startsWith('a2a/'))
+const isACPMessage = computed(() => !!props.message.model?.startsWith('acp/'))
 
 const fullTextContent = computed(() => {
   const parts = displayParts.value
@@ -447,7 +447,7 @@ const { copy, copied } = useClipboard()
               v-for="tool in getToolCallSlice(part.toolCallIndex)"
               :key="tool.toolCall.toolCallId"
               :tool="tool"
-              :compact="isA2AMessage"
+              :compact="isACPMessage"
               :suggested-pattern="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.suggestedPattern"
               :risk-level="chatStore.pendingApprovals.get(tool.toolCall.toolCallId)?.riskLevel"
               :question-data="getQuestionData(tool.toolCall.toolCallId)"

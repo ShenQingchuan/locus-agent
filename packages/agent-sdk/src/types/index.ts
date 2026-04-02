@@ -6,24 +6,38 @@ export type * from './mcp.js'
 export type * from './message.js'
 export type * from './provider.js'
 export {
-  A2A_CODING_PROVIDERS,
+  ACP_CODING_PROVIDERS,
   CODING_MODEL_PROVIDERS,
   CODING_PROVIDERS,
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
   getCodingProviderForParent,
-  isA2ACodingProvider,
+  isACPCodingProvider,
   isCodingExecutor,
   isCodingModelProvider,
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './provider.js'
 
+export type * from './sdk-message.js'
+export {
+  extractAssistantText,
+  extractResultText,
+  extractToolUseBlocks,
+  isAssistantMessage,
+  isPartialMessage,
+  isResultMessage,
+  isSystemMessage,
+  isToolResultMessage,
+  toRuntimeUsage,
+  toSDKUsage,
+} from './sdk-message.js'
 export type * from './skill.js'
 export type * from './sse-events.js'
 export type * from './task.js'
 export type * from './tool.js'
 export type * from './whitelist.js'
+
 export {
   DANGEROUS_COMMAND_PREFIXES,
   extractDefaultPattern,

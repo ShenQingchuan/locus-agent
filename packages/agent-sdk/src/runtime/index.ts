@@ -16,12 +16,30 @@ export type {
 } from './delegation.js'
 
 export type {
+  AgentDefinition,
+  AgentOptions,
+  CanUseToolFn,
+  CanUseToolResult,
+  EffortLevel,
+  IQueryEngine,
+  OutputFormat,
+  PermissionMode,
+  QueryEngineConfig,
+  QueryResult,
+  SandboxFilesystemConfig,
+  SandboxNetworkConfig,
+  SandboxSettings,
+  SettingSource,
+  ThinkingConfig,
+} from './query.js'
+
+export type {
   ToolCategory,
   ToolPolicyConfig,
 } from './tool-policy.js'
-
 export { classifyTool } from './tool-policy.js'
 export { BuiltinTool } from './tool.js'
+
 export type {
   BuiltinToolName,
   StreamingToolExecutor,

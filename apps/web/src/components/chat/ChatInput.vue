@@ -2,7 +2,7 @@
 import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { DropdownItem } from '@univedge/locus-ui'
 import type { QueuedMessage } from '@/composables/useAssistantRuntime'
-import { A2A_CODING_PROVIDERS, getCodingProviderForParent, isA2ACodingProvider } from '@univedge/locus-agent-sdk'
+import { ACP_CODING_PROVIDERS, getCodingProviderForParent, isACPCodingProvider } from '@univedge/locus-agent-sdk'
 import { Dropdown, ImageAttachmentStrip, Select, useToast } from '@univedge/locus-ui'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -68,15 +68,15 @@ const {
   handleModelInput,
 } = useModelSelector()
 
-const activeA2AExecutor = computed(() =>
-  chatStore.codingExecutor && isA2ACodingProvider(chatStore.codingExecutor)
-    ? A2A_CODING_PROVIDERS.find(p => p.value === chatStore.codingExecutor)
+const activeACPExecutor = computed(() =>
+  chatStore.codingExecutor && isACPCodingProvider(chatStore.codingExecutor)
+    ? ACP_CODING_PROVIDERS.find(p => p.value === chatStore.codingExecutor)
     : undefined,
 )
 
 const codingExecutorSelectValue = computed(() => {
-  if (props.showCodingMode && activeA2AExecutor.value)
-    return `a2a:${activeA2AExecutor.value.value}`
+  if (props.showCodingMode && activeACPExecutor.value)
+    return `acp:${activeACPExecutor.value.value}`
   return chatStore.provider
 })
 
@@ -89,12 +89,12 @@ const codingProviderOptions = computed(() => {
       ...option,
       groupLabel: index === 0 ? '模型提供商' : undefined,
     })),
-    ...A2A_CODING_PROVIDERS.map((provider, index) => ({
-      value: `a2a:${provider.value}`,
+    ...ACP_CODING_PROVIDERS.map((provider, index) => ({
+      value: `acp:${provider.value}`,
       label: provider.label,
       icon: provider.icon,
       separator: index === 0,
-      groupLabel: index === 0 ? 'A2A' : undefined,
+      groupLabel: index === 0 ? 'ACP' : undefined,
     })),
   ]
 })
@@ -256,13 +256,13 @@ function handleModeSelect(key: string) {
 }
 
 async function handleCodingExecutorSelect(value: string) {
-  if (!props.showCodingMode || !value.startsWith('a2a:')) {
+  if (!props.showCodingMode || !value.startsWith('acp:')) {
     chatStore.codingExecutor = getCodingProviderForParent(chatStore.provider)?.value ?? null
     await handleProviderChange(value)
     return
   }
 
-  const provider = value.replace('a2a:', '')
+  const provider = value.replace('acp:', '')
   chatStore.codingExecutor = provider as typeof chatStore.codingExecutor
 }
 
@@ -647,7 +647,7 @@ function handleShiftTab() {
               @update:model-value="handleCodingExecutorSelect"
             />
 
-            <template v-if="isCustomProvider && !activeA2AExecutor">
+            <template v-if="isCustomProvider && !activeACPExecutor">
               <span class="text-muted-foreground/30 text-xs flex-shrink-0">·</span>
               <Select
                 :options="customModeOptions"
@@ -659,7 +659,7 @@ function handleShiftTab() {
               />
             </template>
 
-            <template v-if="!activeA2AExecutor">
+            <template v-if="!activeACPExecutor">
               <span class="text-muted-foreground/30 text-xs font-mono flex-shrink-0">/</span>
               <input
                 id="model-name-input"

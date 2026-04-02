@@ -13,10 +13,10 @@ import type { AddMessageInput } from '../services/message.js'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isA2ACodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { runLocalClaudeCode } from '../agent/a2a/local-claude-code.js'
+import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
 import {
   getPendingApproval,
   requestApproval,
@@ -595,7 +595,7 @@ chatRoutes.post('/', async (c) => {
       const assistantModel = codingExecutor
         ? (isCodingModelProvider(codingExecutor)
             ? `${codingExecutor}/${CODING_PROVIDERS.find(cp => cp.value === codingExecutor)?.defaultModel || 'unknown'}`
-            : `a2a/${codingExecutor}`)
+            : `acp/${codingExecutor}`)
         : `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
@@ -701,8 +701,8 @@ chatRoutes.post('/', async (c) => {
       }
 
       let result
-      if (codingExecutor && isA2ACodingProvider(codingExecutor)) {
-        const a2aResult = await runLocalClaudeCode({
+      if (codingExecutor && isACPCodingProvider(codingExecutor)) {
+        const acpResult = await runLocalClaudeCode({
           prompt: effectiveUserMessage,
           attachments,
           conversationId,
@@ -712,19 +712,19 @@ chatRoutes.post('/', async (c) => {
         })
 
         result = {
-          finishReason: a2aResult.finishReason,
-          usage: a2aResult.usage,
+          finishReason: acpResult.finishReason,
+          usage: acpResult.usage,
           generatedMessages: [] as ModelMessage[],
         }
 
         await stream.writeSSE(createSSEEvent({
           type: 'done',
           messageId,
-          model: a2aResult.model ? `a2a/${codingExecutor}/${a2aResult.model}` : assistantModel,
+          model: acpResult.model ? `acp/${codingExecutor}/${acpResult.model}` : assistantModel,
           usage: {
-            promptTokens: a2aResult.usage.inputTokens,
-            completionTokens: a2aResult.usage.outputTokens,
-            totalTokens: a2aResult.usage.totalTokens,
+            promptTokens: acpResult.usage.inputTokens,
+            completionTokens: acpResult.usage.outputTokens,
+            totalTokens: acpResult.usage.totalTokens,
           },
         }))
       }

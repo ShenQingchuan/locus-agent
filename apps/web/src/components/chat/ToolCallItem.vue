@@ -25,7 +25,7 @@ const props = defineProps<{
   questionData?: {
     questions: Array<{ question: string, options: string[], multiple?: boolean }>
   }
-  /** A2A 紧凑展示模式 */
+  /** ACP 紧凑展示模式 */
   compact?: boolean
 }>()
 const emit = defineEmits<{
@@ -150,7 +150,7 @@ const HEURISTIC_ARG_KEYS = [
   'description',
 ]
 
-const a2aSummary = computed(() => {
+const acpSummary = computed(() => {
   const { args } = props.tool.toolCall
   for (const key of HEURISTIC_ARG_KEYS) {
     const val = args[key]
@@ -167,9 +167,9 @@ const a2aSummary = computed(() => {
   return ''
 })
 
-const a2aDelegateDeltas = computed(() => props.tool.delegateDeltas ?? [])
+const acpDelegateDeltas = computed(() => props.tool.delegateDeltas ?? [])
 
-const a2aDelegateStatus = computed<'pending' | 'completed' | 'error'>(() => {
+const acpDelegateStatus = computed<'pending' | 'completed' | 'error'>(() => {
   const s = props.tool.status
   if (s === 'error' || s === 'interrupted')
     return 'error'
@@ -366,16 +366,16 @@ watch(bashExpanded, (expanded) => {
 
 <template>
   <div v-if="!isSilentTool" :class="compact ? 'my-0.5 text-sm' : 'my-2 text-sm'">
-    <!-- ===== A2A compact mode ===== -->
+    <!-- ===== ACP compact mode ===== -->
     <template v-if="compact">
       <DelegateCard
-        v-if="a2aDelegateDeltas.length > 0"
+        v-if="acpDelegateDeltas.length > 0"
         :tool-call-id="tool.toolCall.toolCallId"
         :agent-name="tool.toolCall.toolName"
         :agent-type="tool.toolCall.toolName"
-        :task="a2aSummary"
-        :status="a2aDelegateStatus"
-        :deltas="a2aDelegateDeltas"
+        :task="acpSummary"
+        :status="acpDelegateStatus"
+        :deltas="acpDelegateDeltas"
         class="mt-1"
       />
       <template v-else>
@@ -385,7 +385,7 @@ watch(bashExpanded, (expanded) => {
         >
           <div class="h-3 w-3 flex-shrink-0" :class="[statusIcon, statusIconClass]" />
           <code class="text-xs font-mono text-foreground/80">{{ tool.toolCall.toolName }}</code>
-          <span v-if="a2aSummary" class="text-xs font-mono truncate">{{ a2aSummary }}</span>
+          <span v-if="acpSummary" class="text-xs font-mono truncate">{{ acpSummary }}</span>
         </div>
         <div
           v-if="tool.output && tool.status === 'pending'"

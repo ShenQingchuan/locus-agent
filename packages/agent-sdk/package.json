@@ -17,6 +17,24 @@
       "dev": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tool-helper": {
+      "bun": "./src/tool-helper.ts",
+      "dev": "./src/tool-helper.ts",
+      "types": "./dist/tool-helper.d.ts",
+      "default": "./dist/tool-helper.js"
+    },
+    "./session": {
+      "bun": "./src/session.ts",
+      "dev": "./src/session.ts",
+      "types": "./dist/session.d.ts",
+      "default": "./dist/session.js"
+    },
+    "./agent": {
+      "bun": "./src/agent.ts",
+      "dev": "./src/agent.ts",
+      "types": "./dist/agent.d.ts",
+      "default": "./dist/agent.js"
     }
   },
   "main": "./dist/index.js",
@@ -29,7 +47,14 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "zod": "catalog:ai-sdk"
+  },
+  "peerDependenciesMeta": {
+    "zod": { "optional": true }
+  },
   "devDependencies": {
-    "typescript": "catalog:dev-tools"
+    "typescript": "catalog:dev-tools",
+    "zod": "catalog:ai-sdk"
   }
 }

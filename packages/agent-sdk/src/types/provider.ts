@@ -40,8 +40,8 @@ export const DEFAULT_API_BASES: Record<LLMProviderType, string> = Object.fromEnt
 // ---------------------------------------------------------------------------
 
 export type CodingModelProviderType = 'kimi-code'
-export type A2ACodingProviderType = 'local-claude-code'
-export type CodingExecutorType = CodingModelProviderType | A2ACodingProviderType
+export type ACPCodingProviderType = 'local-claude-code'
+export type CodingExecutorType = CodingModelProviderType | ACPCodingProviderType
 
 export interface CodingProviderMeta {
   value: CodingModelProviderType
@@ -56,8 +56,8 @@ export interface CodingProviderMeta {
   apiFormat: 'anthropic'
 }
 
-export interface A2ACodingProviderMeta {
-  value: A2ACodingProviderType
+export interface ACPCodingProviderMeta {
+  value: ACPCodingProviderType
   label: string
   transport: 'local-cli' | 'remote-http'
   icon?: string
@@ -75,7 +75,7 @@ export const CODING_MODEL_PROVIDERS: CodingProviderMeta[] = [
   },
 ]
 
-export const A2A_CODING_PROVIDERS: A2ACodingProviderMeta[] = [
+export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
   {
     value: 'local-claude-code',
     label: '本地 Claude Code',
@@ -95,12 +95,12 @@ export function isCodingModelProvider(value: string): value is CodingModelProvid
   return CODING_MODEL_PROVIDERS.some(cp => cp.value === value)
 }
 
-export function isA2ACodingProvider(value: string): value is A2ACodingProviderType {
-  return A2A_CODING_PROVIDERS.some(cp => cp.value === value)
+export function isACPCodingProvider(value: string): value is ACPCodingProviderType {
+  return ACP_CODING_PROVIDERS.some(cp => cp.value === value)
 }
 
 export function isCodingExecutor(value: string): value is CodingExecutorType {
-  return isCodingModelProvider(value) || isA2ACodingProvider(value)
+  return isCodingModelProvider(value) || isACPCodingProvider(value)
 }
 
 export function normalizeModelForProvider(model: string, provider: LLMProviderType): string {

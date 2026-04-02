@@ -2,7 +2,7 @@ import type { CodingExecutorType, Conversation, CoreMessage, LLMProviderType, Me
 import type { Ref } from 'vue'
 import type { Message } from '@/composables/useAssistantRuntime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
-import { A2A_CODING_PROVIDERS, CODING_PROVIDERS, DEFAULT_MODELS, isA2ACodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { ACP_CODING_PROVIDERS, CODING_PROVIDERS, DEFAULT_MODELS, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { abortChat } from '@/api/chat'
 import { truncateMessages } from '@/api/conversations'
 import { streamAssistantReply } from '@/composables/useAssistantStreaming'
@@ -139,8 +139,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
       if (options.conversationScope.value.space === 'coding' && executor) {
         if (isCodingModelProvider(executor))
           return `${executor}/${CODING_PROVIDERS.find(cp => cp.value === executor)?.defaultModel || 'unknown'}`
-        if (isA2ACodingProvider(executor))
-          return `a2a/${A2A_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
+        if (isACPCodingProvider(executor))
+          return `acp/${ACP_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
       }
       return `${options.provider.value}/${selectedModel}`
     })()
