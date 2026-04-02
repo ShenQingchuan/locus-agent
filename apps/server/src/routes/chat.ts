@@ -50,14 +50,75 @@ export const chatRoutes = new Hono()
 /**
  * 活跃的 AbortController 映射
  * key: conversationId
+ *
+ * 清理策略（防止内存泄漏）：
+ * 1. 流正常完成/异常：finally 块调用 cleanupSession()
+ * 2. 客户端中止：/abort 端点调用 cleanupSession()
+ * 3. 超时清理：后台任务定期清理超时会话
  */
 const activeAbortControllers = new Map<string, AbortController>()
 
 /**
  * 活跃会话的可变 confirmMode 状态
  * key: conversationId, value: 可变引用，可由 approve 端点或 conversation 更新实时变更
+ *
+ * 清理策略：同 activeAbortControllers
  */
 const activeConfirmModes = new Map<string, { value: boolean }>()
+
+/**
+ * 活跃会话的创建时间戳（用于超时检测）
+ * key: conversationId, value: 创建时间戳（ms）
+ */
+const activeSessionTimestamps = new Map<string, number>()
+
+/**
+ * 清理超时会话的间隔和超时时间
+ */
+const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000 // 每 5 分钟检查一次
+const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 分钟未活动则清理
+
+/**
+ * 清理指定会话的所有活跃状态
+ * 安全地处理已中止的控制器
+ */
+function cleanupSession(conversationId: string): void {
+  const controller = activeAbortControllers.get(conversationId)
+  if (controller) {
+    try {
+      controller.abort()
+    }
+    catch {
+      // 忽略已中止的控制器错误
+    }
+  }
+  activeAbortControllers.delete(conversationId)
+  activeConfirmModes.delete(conversationId)
+  activeSessionTimestamps.delete(conversationId)
+}
+
+/**
+ * 后台清理任务：定期清理超时的会话
+ */
+function startSessionCleanupTask(): void {
+  setInterval(() => {
+    const now = Date.now()
+    const expired: string[] = []
+
+    for (const [conversationId, timestamp] of activeSessionTimestamps.entries()) {
+      if (now - timestamp > SESSION_TIMEOUT) {
+        expired.push(conversationId)
+      }
+    }
+
+    for (const conversationId of expired) {
+      cleanupSession(conversationId)
+    }
+  }, SESSION_CLEANUP_INTERVAL)
+}
+
+// 启动后台清理任务
+startSessionCleanupTask()
 
 /**
  * 更新活跃会话的 confirmMode（供外部路由调用）
@@ -564,20 +625,21 @@ chatRoutes.post('/', async (c) => {
     metadata: messageMetadata,
   })
 
-  // 取消之前的请求（如果存在）
-  const existingController = activeAbortControllers.get(conversationId)
-  if (existingController) {
-    existingController.abort()
-    activeAbortControllers.delete(conversationId)
+  // 如果该会话已有活跃请求，先清理旧的
+  if (activeAbortControllers.has(conversationId)) {
+    cleanupSession(conversationId)
   }
 
-  // 创建新的 AbortController
+  // 创建新的会话状态
   const abortController = new AbortController()
   activeAbortControllers.set(conversationId, abortController)
 
   // 可变 confirmMode 状态，approve 端点收到 switchToYolo 时会实时更新
   const confirmModeState = { value: confirmMode ?? config.confirmMode }
   activeConfirmModes.set(conversationId, confirmModeState)
+
+  // 记录会话创建时间戳，用于超时清理
+  activeSessionTimestamps.set(conversationId, Date.now())
 
   return streamSSE(c, async (stream) => {
     // 用于生成消息 ID
@@ -822,8 +884,8 @@ chatRoutes.post('/', async (c) => {
       }))
     }
     finally {
-      activeAbortControllers.delete(conversationId)
-      activeConfirmModes.delete(conversationId)
+      // 清理所有活跃状态，防止内存泄漏
+      cleanupSession(conversationId)
     }
   })
 })
@@ -848,8 +910,13 @@ chatRoutes.post('/abort', async (c) => {
 
   const controller = activeAbortControllers.get(conversationId)
   if (controller) {
-    controller.abort()
-    activeAbortControllers.delete(conversationId)
+    try {
+      controller.abort()
+    }
+    catch {
+      // 忽略已中止的控制器错误
+    }
+    cleanupSession(conversationId)
     return c.json({ success: true, aborted: true })
   }
 
