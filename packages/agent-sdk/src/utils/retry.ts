@@ -63,7 +63,7 @@ export function isRateLimitError(err: any): boolean {
 
 /** Exponential backoff delay with ±25% jitter. */
 export function getRetryDelay(attempt: number, config: RetryConfig = DEFAULT_RETRY_CONFIG): number {
-  const delay = config.baseDelayMs * Math.pow(2, attempt)
+  const delay = config.baseDelayMs * 2 ** attempt
   const jitter = delay * 0.25 * (Math.random() * 2 - 1)
   return Math.min(delay + jitter, config.maxDelayMs)
 }

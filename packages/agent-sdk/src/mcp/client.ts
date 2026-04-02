@@ -8,9 +8,9 @@
  * @module mcp/client
  */
 
-import process from 'node:process'
 import type { MCPServerConfig } from '../types/mcp.js'
 import type { ToolDefinition } from '../types/tool.js'
+import process from 'node:process'
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -161,8 +161,12 @@ export async function connectMCPServer(
       },
 
       async close() {
-        try { await client.close() }
-        catch { /* ignore */ }
+        try {
+          await client.close()
+        }
+        catch {
+          // ignore
+        }
       },
     }
   }

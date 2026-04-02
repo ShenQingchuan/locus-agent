@@ -77,23 +77,23 @@ export function toSDKUsage(runtime: TokenUsage): SDKTokenUsage {
  * Consumers should switch on the `type` field, and for `type: 'system'`
  * additionally switch on `subtype`.
  */
-export type SDKMessage =
-  | SDKAssistantMessage
-  | SDKToolResultMessage
-  | SDKResultMessage
-  | SDKPartialMessage
-  | SDKSystemMessage
+export type SDKMessage
+  = | SDKAssistantMessage
+    | SDKToolResultMessage
+    | SDKResultMessage
+    | SDKPartialMessage
+    | SDKSystemMessage
 
 /**
  * Discriminated union of system message subtypes.
  * Separated so consumers can narrow `SDKSystemMessage` further by `subtype`.
  */
-export type SDKSystemMessage =
-  | SDKInitMessage
-  | SDKCompactBoundaryMessage
-  | SDKStatusMessage
-  | SDKTaskNotificationMessage
-  | SDKRateLimitMessage
+export type SDKSystemMessage
+  = | SDKInitMessage
+    | SDKCompactBoundaryMessage
+    | SDKStatusMessage
+    | SDKTaskNotificationMessage
+    | SDKRateLimitMessage
 
 // --------------------------------------------------------------------------
 // Individual SDK Message Types
@@ -140,8 +140,8 @@ export interface SDKResultMessage {
   duration_ms?: number
   duration_api_ms?: number
   usage?: SDKTokenUsage
-  model_usage?: Record<string, { input_tokens: number; output_tokens: number }>
-  permission_denials?: Array<{ tool: string; reason: string }>
+  model_usage?: Record<string, { input_tokens: number, output_tokens: number }>
+  permission_denials?: Array<{ tool: string, reason: string }>
   structured_output?: unknown
   errors?: string[]
 }
@@ -166,7 +166,7 @@ export interface SDKInitMessage {
   tools: string[]
   model: string
   cwd: string
-  mcp_servers: Array<{ name: string; status: string }>
+  mcp_servers: Array<{ name: string, status: string }>
   permission_mode: string
 }
 

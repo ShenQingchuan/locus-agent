@@ -5,7 +5,7 @@
  * for CoreMessage arrays. Browser and Node.js compatible.
  */
 
-import type { CoreMessage, UserMessage, AssistantMessage } from '../types/message.js'
+import type { AssistantMessage, CoreMessage, UserMessage } from '../types/message.js'
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -52,8 +52,8 @@ export function normalizeMessages(messages: CoreMessage[]): CoreMessage[] {
 
   for (const msg of messages) {
     if (result.length > 0) {
-      const last = result[result.length - 1]
-      if (last.role === msg.role && (msg.role === 'user' || msg.role === 'assistant')) {
+      const last = result.at(-1)
+      if (last?.role === msg.role && (msg.role === 'user' || msg.role === 'assistant')) {
         // Merge: append content with a newline
         result[result.length - 1] = {
           ...last,

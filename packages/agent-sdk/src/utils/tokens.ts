@@ -79,7 +79,7 @@ export function estimateCost(
 ): number {
   const pricing
     = Object.entries(MODEL_PRICING).find(([key]) => model.includes(key))?.[1]
-    ?? { input: 3 / 1_000_000, output: 15 / 1_000_000 }
+      ?? { input: 3 / 1_000_000, output: 15 / 1_000_000 }
 
   return usage.input_tokens * pricing.input + usage.output_tokens * pricing.output
 }

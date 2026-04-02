@@ -6,6 +6,7 @@
  * redundant reads during an agent session.
  */
 
+import { Buffer } from 'node:buffer'
 import { normalize, resolve } from 'node:path'
 
 // ---------------------------------------------------------------------------
@@ -110,7 +111,7 @@ export class FileStateCache {
   }
 
   keys(): string[] {
-    return Array.from(this.cache.keys())
+    return [...this.cache.keys()]
   }
 
   clone(): FileStateCache {
