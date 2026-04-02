@@ -1,5 +1,6 @@
 import { generateText } from 'ai'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { resolvePendingApprovalsForConversation } from '../agent/approval.js'
 import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import {
@@ -14,6 +15,34 @@ import { addMessage, getMessages, truncateMessages } from '../services/message.j
 import { updateActiveConfirmMode } from './chat.js'
 
 const RE_SURROUNDING_QUOTES = /^["']|["']$/g
+
+const CreateConversationSchema = z.object({
+  title: z.string().max(200).optional(),
+  space: z.enum(['chat', 'coding']).optional(),
+  projectKey: z.string().max(100).optional(),
+})
+
+const UpdateConversationSchema = z.object({
+  title: z.string().max(200).optional(),
+  confirmMode: z.boolean().optional(),
+})
+
+const AddMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system', 'tool']),
+  content: z.string(),
+  model: z.string().optional(),
+  toolCalls: z.array(z.unknown()).optional(),
+  toolResults: z.array(z.unknown()).optional(),
+  usage: z.object({
+    promptTokens: z.number(),
+    completionTokens: z.number(),
+    totalTokens: z.number(),
+  }).optional(),
+})
+
+const TruncateMessagesSchema = z.object({
+  keepCount: z.number().int().min(0),
+})
 
 export const conversationsRoutes = new Hono()
 
@@ -34,13 +63,24 @@ conversationsRoutes.get('/', async (c) => {
 
 // POST /api/conversations - Create a new conversation
 conversationsRoutes.post('/', async (c) => {
-  const body = await c.req.json()
-  const { title, space, projectKey } = body
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
 
+  const parsed = CreateConversationSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400)
+  }
+
+  const { title, space, projectKey } = parsed.data
   const conversation = await createScopedConversation({
     title,
     space: space === 'coding' ? 'coding' : 'chat',
-    projectKey: typeof projectKey === 'string' ? projectKey : undefined,
+    projectKey,
   })
   return c.json({ conversation }, 201)
 })
@@ -64,8 +104,21 @@ conversationsRoutes.get('/:id', async (c) => {
 // PATCH /api/conversations/:id - Update a conversation
 conversationsRoutes.patch('/:id', async (c) => {
   const id = c.req.param('id')
-  const body = await c.req.json()
-  const { title, confirmMode } = body
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+
+  const parsed = UpdateConversationSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400)
+  }
+
+  const { title, confirmMode } = parsed.data
 
   const updated = await updateConversation(id, { title, confirmMode })
 
@@ -157,8 +210,21 @@ conversationsRoutes.post('/:id/generate-title', async (c) => {
 // POST /api/conversations/:id/messages - Add a message to a conversation
 conversationsRoutes.post('/:id/messages', async (c) => {
   const conversationId = c.req.param('id')
-  const body = await c.req.json()
-  const { role, content, model, toolCalls, toolResults, usage } = body
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+
+  const parsed = AddMessageSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400)
+  }
+
+  const { role, content, model, toolCalls, toolResults, usage } = parsed.data
 
   const exists = await conversationExists(conversationId)
 
@@ -170,8 +236,8 @@ conversationsRoutes.post('/:id/messages', async (c) => {
     role,
     content,
     model,
-    toolCalls,
-    toolResults,
+    toolCalls: toolCalls as any,
+    toolResults: toolResults as any,
     usage,
   })
 
@@ -181,12 +247,21 @@ conversationsRoutes.post('/:id/messages', async (c) => {
 // POST /api/conversations/:id/truncate - Truncate messages, keeping only the first N
 conversationsRoutes.post('/:id/truncate', async (c) => {
   const conversationId = c.req.param('id')
-  const body = await c.req.json<{ keepCount: number }>()
-  const { keepCount } = body
 
-  if (typeof keepCount !== 'number' || keepCount < 0) {
-    return c.json({ error: 'keepCount must be a non-negative number' }, 400)
+  let body: unknown
+  try {
+    body = await c.req.json()
   }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+
+  const parsed = TruncateMessagesSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400)
+  }
+
+  const { keepCount } = parsed.data
 
   const exists = await conversationExists(conversationId)
   if (!exists) {

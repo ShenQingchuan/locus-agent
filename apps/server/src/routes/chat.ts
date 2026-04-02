@@ -2,14 +2,13 @@ import type {
   ChatRequest,
   MessageImageAttachment,
   SSEEvent,
-  ToolApprovalRequest,
   ToolCall,
   ToolResult,
   WhitelistRule,
 } from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
-import type { QuestionAnswer } from '../agent/tools/ask_question.js'
 import type { AddMessageInput } from '../services/message.js'
+import { z } from 'zod'
 import { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -44,6 +43,29 @@ const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
 const RE_NON_WORD_OR_HYPHEN = /[^\w-]/g
 const RE_PLAN_TAG = /<plan\b[^>]*>[\s\S]*?<\/plan>/gi
 const RE_PLAN_REF_TAG = /<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi
+
+const AbortSchema = z.object({
+  conversationId: z.string().min(1),
+})
+
+const ApproveSchema = z.object({
+  conversationId: z.string().min(1),
+  toolCallId: z.string().min(1),
+  approved: z.boolean(),
+  switchToYolo: z.boolean().optional(),
+  addToWhitelist: z.object({
+    pattern: z.string(),
+    scope: z.enum(['session', 'global']),
+  }).optional(),
+})
+
+const AnswerSchema = z.object({
+  toolCallId: z.string().min(1),
+  answers: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })),
+})
 
 export const chatRoutes = new Hono()
 
@@ -892,21 +914,23 @@ chatRoutes.post('/', async (c) => {
 
 // POST /api/chat/abort - Abort current stream
 chatRoutes.post('/abort', async (c) => {
-  const body = await c.req.json<{ conversationId: string }>()
-  const { conversationId } = body
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
+  }
 
-  if (!conversationId) {
+  const parsed = AbortSchema.safeParse(body)
+  if (!parsed.success) {
     return c.json(
-      {
-        success: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'conversationId is required',
-        },
-      },
+      { success: false, error: { code: 'INVALID_REQUEST', message: 'conversationId is required' } },
       400,
     )
   }
+
+  const { conversationId } = parsed.data
 
   const controller = activeAbortControllers.get(conversationId)
   if (controller) {
@@ -925,10 +949,16 @@ chatRoutes.post('/abort', async (c) => {
 
 // POST /api/chat/approve - Approve or reject tool execution
 chatRoutes.post('/approve', async (c) => {
-  const body = await c.req.json<ToolApprovalRequest>()
-  const { conversationId, toolCallId, approved, switchToYolo, addToWhitelist } = body
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
+  }
 
-  if (!conversationId || !toolCallId || approved === undefined) {
+  const parsed = ApproveSchema.safeParse(body)
+  if (!parsed.success) {
     return c.json(
       {
         success: false,
@@ -940,6 +970,8 @@ chatRoutes.post('/approve', async (c) => {
       400,
     )
   }
+
+  const { conversationId, toolCallId, approved, switchToYolo, addToWhitelist } = parsed.data
 
   // 实时切换当前运行中 loop 的 confirmMode
   if (switchToYolo && approved) {
@@ -1008,13 +1040,16 @@ chatRoutes.post('/approve', async (c) => {
 
 // POST /api/chat/answer - Submit answers to ask_question tool
 chatRoutes.post('/answer', async (c) => {
-  const body = await c.req.json<{
-    toolCallId: string
-    answers: QuestionAnswer[]
-  }>()
-  const { toolCallId, answers } = body
+  let body: unknown
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ success: false, error: { code: 'INVALID_REQUEST', message: 'Invalid JSON' } }, 400)
+  }
 
-  if (!toolCallId || !answers) {
+  const parsed = AnswerSchema.safeParse(body)
+  if (!parsed.success) {
     return c.json(
       {
         success: false,
@@ -1026,6 +1061,8 @@ chatRoutes.post('/answer', async (c) => {
       400,
     )
   }
+
+  const { toolCallId, answers } = parsed.data
 
   const resolved = resolveQuestionAnswer(toolCallId, answers)
 
