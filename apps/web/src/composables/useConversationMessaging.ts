@@ -242,7 +242,6 @@ export function createConversationMessagingActions(options: CreateConversationMe
         if (isPlanningTurn)
           options.onPlanPreviewDone?.(conversationId)
       },
-      isStillStreaming: () => options.getConversationRuntimeState(conversationId).currentStreamingMessageId === assistantMessageId,
       onMissingTerminalEvent: () => {
         options.updateMessage(assistantMessageId, { isStreaming: false }, conversationId)
         const fallbackState = options.getConversationRuntimeState(conversationId)

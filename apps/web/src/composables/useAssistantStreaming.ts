@@ -26,11 +26,14 @@ interface StreamAssistantReplyOptions {
   onDelegateDelta: (event: Parameters<NonNullable<Parameters<typeof streamChat>[0]['onDelegateDelta']>>[0]) => void
   onDone: (usage?: Message['usage'], model?: string) => void
   onError: (code: string, message: string) => void
-  isStillStreaming: () => boolean
   onMissingTerminalEvent: () => void
 }
 
 export async function streamAssistantReply(options: StreamAssistantReplyOptions): Promise<void> {
+  // Local flag to track whether a terminal event (onDone/onError) was received,
+  // avoiding reliance on external Store state for stream termination detection.
+  let hasReceivedTerminalEvent = false
+
   try {
     await streamChat({
       conversationId: options.conversationId,
@@ -67,19 +70,23 @@ export async function streamAssistantReply(options: StreamAssistantReplyOptions)
         options.onDelegateDelta(event)
       },
       onDone: (_messageId, usage, model) => {
+        hasReceivedTerminalEvent = true
         options.onDone(usage, model)
       },
       onError: (code, message) => {
+        hasReceivedTerminalEvent = true
         options.onError(code, message)
       },
     })
 
-    if (options.isStillStreaming()) {
+    if (!hasReceivedTerminalEvent) {
       options.onMissingTerminalEvent()
     }
   }
   catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-    options.onError('STREAM_ERROR', errorMessage)
+    if (!hasReceivedTerminalEvent) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      options.onError('STREAM_ERROR', errorMessage)
+    }
   }
 }
