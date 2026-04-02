@@ -9,6 +9,25 @@ import { executeToolCall, hasToolExecutor, interactiveTools, isTrustedBuiltinToo
 import { isWhitelisted } from '../whitelist.js'
 import { withTimeout } from './timeout.js'
 
+async function executeToolWithTimeout(
+  toolName: string,
+  toolCallId: string,
+  args: unknown,
+  onToolOutputDelta: ExecuteToolPipelineOptions['onToolOutputDelta'],
+  toolContext: ExecuteToolPipelineOptions['toolContext'],
+  toolTimeoutMs: number,
+): Promise<unknown> {
+  const callbacks = onToolOutputDelta
+    ? { onOutputDelta: (stream: 'stdout' | 'stderr', delta: string) => onToolOutputDelta(toolCallId, stream, delta) }
+    : undefined
+  const toolPromise = executeToolCall(toolName, args, callbacks, toolContext)
+  return withTimeout(
+    toolPromise,
+    toolTimeoutMs,
+    `Tool "${toolName}" timed out after ${toolTimeoutMs}ms`,
+  )
+}
+
 export async function executePendingToolCall(
   options: ExecuteToolPipelineOptions,
 ): Promise<ExecuteToolPipelineResult> {
@@ -145,14 +164,7 @@ export async function executePendingToolCall(
         : null
 
       if (isTrusted || whitelistMatch) {
-        const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
-          ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-          : undefined, toolContext)
-        result = await withTimeout(
-          toolPromise,
-          toolTimeoutMs,
-          `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
-        )
+        result = await executeToolWithTimeout(tc.toolName, tc.toolCallId, tc.args, onToolOutputDelta, toolContext, toolTimeoutMs)
       }
       else {
         if (onToolPendingApproval) {
@@ -166,26 +178,12 @@ export async function executePendingToolCall(
           result = 'Tool execution was rejected by user'
         }
         else {
-          const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
-            ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-            : undefined, toolContext)
-          result = await withTimeout(
-            toolPromise,
-            toolTimeoutMs,
-            `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
-          )
+          result = await executeToolWithTimeout(tc.toolName, tc.toolCallId, tc.args, onToolOutputDelta, toolContext, toolTimeoutMs)
         }
       }
     }
     else {
-      const toolPromise = executeToolCall(tc.toolName, tc.args, onToolOutputDelta
-        ? { onOutputDelta: (stream, delta) => onToolOutputDelta(tc.toolCallId, stream, delta) }
-        : undefined, toolContext)
-      result = await withTimeout(
-        toolPromise,
-        toolTimeoutMs,
-        `Tool "${tc.toolName}" timed out after ${toolTimeoutMs}ms`,
-      )
+      result = await executeToolWithTimeout(tc.toolName, tc.toolCallId, tc.args, onToolOutputDelta, toolContext, toolTimeoutMs)
     }
   }
   catch (error) {
