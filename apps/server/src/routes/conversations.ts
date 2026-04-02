@@ -184,7 +184,7 @@ conversationsRoutes.post('/:id/generate-title', async (c) => {
 
   try {
     const modelInfo = getCurrentModelInfo()
-    const model = createLLMModel(modelInfo.model, false)
+    const model = createLLMModel({ modelId: modelInfo.model, thinkingMode: false })
 
     const { text } = await generateText({
       model,

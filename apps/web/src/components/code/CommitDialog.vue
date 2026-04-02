@@ -43,7 +43,7 @@ function handleConfirm() {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="emit('cancel')">
-    <div class="w-full max-w-lg mx-4 rounded-xl border border-border bg-background shadow-2xl flex flex-col overflow-hidden">
+    <div class="w-full max-w-3xl mx-4 rounded-xl border border-border bg-background shadow-2xl flex flex-col overflow-hidden">
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-border">
         <div>
@@ -63,18 +63,18 @@ function handleConfirm() {
       </div>
 
       <!-- Body -->
-      <div class="p-4 space-y-3">
+      <div class="p-6 space-y-4">
         <!-- Commit message textarea -->
-        <div class="space-y-1.5">
+        <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-medium text-muted-foreground">提交信息</label>
+            <label class="text-sm font-medium text-muted-foreground">提交信息</label>
             <span class="text-xs text-muted-foreground/60">建议遵照规范：&lt;type&gt;(scope): &lt;subject&gt;</span>
           </div>
           <textarea
             v-model="message"
-            class="w-full min-h-[80px] resize-y rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors"
+            class="w-full min-h-[400px] resize-y rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-foreground font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/20 transition-colors"
             placeholder="feat(auth): add login with email verification"
-            rows="3"
+            rows="16"
             autofocus
             @keydown.meta.enter="handleConfirm"
             @keydown.ctrl.enter="handleConfirm"

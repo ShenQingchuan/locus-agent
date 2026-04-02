@@ -12,6 +12,7 @@ import { basename, join, relative, resolve, sep } from 'node:path'
 import { generateText } from 'ai'
 import { Glob } from 'bun'
 import { Hono } from 'hono'
+import { buildCommitMessagePrompt, COMMIT_MESSAGE_SYSTEM_PROMPT } from '../agent/prompts/commit-message.js'
 import { createLLMModel } from '../agent/providers/model-factory.js'
 import { getGitignoreFilter } from '../agent/tools/gitignore-filter.js'
 import { getAllowedRoots, resolveAllowedDirectory } from '../services/workspace-access.js'
@@ -772,6 +773,7 @@ const MAX_LINES_PER_FILE = 80
  *     a `[… N more lines truncated]` marker.
  *  3. Stop adding file patches once we exceed MAX_DIFF_CHARS.
  */
+const RE_DIFF_GIT = /(?=^diff --git )/m
 function trimDiffForLLM(stat: string, fullDiff: string): string {
   const header = stat.trim()
   if (!fullDiff.trim()) {
@@ -779,7 +781,7 @@ function trimDiffForLLM(stat: string, fullDiff: string): string {
   }
 
   // Split into per-file patches (each starts with "diff --git ...")
-  const patches = fullDiff.split(/(?=^diff --git )/m)
+  const patches = fullDiff.split(RE_DIFF_GIT)
   const parts: string[] = [header, '']
   let totalChars = header.length
 
@@ -830,32 +832,20 @@ workspaceRoutes.post('/git/suggest-commit-message', async (c) => {
 
     const diffContext = trimDiffForLLM(statResult.stdout, diffResult.stdout)
 
-    const model = createLLMModel()
-    const { text } = await generateText({
+    const model = createLLMModel({ thinkingMode: false })
+    const result = await generateText({
       model,
-      maxTokens: 120,
-      messages: [
-        {
-          role: 'user',
-          content: `You are an expert at writing conventional commit messages.
-Write a concise commit message for the following staged changes.
-
-Rules:
-- Format: <type>(<scope>): <subject>
-- Common types: feat, fix, refactor, docs, style, test, chore, perf
-- Subject: imperative mood, ≤72 chars, no trailing period
-- If the scope is obvious from the diff, include it; otherwise omit
-- Output ONLY the commit message line, nothing else
-
-Staged diff:
-\`\`\`
-${diffContext}
-\`\`\``,
-        },
-      ],
+      maxOutputTokens: 1024,
+      system: COMMIT_MESSAGE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildCommitMessagePrompt(diffContext) }],
+      providerOptions: {
+        anthropic: { thinking: { type: 'disabled' } },
+        moonshotai: { thinking: { type: 'disabled' } },
+        deepseek: { thinking: { type: 'disabled' } },
+      },
     })
 
-    return c.json({ message: text.trim() })
+    return c.json({ message: result.text.trim() })
   }
   catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 500)

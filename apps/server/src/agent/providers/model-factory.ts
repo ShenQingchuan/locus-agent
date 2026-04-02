@@ -19,8 +19,13 @@ const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
 }
 
 export function createLLMModel(
-  modelId: string = getDefaultModelId(),
-  thinkingMode?: boolean,
+  {
+    modelId = getDefaultModelId(),
+    thinkingMode = true,
+  }: {
+    modelId?: string
+    thinkingMode?: boolean
+  } = {},
 ): LanguageModel {
   const cfg = getProviderConfig()
   if (!cfg.apiKey?.trim()) {

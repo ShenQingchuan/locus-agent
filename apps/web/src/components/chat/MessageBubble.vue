@@ -23,7 +23,7 @@ const chatStore = useChatStore()
 const modelSettings = useModelSettingsStore()
 const toast = useToast()
 
-const { activeReasoningIdx, isBlockDone, isBlockExpanded, handleReasoningToggle } = useReasoningBlockState(props.message)
+const { activeReasoningIdx, isBlockDone, isBlockExpanded, handleReasoningToggle } = useReasoningBlockState(() => props.message)
 const markDirty = useMarkConversationDirty()
 
 const isUser = computed(() => props.message.role === 'user')

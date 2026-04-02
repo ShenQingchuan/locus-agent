@@ -829,7 +829,7 @@ chatRoutes.post('/', async (c) => {
       else {
         const model = codingExecutor && isCodingModelProvider(codingExecutor)
           ? await createCodingModel(codingExecutor)
-          : createLLMModel(runtimeModelInfo.model, effectiveThinkingMode)
+          : createLLMModel({ modelId: runtimeModelInfo.model, thinkingMode: effectiveThinkingMode })
 
         result = await runAgentLoop({
           model,

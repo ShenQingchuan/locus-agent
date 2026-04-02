@@ -4,6 +4,7 @@ import { useQueryCache } from '@pinia/colada'
 import { useToast } from '@univedge/locus-ui'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import * as workspaceApi from '@/api/workspace'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationList from '@/components/chat/ConversationList.vue'
@@ -40,6 +41,8 @@ const isLeftSidebarCollapsed = useLocalStorage('locus-agent:coding-left-sidebar-
 const dirtyConversations = new Set<string>()
 
 const toast = useToast()
+const route = useRoute()
+const router = useRouter()
 const chatStore = useChatStore()
 const modelSettings = useModelSettingsStore()
 const planStore = usePlanStore()
@@ -70,7 +73,7 @@ function getStoredPanelWidth(storageKey: string, fallback: number, min: number, 
 }
 
 const leftPanel = useResizePanel({
-  initialWidth: getStoredPanelWidth(STORAGE_KEY_LEFT_PANEL_WIDTH, 200, 160, 320),
+  initialWidth: getStoredPanelWidth(STORAGE_KEY_LEFT_PANEL_WIDTH, 160, 160, 320),
   minWidth: 160,
   maxWidth: 320,
   onWidthChange: (width) => {
@@ -109,6 +112,19 @@ const { data: conversationData } = useConversationQuery(() => chatStore.currentC
 watch(codingScope, (scope) => {
   chatStore.setConversationScope(scope)
 }, { immediate: true })
+
+// Sync selected conversation → URL query (replace, not push, to avoid history spam)
+watch(() => chatStore.currentConversationId, (id) => {
+  const q = route.query
+  if (id) {
+    if (q.conversation !== id)
+      router.replace({ query: { ...q, conversation: id } })
+  }
+  else if (q.conversation) {
+    const { conversation: _, ...rest } = q
+    router.replace({ query: rest })
+  }
+})
 
 watch(conversationsData, (data) => {
   if (data) {
@@ -187,6 +203,13 @@ watch(() => workspaceStore.currentWorkspacePath, async (newPath) => {
 onMounted(async () => {
   await modelSettings.loadModelSettings()
   await initWorkspaceProjectKey()
+  // Restore conversation from URL query after workspace is ready
+  await nextTick()
+  const conversationId = route.query.conversation as string | undefined
+  if (conversationId) {
+    chatStore.switchConversation(conversationId)
+    activeSection.value = 'chat'
+  }
 })
 
 onActivated(async () => {
