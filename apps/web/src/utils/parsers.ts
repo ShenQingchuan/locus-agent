@@ -6,6 +6,8 @@
  * - useAssistantRuntime.ts (TODO tasks)
  */
 
+import { isDelegateResultObject, isTodoItemObject, isTodoResultObject } from '@/types/delegate'
+
 // ===== Regex Patterns =====
 
 const RE_ITERATIONS = /Iterations:\s*(\d+)/
@@ -46,24 +48,16 @@ export interface QuestionAnswerPair {
  */
 export function parseDelegateMeta(raw: unknown): DelegateMeta | null {
   // Object format (includes deltas)
-  if (typeof raw === 'object' && raw !== null) {
-    const r = raw as {
-      success?: boolean
-      taskId?: string
-      agentName?: string
-      agentType?: string
-      iterations?: number
-      usage?: { inputTokens: number, outputTokens: number, totalTokens: number }
-    }
+  if (isDelegateResultObject(raw)) {
     return {
-      taskId: r.taskId ?? '',
-      iterations: r.iterations ?? 0,
-      inputTokens: r.usage?.inputTokens ?? 0,
-      outputTokens: r.usage?.outputTokens ?? 0,
-      totalTokens: r.usage?.totalTokens ?? 0,
-      success: r.success ?? false,
-      agentName: r.agentName ?? '',
-      agentType: r.agentType ?? '',
+      taskId: raw.taskId ?? '',
+      iterations: raw.iterations ?? 0,
+      inputTokens: raw.usage?.inputTokens ?? 0,
+      outputTokens: raw.usage?.outputTokens ?? 0,
+      totalTokens: raw.usage?.totalTokens ?? 0,
+      success: raw.success ?? false,
+      agentName: raw.agentName ?? '',
+      agentType: raw.agentType ?? '',
     }
   }
 
@@ -149,27 +143,17 @@ export function parseQuestionAnswerBlocks(raw: unknown): QuestionAnswerPair[] | 
  * Returns `null` if parsing fails.
  */
 export function parseManageTodosResult(result: unknown): TodoTask[] | null {
-  if (typeof result === 'object' && result !== null) {
-    const todos = (result as { todos?: unknown }).todos
-    if (!Array.isArray(todos))
+  if (isTodoResultObject(result)) {
+    if (!Array.isArray(result.todos))
       return null
 
-    const parsed = todos
-      .map((item) => {
-        if (typeof item !== 'object' || item === null)
-          return null
-        const maybe = item as { id?: unknown, content?: unknown, status?: unknown }
-        if (typeof maybe.id !== 'string' || typeof maybe.content !== 'string')
-          return null
-        if (maybe.status !== 'in_progress' && maybe.status !== 'completed')
-          return null
-        return {
-          id: maybe.id,
-          content: maybe.content,
-          status: maybe.status,
-        } as TodoTask
-      })
-      .filter((item): item is TodoTask => !!item)
+    const parsed = result.todos
+      .filter(isTodoItemObject)
+      .map((item): TodoTask => ({
+        id: item.id,
+        content: item.content,
+        status: item.status,
+      }))
 
     return parsed
   }

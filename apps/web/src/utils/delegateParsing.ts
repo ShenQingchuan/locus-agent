@@ -5,3 +5,5 @@ export type * from './parsers'
 export {
   parseDelegateMeta,
 } from './parsers'
+export type { DelegateResultObject, ToolCallResultObject } from '@/types/delegate'
+export { isDelegateResultObject, isToolCallResultObject } from '@/types/delegate'
