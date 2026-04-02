@@ -38,8 +38,8 @@
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun --external onnxruntime-node --external @huggingface/transformers",
-    "typecheck": "tsc --noEmit",
+    "build": "bun run build.ts",
+    "typecheck": "tsgo --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -73,6 +73,7 @@
   "devDependencies": {
     "@types/bun": "catalog:bun-family",
     "drizzle-kit": "catalog:database",
+    "@typescript/native-preview": "catalog:dev-tools",
     "typescript": "catalog:dev-tools"
   }
 }

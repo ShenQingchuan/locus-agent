@@ -50,8 +50,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "tsdown",
+    "typecheck": "tsgo --noEmit"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "catalog:ai-sdk",
@@ -67,7 +67,9 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "catalog:ai-sdk",
-    "typescript": "catalog:dev-tools",
+    "@types/node": "catalog:dev-tools",
+    "@typescript/native-preview": "catalog:dev-tools",
+    "tsdown": "catalog:dev-tools",
     "zod": "catalog:ai-sdk"
   }
 }

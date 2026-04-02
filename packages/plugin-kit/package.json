@@ -23,13 +23,15 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "tsdown",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@univedge/locus-agent-sdk": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:dev-tools"
+    "@types/node": "catalog:dev-tools",
+    "@typescript/native-preview": "catalog:dev-tools",
+    "tsdown": "catalog:dev-tools"
   }
 }

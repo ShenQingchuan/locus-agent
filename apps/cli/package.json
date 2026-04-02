@@ -19,8 +19,8 @@
   ],
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun run scripts/build.ts",
-    "typecheck": "tsc --noEmit"
+    "build": "bun run build.ts",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "catalog:cli-tools",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:bun-family",
-    "typescript": "catalog:dev-tools"
+    "@types/node": "catalog:dev-tools",
+    "@typescript/native-preview": "catalog:dev-tools"
   }
 }

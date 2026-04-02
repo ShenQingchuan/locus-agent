@@ -31,8 +31,11 @@ catalogs:
     drizzle-orm: ^0.45.1
   dev-tools:
     '@antfu/eslint-config': ^7.7.0
+    '@tsdown/css': ^0.21.7
     '@types/node': ^24.12.0
+    '@typescript/native-preview': latest
     eslint: ^10.0.3
+    tsdown: ^0.21.7
     typescript: ^5.9.3
   embedding:
     '@huggingface/transformers': ^3.8.1
@@ -60,7 +63,7 @@ catalogs:
     unocss: ^66.6.6
   vite-family:
     '@vitejs/plugin-vue': ^6.0.4
-    vite: ^7.3.1
+    vite: ^8.0.3
   vue-family:
     '@ai-sdk/vue': ^3.0.116
     '@pierre/diffs': ^1.0.11
@@ -76,6 +79,7 @@ catalogs:
     vue: ^3.5.30
     vue-draggable-plus: ^0.6.1
     vue-router: ^5.0.3
+    unplugin-vue: ^7.1.1
     vue-tsc: ^3.2.5
 
 onlyBuiltDependencies:

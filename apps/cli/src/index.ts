@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { spawn } from 'node:child_process'
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
@@ -48,7 +47,13 @@ function getCommand(): string | undefined {
 }
 
 const portFlag = parsePortFlag()
-const command = args.includes('--daemon') ? '--daemon' : getCommand()
+const command = args.includes('--daemon')
+  ? '--daemon'
+  : args.includes('--help') || args.includes('-h')
+    ? 'help'
+    : args.includes('--version') || args.includes('-v')
+      ? 'version'
+      : getCommand()
 
 async function main(): Promise<void> {
   switch (command) {
@@ -232,7 +237,11 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-main().catch((error) => {
+main().then(() => {
+  // Daemon mode runs a long-lived server — don't exit
+  if (command !== '--daemon')
+    process.exit(0)
+}).catch((error) => {
   console.error('Fatal error:', error)
   process.exit(1)
 })
