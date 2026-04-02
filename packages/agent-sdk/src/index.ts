@@ -78,4 +78,36 @@ export {
   toRuntimeUsage,
   toSDKUsage,
 } from './types/index.js'
-export { formatNotePreview, formatRelativeDateShort } from './utils/index.js'
+export {
+  formatNotePreview,
+  formatRelativeDateShort,
+  // Token utilities
+  AUTOCOMPACT_BUFFER_TOKENS,
+  estimateCost,
+  estimateMessagesTokens,
+  estimateSystemPromptTokens,
+  estimateTokens,
+  getAutoCompactThreshold,
+  getContextWindowSize,
+  getTotalTokenCount,
+  MODEL_PRICING,
+  // Retry utilities
+  DEFAULT_RETRY_CONFIG,
+  formatApiError,
+  getRetryDelay,
+  isAuthError,
+  isPromptTooLongError,
+  isRateLimitError,
+  isRetryableError,
+  withRetry,
+  // Message utilities
+  createAssistantMessage,
+  createCompactBoundaryMessage,
+  createUserMessage,
+  extractAssistantTexts,
+  extractTextFromMessage,
+  normalizeMessages,
+  stripAttachments,
+  truncateText,
+} from './utils/index.js'
+export type { RetryConfig } from './utils/index.js'
