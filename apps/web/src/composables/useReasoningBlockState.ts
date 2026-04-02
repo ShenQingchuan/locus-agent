@@ -26,11 +26,8 @@ export function useReasoningBlockState(message: Message) {
     }
   }, { immediate: true })
 
-  function isBlockDone(partIdx: number): boolean {
-    if (!message.isStreaming)
-      return true
-    const parts = message.parts
-    return !parts || partIdx + 1 < parts.length
+  function isBlockDone(): boolean {
+    return !message.isStreaming
   }
 
   function isBlockExpanded(partIdx: number): boolean {

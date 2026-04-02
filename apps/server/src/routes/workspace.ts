@@ -6,13 +6,13 @@ import type {
   WorkspaceTreeNode,
 } from '@univedge/locus-agent-sdk'
 import { watch as fsWatch } from 'node:fs'
-import { generateText } from 'ai'
-import { createLLMModel } from '../agent/providers/model-factory.js'
 import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join, relative, resolve, sep } from 'node:path'
+import { generateText } from 'ai'
 import { Glob } from 'bun'
 import { Hono } from 'hono'
+import { createLLMModel } from '../agent/providers/model-factory.js'
 import { getGitignoreFilter } from '../agent/tools/gitignore-filter.js'
 import { getAllowedRoots, resolveAllowedDirectory } from '../services/workspace-access.js'
 

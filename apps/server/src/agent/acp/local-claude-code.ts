@@ -44,12 +44,12 @@ function resolveAcpBinary(): string {
 // ---------------------------------------------------------------------------
 
 const runner = createACPRunner({
-  name: 'local-claude-code',
+  name: 'claude-code',
   spawn: (cwd) => {
     const binPath = resolveAcpBinary()
     return spawn(process.execPath, [binPath], {
       cwd,
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
         PATH: process.env.PATH,

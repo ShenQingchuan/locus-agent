@@ -72,8 +72,8 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:bun-family",
-    "drizzle-kit": "catalog:database",
     "@typescript/native-preview": "catalog:dev-tools",
+    "drizzle-kit": "catalog:database",
     "typescript": "catalog:dev-tools"
   }
 }

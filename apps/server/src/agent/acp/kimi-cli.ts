@@ -28,7 +28,7 @@ const runner = createACPRunner({
   spawn: (cwd) => {
     return spawn('kimi', ['acp'], {
       cwd,
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
         PATH: process.env.PATH,

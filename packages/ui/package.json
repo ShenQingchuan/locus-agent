@@ -32,9 +32,9 @@
   },
   "devDependencies": {
     "@tanstack/vue-virtual": "catalog:vue-family",
+    "@tsdown/css": "catalog:dev-tools",
     "@vue/tsconfig": "catalog:vue-family",
     "@vueuse/core": "catalog:vue-family",
-    "@tsdown/css": "catalog:dev-tools",
     "tsdown": "catalog:dev-tools",
     "typescript": "catalog:dev-tools",
     "unplugin-vue": "catalog:vue-family",

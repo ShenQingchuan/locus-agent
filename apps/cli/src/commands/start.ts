@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process'
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
-import { defineCommand } from 'citty'
 import { initDB } from '@univedge/locus-server/db'
 import {
   ensureDataDir,
@@ -10,6 +9,7 @@ import {
   isSetupComplete,
   setSetting,
 } from '@univedge/locus-server/settings'
+import { defineCommand } from 'citty'
 import { getLogPath, getMigrationsFolder, getPidPath } from '../paths.js'
 
 function isProcessAlive(pid: number): boolean {

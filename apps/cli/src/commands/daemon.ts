@@ -1,4 +1,3 @@
-import { defineCommand } from 'citty'
 import { initDB } from '@univedge/locus-server/db'
 import {
   ensureDataDir,
@@ -7,6 +6,7 @@ import {
   getSettingsDbPath,
   isYoloMode,
 } from '@univedge/locus-server/settings'
+import { defineCommand } from 'citty'
 import { getMigrationsFolder, getWebDistDir } from '../paths.js'
 import { startServer } from '../server.js'
 

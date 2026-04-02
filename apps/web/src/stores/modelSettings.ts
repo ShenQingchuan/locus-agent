@@ -1,6 +1,6 @@
 import type { CodingExecutorType, CoreMessage, CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, isCodingModelProvider } from '@univedge/locus-agent-sdk'
-import { useToggle } from '@vueuse/core'
+import { useSessionStorage, useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
@@ -11,13 +11,16 @@ export const useModelSettingsStore = defineStore('modelSettings', () => {
   const [thinkMode, toggleThinkMode] = useToggle(true)
 
   // Model provider & model name (synced with server settings)
-  const provider = ref<LLMProviderType>('anthropic')
+  // sessionStorage so the last-used provider is restored immediately on mount
+  // before the async server fetch completes, avoiding a flash of the default.
+  const provider = useSessionStorage<LLMProviderType>('locus-agent:provider', 'anthropic')
   const modelName = ref('')
   const customMode = ref<CustomProviderMode>('openai-compatible')
   const isSavingModelSettings = ref(false)
 
-  // Coding executor selection (model provider or A2A executor / null = use default model)
-  const codingExecutor = ref<CodingExecutorType | null>(null)
+  // Coding executor selection — sessionStorage so the ACP / model executor
+  // choice survives page refreshes and tab switches within the same session.
+  const codingExecutor = useSessionStorage<CodingExecutorType | null>('locus-agent:coding-executor', null)
 
   // Clear provider-affine coding executors when switching to a provider
   // that doesn't expose one. A2A executors are independent.

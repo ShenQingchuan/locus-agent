@@ -780,12 +780,32 @@ chatRoutes.post('/', async (c) => {
       let result
       if (codingExecutor && isACPCodingProvider(codingExecutor)) {
         const acpRunner = codingExecutor === 'kimi-cli' ? runKimiCLI : runLocalClaudeCode
+
+        // Build a lightweight prior-context summary from the conversation history
+        // so that a fresh ACP session (e.g. after switching providers) has context.
+        const PRIOR_CONTEXT_MAX_MSGS = 12
+        const PRIOR_CONTEXT_CONTENT_LIMIT = 300
+        const recentForContext = dbMessages.slice(-PRIOR_CONTEXT_MAX_MSGS)
+        const priorContext = recentForContext.length > 0
+          ? recentForContext
+              .filter(m => m.role === 'user' || m.role === 'assistant')
+              .map((m) => {
+                const label = m.role === 'user' ? 'User' : 'Assistant'
+                const content = m.content.length > PRIOR_CONTEXT_CONTENT_LIMIT
+                  ? `${m.content.slice(0, PRIOR_CONTEXT_CONTENT_LIMIT)}…`
+                  : m.content
+                return `[${label}]: ${content}`
+              })
+              .join('\n')
+          : undefined
+
         const acpResult = await acpRunner({
           prompt: effectiveUserMessage,
           attachments,
           conversationId,
           workspaceRoot: resolvedWorkspaceRoot,
           abortSignal: abortController.signal,
+          priorContext,
           ...streamCallbacks,
         })
 

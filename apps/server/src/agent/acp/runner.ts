@@ -46,6 +46,8 @@ export interface RunACPOptions extends ACPCallbacks {
   conversationId: string
   workspaceRoot: string
   abortSignal?: AbortSignal
+  /** Pre-formatted prior conversation context, injected when starting a fresh session. */
+  priorContext?: string
 }
 
 export interface ACPResult {
@@ -206,10 +208,24 @@ export function createACPRunner(config: ACPRunnerConfig): {
 
   const sessionByConversation = new Map<string, string>()
 
+  const RE_EPIPE = /EPIPE|broken pipe|ACP write error/i
+
   function spawnProcess(cwd: string): ChildProcess {
     const child = config.spawn(cwd)
+
+    // Pipe stderr and suppress expected EPIPE noise that occurs when the server
+    // closes the connection while the subprocess is still writing.
+    if (child.stderr) {
+      child.stderr.on('data', (chunk: Buffer) => {
+        const text = chunk.toString()
+        if (!RE_EPIPE.test(text))
+          process.stderr.write(`[acp:${config.name}] ${text}`)
+      })
+    }
+
     child.on('exit', (code, signal) => {
-      console.error(`[acp:${config.name}] exited: code=${code} signal=${signal}`)
+      if (signal !== 'SIGTERM')
+        console.error(`[acp:${config.name}] exited: code=${code} signal=${signal}`)
       acpProcess = null
       acpConnection = null
       connectionReady = null
@@ -304,6 +320,9 @@ export function createACPRunner(config: ACPRunnerConfig): {
         pendingTools: new Map(),
       }
 
+      // Detect fresh session before ensureSession creates one
+      const isFreshSession = !sessionByConversation.has(options.conversationId)
+
       const conn = await getConnection(options.workspaceRoot)
       const sessionId = await ensureSession(conn, options.conversationId, options.workspaceRoot)
       state.sessionId = sessionId
@@ -322,7 +341,14 @@ export function createACPRunner(config: ACPRunnerConfig): {
 
       const promptContent: ContentBlock[] = []
 
-      if (options.prompt.trim()) {
+      // Inject prior context when starting a fresh session (e.g. provider switched mid-conversation)
+      if (isFreshSession && options.priorContext?.trim()) {
+        promptContent.push({
+          type: 'text',
+          text: `[Prior conversation context — for reference only, do not repeat]\n${options.priorContext}\n\n[Current request]\n${options.prompt}`,
+        })
+      }
+      else if (options.prompt.trim()) {
         promptContent.push({ type: 'text', text: options.prompt })
       }
 
@@ -338,6 +364,14 @@ export function createACPRunner(config: ACPRunnerConfig): {
           }
         }
       }
+
+      // Kill the subprocess when the caller aborts so it stops writing to the
+      // pipe immediately, preventing EPIPE errors.
+      const killOnAbort = () => {
+        if (acpProcess && !acpProcess.killed)
+          acpProcess.kill('SIGTERM')
+      }
+      options.abortSignal?.addEventListener('abort', killOnAbort, { once: true })
 
       try {
         const result = await conn.prompt({
@@ -364,6 +398,7 @@ export function createACPRunner(config: ACPRunnerConfig): {
         }
       }
       finally {
+        options.abortSignal?.removeEventListener('abort', killOnAbort)
         activeUpdateHandler = null
         activePermissionHandler = null
       }

@@ -1,7 +1,7 @@
 /**
  * Coding Executor Types and Configuration
  *
- * Defines available coding executors (Kimi Code, Local Claude Code) for code generation.
+ * Defines available coding executors (Kimi Code, Claude Code) for code generation.
  * Use these types for selecting code generation providers separate from main LLM.
  *
  * @module types/coding-executor
@@ -10,7 +10,7 @@
 import type { LLMProviderType } from './llm-provider.js'
 
 export type CodingModelProviderType = 'kimi-code'
-export type ACPCodingProviderType = 'local-claude-code' | 'kimi-cli'
+export type ACPCodingProviderType = 'claude-code' | 'kimi-cli'
 export type CodingExecutorType = CodingModelProviderType | ACPCodingProviderType
 
 export interface CodingProviderMeta {
@@ -47,8 +47,8 @@ export const CODING_MODEL_PROVIDERS: CodingProviderMeta[] = [
 
 export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
   {
-    value: 'local-claude-code',
-    label: '本地 Claude Code',
+    value: 'claude-code',
+    label: 'Claude Code',
     transport: 'local-cli',
     icon: 'i-simple-icons:claude',
   },

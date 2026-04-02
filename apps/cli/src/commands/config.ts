@@ -1,5 +1,4 @@
 import process from 'node:process'
-import { defineCommand } from 'citty'
 import { initDB } from '@univedge/locus-server/db'
 import {
   ensureDataDir,
@@ -9,6 +8,7 @@ import {
   saveLLMSettings,
   setSetting,
 } from '@univedge/locus-server/settings'
+import { defineCommand } from 'citty'
 import { getMigrationsFolder } from '../paths.js'
 import { runSetup } from '../setup/interactive.js'
 

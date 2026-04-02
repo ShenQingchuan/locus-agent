@@ -23,7 +23,7 @@ const chatStore = useChatStore()
 const modelSettings = useModelSettingsStore()
 const toast = useToast()
 
-const { isBlockDone, isBlockExpanded, handleReasoningToggle } = useReasoningBlockState(props.message)
+const { activeReasoningIdx, isBlockDone, isBlockExpanded, handleReasoningToggle } = useReasoningBlockState(props.message)
 const markDirty = useMarkConversationDirty()
 
 const isUser = computed(() => props.message.role === 'user')
@@ -385,9 +385,11 @@ const { copy, copied } = useClipboard()
               @click="handleReasoningToggle(partIdx)"
             >
               <div class="i-carbon-idea h-3 w-3" />
-              <span>{{ isBlockDone(partIdx) ? '思考结束' : '思考过程' }}</span>
-              <span v-if="isBlockDone(partIdx) && !isBlockExpanded(partIdx)" class="opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开</span>
-              <span v-if="!isBlockDone(partIdx)" class="text-muted-foreground/40">
+              <span>{{ isBlockDone() ? '思考结束' : '思考中...' }}</span>
+              <span v-if="isBlockDone() && !isBlockExpanded(partIdx)" class="opacity-0 group-hover/reasoning:opacity-100 transition-opacity duration-150 text-muted-foreground/40">点击展开</span>
+              <!-- Spinner only for the actively-receiving block, not for blocks
+                   that already have a tool-call after them (ACP pattern) -->
+              <span v-if="activeReasoningIdx === partIdx" class="text-muted-foreground/40">
                 <div class="i-carbon-circle-dash animate-spin h-3 w-3" />
               </span>
             </div>
