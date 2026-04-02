@@ -9,9 +9,9 @@ import type {
 } from '@univedge/locus-agent-sdk'
 import type { ComputedRef, Ref } from 'vue'
 import type { PendingApproval, PendingQuestion } from '@/api/chat'
+import type { TodoTask } from '@/utils/parsers'
 import { computed, ref } from 'vue'
-
-const RE_TODO_LINE = /^\d+\.\s+\[(?:completed|in_progress)\]/
+import { parseManageTodosResult } from '@/utils/parsers'
 
 export interface ToolCallState {
   toolCall: ToolCall
@@ -52,11 +52,7 @@ export interface Message {
   metadata?: { trigger?: string }
 }
 
-export interface TodoTask {
-  id: string
-  content: string
-  status: 'in_progress' | 'completed'
-}
+export type { TodoTask } from '@/utils/parsers'
 
 export type AssistantError = { code: string, message: string } | null
 
@@ -84,77 +80,6 @@ export function createConversationRuntimeState(): ConversationRuntimeState {
     messageQueue: [],
     isProcessingQueue: false,
   }
-}
-
-export function parseManageTodosResult(result: unknown): TodoTask[] | null {
-  if (typeof result === 'object' && result !== null) {
-    const todos = (result as { todos?: unknown }).todos
-    if (!Array.isArray(todos))
-      return null
-
-    const parsed = todos
-      .map((item) => {
-        if (typeof item !== 'object' || item === null)
-          return null
-        const maybe = item as { id?: unknown, content?: unknown, status?: unknown }
-        if (typeof maybe.id !== 'string' || typeof maybe.content !== 'string')
-          return null
-        if (maybe.status !== 'in_progress' && maybe.status !== 'completed')
-          return null
-        return {
-          id: maybe.id,
-          content: maybe.content,
-          status: maybe.status,
-        } as TodoTask
-      })
-      .filter((item): item is TodoTask => !!item)
-
-    return parsed
-  }
-
-  if (typeof result !== 'string')
-    return null
-
-  const lines = result.split('\n')
-  const todoLines = lines.filter((line) => {
-    const normalized = line.trim()
-    return RE_TODO_LINE.test(normalized) && normalized.includes(') ')
-  })
-  if (todoLines.length === 0) {
-    if (result.includes('Current todos: (empty)'))
-      return []
-    return null
-  }
-
-  const parsed: TodoTask[] = []
-  for (const line of todoLines) {
-    const normalized = line.trim()
-    const status = normalized.includes('[completed]')
-      ? 'completed'
-      : normalized.includes('[in_progress]')
-        ? 'in_progress'
-        : null
-    if (!status)
-      continue
-
-    const idStart = normalized.indexOf('(')
-    const idEnd = normalized.indexOf(')', idStart + 1)
-    if (idStart === -1 || idEnd === -1 || idEnd <= idStart + 1)
-      continue
-
-    const id = normalized.slice(idStart + 1, idEnd).trim()
-    const content = normalized.slice(idEnd + 1).trim()
-    if (!id || !content)
-      continue
-
-    parsed.push({
-      id,
-      status,
-      content,
-    })
-  }
-
-  return parsed
 }
 
 export interface AssistantRuntimeManager {

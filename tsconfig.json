@@ -12,6 +12,7 @@
     "noUnusedParameters": true,
     "declaration": true,
     "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "skipLibCheck": true
   },

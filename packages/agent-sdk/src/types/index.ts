@@ -1,19 +1,4 @@
 export type * from './api.js'
-export type * from './conversation.js'
-export type * from './git.js'
-export type * from './knowledge.js'
-export type * from './mcp.js'
-export type * from './message.js'
-
-// LLM Provider
-export type * from './llm-provider.js'
-export {
-  DEFAULT_API_BASES,
-  DEFAULT_MODELS,
-  LLM_PROVIDERS,
-  normalizeModelForProvider,
-} from './llm-provider.js'
-
 // Coding Executor
 export type * from './coding-executor.js'
 export {
@@ -25,22 +10,21 @@ export {
   isCodingExecutor,
   isCodingModelProvider,
 } from './coding-executor.js'
+export type * from './conversation.js'
+export type * from './git.js'
+export type * from './knowledge.js'
 
-// Backward compatibility re-exports
-export type * from './provider.js'
+// LLM Provider
+export type * from './llm-provider.js'
 export {
-  ACP_CODING_PROVIDERS,
-  CODING_MODEL_PROVIDERS,
-  CODING_PROVIDERS,
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
-  getCodingProviderForParent,
-  isACPCodingProvider,
-  isCodingExecutor,
-  isCodingModelProvider,
   LLM_PROVIDERS,
   normalizeModelForProvider,
-} from './provider.js'
+} from './llm-provider.js'
+
+export type * from './mcp.js'
+export type * from './message.js'
 
 export type * from './sdk-message.js'
 export {

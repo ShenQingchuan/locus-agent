@@ -5,8 +5,8 @@ import type { ToolCallState } from '@/composables/useAssistantRuntime'
 import { onClickOutside } from '@vueuse/core'
 import { computed, nextTick, ref, watch } from 'vue'
 import DiffViewer from '@/components/code/DiffViewer.vue'
-import { parseDelegateMeta } from '@/utils/delegateParsing'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
+import { parseDelegateMeta, parseQuestionAnswerBlocks } from '@/utils/parsers'
 import { toolsHideSummaryRow, toolSummaryResolvers, toolsWithOutputWidget } from '@/utils/toolSummary'
 import DelegateCard from './DelegateCard.vue'
 import InlineDelegateModal from './InlineDelegateModal.vue'
@@ -45,9 +45,6 @@ defineSlots<{
     isError?: boolean
   }) => any
 }>()
-const RE_DOUBLE_NEWLINE = /\n\n/
-const RE_QUESTION_ANSWER_BLOCK = /^- ([^\n：]+)：\n([\s\S]*)$/
-
 const modalOpen = ref(false)
 const inlineDelegateModalOpen = ref(false)
 const whitelistOpen = ref(false)
@@ -293,18 +290,7 @@ const questionResultPairs = computed<Array<{ question: string, answer: string }>
   if (props.tool.status !== 'completed' && props.tool.status !== 'error' && props.tool.status !== 'interrupted')
     return null
   const raw = props.tool.result?.result
-  if (!raw || typeof raw !== 'string')
-    return null
-  // 解析 "- 问题：\n回答" 格式
-  const pairs: Array<{ question: string, answer: string }> = []
-  const blocks = raw.split(RE_DOUBLE_NEWLINE).filter(Boolean)
-  for (const block of blocks) {
-    const match = block.match(RE_QUESTION_ANSWER_BLOCK)
-    if (match) {
-      pairs.push({ question: match[1]!, answer: match[2]!.trim() })
-    }
-  }
-  return pairs.length > 0 ? pairs : null
+  return parseQuestionAnswerBlocks(raw)
 })
 
 /** Whether to hide the compact summary row (tool has its own result display) */

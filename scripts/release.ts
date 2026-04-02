@@ -15,7 +15,7 @@
  */
 
 import { execSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -50,15 +50,30 @@ function resolveVersion(): string {
 const version = resolveVersion()
 const tag = version.startsWith('v') ? version : `v${version}`
 
-const packageJsonPaths = [
-  join(root, 'package.json'),
-  join(root, 'packages', 'agent-sdk', 'package.json'),
-  join(root, 'packages', 'ui', 'package.json'),
-  join(root, 'packages', 'plugin-kit', 'package.json'),
-  join(root, 'apps', 'web', 'package.json'),
-  join(root, 'apps', 'server', 'package.json'),
-  join(root, 'apps', 'cli', 'package.json'),
-]
+/**
+ * Dynamically discover package.json files in workspace.
+ * Scans packages/ and apps/ directories for subdirectories containing package.json.
+ */
+function discoverPackageJsons(): string[] {
+  const paths: string[] = [join(root, 'package.json')]
+
+  for (const dir of ['packages', 'apps']) {
+    const baseDir = join(root, dir)
+    if (!existsSync(baseDir))
+      continue
+
+    for (const entry of readdirSync(baseDir)) {
+      const pkgPath = join(baseDir, entry, 'package.json')
+      if (existsSync(pkgPath)) {
+        paths.push(pkgPath)
+      }
+    }
+  }
+
+  return paths
+}
+
+const packageJsonPaths = discoverPackageJsons()
 
 function bumpVersions(): void {
   for (const p of packageJsonPaths) {

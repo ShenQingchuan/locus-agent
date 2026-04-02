@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/admin/research/locus-agent && nr typecheck 2>&1 | tail -40 && echo '--- lint ---' && nr lint --fix 2>&1 | tail -20"
+          }
+        ]
+      }
+    ]
+  }
+}

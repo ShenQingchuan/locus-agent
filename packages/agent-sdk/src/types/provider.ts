@@ -11,30 +11,33 @@
  * @module types/provider
  */
 
-// LLM Provider exports
-export type { LLMProviderType, CustomProviderMode, LLMProviderMeta } from './llm-provider.js'
-export {
-  LLM_PROVIDERS,
-  DEFAULT_MODELS,
-  DEFAULT_API_BASES,
-  normalizeModelForProvider,
-} from './llm-provider.js'
-
 // Coding Executor exports
 export type {
-  CodingModelProviderType,
+  ACPCodingProviderMeta,
   ACPCodingProviderType,
   CodingExecutorType,
+  CodingModelProviderType,
   CodingProviderMeta,
-  ACPCodingProviderMeta,
 } from './coding-executor.js'
 export {
-  CODING_MODEL_PROVIDERS,
   ACP_CODING_PROVIDERS,
+  CODING_MODEL_PROVIDERS,
   CODING_PROVIDERS,
   getCodingProviderForParent,
-  isCodingModelProvider,
   isACPCodingProvider,
   isCodingExecutor,
+  isCodingModelProvider,
 } from './coding-executor.js'
 
+// LLM Provider exports
+export type {
+  CustomProviderMode,
+  LLMProviderMeta,
+  LLMProviderType,
+} from './llm-provider.js'
+export {
+  DEFAULT_API_BASES,
+  DEFAULT_MODELS,
+  LLM_PROVIDERS,
+  normalizeModelForProvider,
+} from './llm-provider.js'
