@@ -35,6 +35,12 @@
       "dev": "./src/agent.ts",
       "types": "./dist/agent.d.ts",
       "default": "./dist/agent.js"
+    },
+    "./mcp": {
+      "bun": "./src/mcp/index.ts",
+      "dev": "./src/mcp/index.ts",
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -48,12 +54,15 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/sdk": "catalog:ai-sdk",
     "zod": "catalog:ai-sdk"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": { "optional": true },
     "zod": { "optional": true }
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "catalog:ai-sdk",
     "typescript": "catalog:dev-tools",
     "zod": "catalog:ai-sdk"
   }
