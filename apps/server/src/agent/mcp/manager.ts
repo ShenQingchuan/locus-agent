@@ -295,6 +295,9 @@ class MCPManager extends EventEmitter {
     catch (error) {
       entry.status = 'error'
       entry.error = this.formatErrorMessage(error)
+      // Clear the cached promise eagerly so the next caller retries
+      // instead of reusing this resolved-but-failed attempt.
+      this.connectPromises.delete(name)
       this.logServer('error', name, `connection failed: ${entry.error}`)
       this.emitStatusChange(name)
       this.scheduleReconnect(name, 'connect-failed')
