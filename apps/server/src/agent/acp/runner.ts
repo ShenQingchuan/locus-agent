@@ -20,9 +20,11 @@ import type {
   WriteTextFileResponse,
 } from '@agentclientprotocol/sdk'
 import type { DelegateDelta, MessageImageAttachment } from '@univedge/locus-agent-sdk'
+import type { Buffer } from 'node:buffer'
 import type { ChildProcess } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import process from 'node:process'
 import { Readable, Writable } from 'node:stream'
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 
@@ -195,6 +197,7 @@ async function mapSessionUpdate(
 // ---------------------------------------------------------------------------
 
 const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
+const RE_EPIPE = /EPIPE|broken pipe|ACP write error/i
 
 export function createACPRunner(config: ACPRunnerConfig): {
   run: (options: RunACPOptions) => Promise<ACPResult>
@@ -207,8 +210,6 @@ export function createACPRunner(config: ACPRunnerConfig): {
   let activePermissionHandler: ((params: RequestPermissionRequest) => Promise<RequestPermissionResponse>) | null = null
 
   const sessionByConversation = new Map<string, string>()
-
-  const RE_EPIPE = /EPIPE|broken pipe|ACP write error/i
 
   function spawnProcess(cwd: string): ChildProcess {
     const child = config.spawn(cwd)
@@ -345,7 +346,13 @@ export function createACPRunner(config: ACPRunnerConfig): {
       if (isFreshSession && options.priorContext?.trim()) {
         promptContent.push({
           type: 'text',
-          text: `[Prior conversation context — for reference only, do not repeat]\n${options.priorContext}\n\n[Current request]\n${options.prompt}`,
+          text: `
+[Prior conversation context — for reference only, do not repeat]
+${options.priorContext}
+
+[Current request]
+${options.prompt}
+          `.trim(),
         })
       }
       else if (options.prompt.trim()) {

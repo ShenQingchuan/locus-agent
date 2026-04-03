@@ -1,4 +1,4 @@
-import type { ACPCallbacks, ACPResult, RunACPOptions } from './runner.js'
+import type { ACPResult, RunACPOptions } from './runner.js'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
@@ -6,20 +6,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { createACPRunner } from './runner.js'
 
-// ---------------------------------------------------------------------------
-// Public interfaces (unchanged — chat.ts depends on these)
-// ---------------------------------------------------------------------------
-
-export type LocalClaudeCodeCallbacks = ACPCallbacks
-
-export interface RunLocalClaudeCodeOptions extends LocalClaudeCodeCallbacks {
-  prompt: string
-  attachments?: RunACPOptions['attachments']
-  conversationId: string
-  workspaceRoot: string
-  abortSignal?: AbortSignal
-}
-
+export type RunLocalClaudeCodeOptions = RunACPOptions
 export type LocalClaudeCodeResult = ACPResult
 
 // ---------------------------------------------------------------------------

@@ -1,22 +1,9 @@
-import type { ACPCallbacks, ACPResult, RunACPOptions } from './runner.js'
+import type { ACPResult, RunACPOptions } from './runner.js'
 import { spawn } from 'node:child_process'
 import process from 'node:process'
 import { createACPRunner } from './runner.js'
 
-// ---------------------------------------------------------------------------
-// Public interfaces
-// ---------------------------------------------------------------------------
-
-export type KimiCLICallbacks = ACPCallbacks
-
-export interface RunKimiCLIOptions extends KimiCLICallbacks {
-  prompt: string
-  attachments?: RunACPOptions['attachments']
-  conversationId: string
-  workspaceRoot: string
-  abortSignal?: AbortSignal
-}
-
+export type RunKimiCLIOptions = RunACPOptions
 export type KimiCLIResult = ACPResult
 
 // ---------------------------------------------------------------------------
