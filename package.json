@@ -9,6 +9,7 @@
     "url": "https://github.com/ShenQingchuan/locus-agent"
   },
   "scripts": {
+    "prepare": "pnpm exec simple-git-hooks",
     "dev": "bun scripts/dev.ts",
     "dev:server": "pnpm -F @univedge/locus-server dev",
     "dev:web": "pnpm -F @univedge/locus-web dev",
@@ -26,6 +27,10 @@
     "@types/node": "catalog:dev-tools",
     "eslint": "catalog:dev-tools",
     "git-cliff": "catalog:cli-tools",
+    "simple-git-hooks": "catalog:dev-tools",
     "typescript": "catalog:dev-tools"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm run typecheck && pnpm run lint"
   }
 }

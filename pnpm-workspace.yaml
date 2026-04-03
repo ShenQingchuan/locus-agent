@@ -1,5 +1,6 @@
 shellEmulator: true
 trustPolicy: no-downgrade
+
 packages:
   - packages/*
   - apps/*
@@ -36,6 +37,7 @@ catalogs:
     '@types/node': ^25.5.0
     '@typescript/native-preview': latest
     eslint: ^10.1.0
+    simple-git-hooks: ^2.13.1
     tsdown: ^0.21.7
     typescript: ^6.0.2
   embedding:
@@ -89,6 +91,7 @@ onlyBuiltDependencies:
   - onnxruntime-node
   - protobufjs
   - sharp
+  - simple-git-hooks
   - sqlite-vec-darwin-arm64
   - sqlite-vec-darwin-x64
   - sqlite-vec-linux-arm64
