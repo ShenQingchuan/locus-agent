@@ -2,7 +2,6 @@ import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { DropdownItem } from '@univedge/locus-ui'
 import type { EmitFn } from 'vue'
 import type PromptEditor from '@/components/chat/prompt-editor/PromptEditor.vue'
-import type { QueuedMessage } from '@/composables/useAssistantRuntime'
 import { ACP_CODING_PROVIDERS, getCodingProviderForParent, isACPCodingProvider } from '@univedge/locus-agent-sdk'
 import { useToast } from '@univedge/locus-ui'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -12,6 +11,7 @@ import { useImageAttachments } from '@/composables/useImageAttachments'
 import { useModelSelector } from '@/composables/useModelSelector'
 import { useChatStore } from '@/stores/chat'
 import { useModelSettingsStore } from '@/stores/modelSettings'
+import { useChatInputQueue } from './chat-input/useChatInputQueue'
 
 export interface UseChatInputProps {
   disabled?: boolean
@@ -114,47 +114,10 @@ export function useChatInput(
     return '输入消息…'
   })
 
-  const editingQueueId = ref<string | null>(null)
-  const editingQueueContent = ref('')
-
-  function startEditQueueItem(item: QueuedMessage) {
-    editingQueueId.value = item.id
-    editingQueueContent.value = item.content
-    nextTick(() => {
-      const el = document.getElementById(`queue-edit-${item.id}`)
-      if (el)
-        el.focus()
-    })
-  }
-
-  function saveEditQueueItem(id: string) {
-    const trimmed = editingQueueContent.value.trim()
-    if (trimmed) {
-      chatStore.editQueueItem(id, trimmed)
-    }
-    else {
-      chatStore.removeFromQueue(id)
-    }
-    editingQueueId.value = null
-    editingQueueContent.value = ''
-  }
-
-  function cancelEditQueueItem() {
-    editingQueueId.value = null
-    editingQueueContent.value = ''
-  }
-
-  function handleQueueEditKeydown(event: KeyboardEvent, id: string) {
-    if (event.isComposing)
-      return
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      saveEditQueueItem(id)
-    }
-    else if (event.key === 'Escape') {
-      cancelEditQueueItem()
-    }
-  }
+  const queue = useChatInputQueue(
+    chatStore.editQueueItem,
+    chatStore.removeFromQueue,
+  )
 
   const modeItems = computed<DropdownItem[]>(() => {
     const items: DropdownItem[] = [
@@ -408,11 +371,7 @@ export function useChatInput(
     isEditing,
     hasComposerContent,
     dynamicPlaceholder,
-    editingQueueId,
-    editingQueueContent,
-    startEditQueueItem,
-    saveEditQueueItem,
-    handleQueueEditKeydown,
+    ...queue,
     modeItems,
     currentPlanItems,
     codingModeItems,

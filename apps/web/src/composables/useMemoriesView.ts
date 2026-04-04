@@ -5,18 +5,21 @@ import type { TagTreeData } from '@/utils/tagTree'
 import { useQueryCache } from '@pinia/colada'
 import { useToast } from '@univedge/locus-ui'
 import { onClickOutside, onKeyStroke } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import * as api from '@/api/knowledge'
 import {
   useNotesListQuery,
   useSearchNotesQuery,
   useTagsQuery,
 } from '@/composables/knowledgeQueries'
+import { useMemoriesUrlSync } from '@/composables/memories/useMemoriesUrlSync'
+import { useTagManager } from '@/composables/memories/useTagManager'
 import { useMemoriesSidebar } from '@/composables/useMemoriesSidebar'
 import { useNoteEditorSave } from '@/composables/useNoteEditorSave'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { formatTimelineDate, formatTimelineYear } from '@/utils/date'
 
 export type MemoryScope = 'all' | 'global' | 'workspace'
 
@@ -31,12 +34,9 @@ export function useMemoriesView() {
   const workspaceStore = useWorkspaceStore()
   const toast = useToast()
   const queryCache = useQueryCache()
-  const route = useRoute()
   const router = useRouter()
   const { sidebarCollapsed, toggleSidebar } = useMemoriesSidebar()
 
-  const isSyncingFromUrl = ref(false)
-  const isSyncingToUrl = ref(false)
   const memoryScope = ref<MemoryScope>('all')
 
   const workspaceQueryPath = computed<string | undefined>(() => {
@@ -61,31 +61,6 @@ export function useMemoriesView() {
     store.searchQuery.trim() ? isSearchLoading.value : isNotesLoading.value,
   )
   const tagsList = computed(() => tags.value ?? [])
-
-  function formatTimelineDate(date: Date): string {
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-
-    if (dateStart.getTime() === today.getTime()) {
-      return '今天'
-    }
-    if (dateStart.getTime() === yesterday.getTime()) {
-      return '昨天'
-    }
-
-    return `${date.getMonth() + 1}月${date.getDate()}日`
-  }
-
-  function formatTimelineYear(date: Date): string {
-    const now = new Date()
-    if (date.getFullYear() !== now.getFullYear()) {
-      return `${date.getFullYear()}年`
-    }
-    return ''
-  }
 
   // ==================== Tag tree ====================
 
@@ -147,12 +122,12 @@ export function useMemoriesView() {
     const data = node.data as TagTreeData
     const hasChildren = !!(node.children?.length)
     if (data.tagId && !hasChildren) {
-    // Leaf tag: exact match by tag ID
+      // Leaf tag: exact match by tag ID
       store.selectTag(data.tagId)
       activeTagPath.value = node.id
     }
     else {
-    // Parent/group node: prefix match by path
+      // Parent/group node: prefix match by path
       activeTagPath.value = node.id
       store.selectTag(null)
     }
@@ -167,36 +142,6 @@ export function useMemoriesView() {
     store.selectTag(tagId)
     const tag = tagsList.value.find(t => t.id === tagId)
     activeTagPath.value = tag?.name ?? null
-  }
-
-  async function handleDeleteTags(tagIds: string[], groupName: string) {
-    const isSingle = tagIds.length === 1
-    const message = isSingle
-      ? `确定要删除标签「${groupName}」吗？标签会从所有记忆中移除，但记忆本身不会被删除。`
-      : `确定要删除「${groupName}」下的 ${tagIds.length} 个标签吗？标签会从所有记忆中移除，但记忆本身不会被删除。`
-
-    const confirmed = await toast.confirm({
-      title: isSingle ? '删除标签' : '删除标签分组',
-      message,
-      confirmText: '删除',
-      cancelText: '取消',
-      type: 'error',
-    })
-    if (confirmed) {
-      try {
-        await Promise.all(tagIds.map(id => api.deleteTag(id)))
-        if (store.selectedTagId && tagIds.includes(store.selectedTagId)) {
-          store.selectTag(null)
-          activeTagPath.value = null
-        }
-        queryCache.invalidateQueries({ key: ['tags'] })
-        queryCache.invalidateQueries({ key: ['notes'] })
-        toast.success(isSingle ? '标签已删除' : `已删除 ${tagIds.length} 个标签`)
-      }
-      catch (e: unknown) {
-        toast.error((e as { message?: string })?.message || '删除标签失败')
-      }
-    }
   }
 
   // ==================== Composer (create new note) ====================
@@ -262,6 +207,15 @@ export function useMemoriesView() {
     },
   })
 
+  const { isSyncingToUrl } = useMemoriesUrlSync(
+    tagsList,
+    computed(() => store.selectedTagId),
+    selectTag,
+    query => store.search(query),
+    editingNoteId,
+    (id) => { editingNoteId.value = id },
+  )
+
   function startEditing(note: NoteWithTags) {
     highlightedNoteId.value = null
     editingNoteId.value = note.id
@@ -326,106 +280,20 @@ export function useMemoriesView() {
 
   // ==================== Tags modal ====================
 
-  const showAddTagsModal = ref(false)
-  const addTagsNoteId = ref<string | null>(null)
-  const addTagsNoteTags = computed(() => {
-    if (!addTagsNoteId.value)
-      return []
-    const note = notes.value.find(n => n.id === addTagsNoteId.value)
-    return note?.tags ?? []
-  })
-
-  function openTagsModal(noteId: string) {
-    addTagsNoteId.value = noteId
-    showAddTagsModal.value = true
-  }
-
-  async function handleSaveTags(tagNames: string[]) {
-    if (!addTagsNoteId.value)
-      return
-    store.currentNoteId = addTagsNoteId.value
-    const updated = await store.saveCurrentNote({ tagNames })
-    store.currentNoteId = null
-    if (updated) {
-      queryCache.setQueryData(['note', addTagsNoteId.value], updated)
-      queryCache.invalidateQueries({ key: ['notes'] })
-      queryCache.invalidateQueries({ key: ['tags'] })
-    }
-  }
-
-  // ==================== URL query 与标签同步（tag 为 tag name，如 xxx/yyy）====================
-
-  function applyTagFromUrl(tagName: string | undefined) {
-    if (!tagName) {
-      store.selectTag(null)
-      activeTagPath.value = null
-      return
-    }
-    const tag = tagsList.value.find(t => t.name === tagName)
-    if (!tag) {
-      store.selectTag(null)
-      activeTagPath.value = null
-      return
-    }
-    store.selectTag(tag.id)
-    activeTagPath.value = tag.name
-  }
-
-  watch(
-    [() => route.query.tag as string | undefined, tagsList],
-    ([tagName]) => {
-      if (isSyncingToUrl.value)
-        return
-      const name = typeof tagName === 'string' ? tagName : undefined
-      const tag = name ? tagsList.value.find(t => t.name === name) : null
-      const expectedId = tag?.id ?? null
-      if (name && !tag && tagsList.value.length === 0) {
-        return
-      }
-      if (expectedId !== store.selectedTagId) {
-        isSyncingFromUrl.value = true
-        applyTagFromUrl(name)
-        store.search('')
-        isSyncingFromUrl.value = false
-      }
-    },
-    { immediate: true },
-  )
-
-  watch(
-    () => route.query.id as string | undefined,
-    (idFromUrl) => {
-      if (isSyncingToUrl.value)
-        return
-      if (idFromUrl)
-        editingNoteId.value = idFromUrl
-      else if (route.name === 'memories')
-        editingNoteId.value = null
-    },
-    { immediate: true },
-  )
-
-  watch(
-    () => store.selectedTagId,
-    (newId) => {
-      if (isSyncingFromUrl.value)
-        return
-      const tag = newId ? tagsList.value.find(t => t.id === newId) : null
-      const tagName = tag?.name ?? null
-      const urlTag = route.query.tag as string | undefined
-      const urlId = route.query.id as string | undefined
-      if (tagName !== urlTag || (editingNoteId.value ? editingNoteId.value !== urlId : !!urlId)) {
-        isSyncingToUrl.value = true
-        router.replace({
-          name: 'MemoriesView',
-          query: {
-            ...(tagName ? { tag: tagName } : {}),
-            ...(editingNoteId.value ? { id: editingNoteId.value } : {}),
-          },
-        })
-        isSyncingToUrl.value = false
-      }
-    },
+  const {
+    showAddTagsModal,
+    addTagsNoteTags,
+    openTagsModal,
+    handleSaveTags,
+    handleDeleteTags,
+  } = useTagManager(
+    notes,
+    payload => store.saveCurrentNote(payload),
+    queryCache,
+    toast,
+    computed(() => store.selectedTagId),
+    activeTagPath,
+    selectTag,
   )
 
   // ESC to cancel editing (only when not in modal)
@@ -434,6 +302,7 @@ export function useMemoriesView() {
       cancelEditing()
     }
   })
+
   return {
     store,
     workspaceStore,

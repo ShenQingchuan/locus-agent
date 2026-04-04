@@ -1,34 +1,36 @@
-import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
+import type { LLMProviderType } from '@univedge/locus-agent-sdk'
 import type { CodingKimiConfig, ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
+import type { SettingsSectionId } from '@/constants/settings'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@univedge/locus-agent-sdk'
 import { useToast } from '@univedge/locus-ui'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchSettingsConfig, updateKimiCodeSettings, updateSettingsConfig } from '@/api/settings'
+import { SETTINGS_SECTIONS } from '@/constants/settings'
 import { useModelSettingsStore } from '@/stores/modelSettings'
+import { initAllProviderConfigs } from '@/utils/settings'
+import { useSettingsScrollSync } from './settings/useSettingsScrollSync'
 
-export type SettingsSectionId = 'llm' | 'server' | 'whitelist' | 'embedding' | 'mcp'
-
-const HASH_PREFIX_RE = /^#/
+export type { SettingsSectionId }
 
 export function useSettingsView() {
-  const SETTINGS_SECTIONS: Array<{
-    id: SettingsSectionId
-    label: string
-    description: string
-    icon: string
-  }> = [
-    { id: 'llm', label: 'LLM', description: '模型与 API 提供商', icon: 'i-carbon-machine-learning-model' },
-    { id: 'server', label: '服务端', description: '端口与运行状态', icon: 'i-carbon-application-web' },
-    { id: 'whitelist', label: '白名单', description: '路径访问控制', icon: 'i-carbon-document-security' },
-    { id: 'embedding', label: 'Embedding', description: '语义检索与本地模型', icon: 'i-carbon-model-alt' },
-    { id: 'mcp', label: 'MCP', description: '工具服务与集成', icon: 'i-carbon-connection-signal' },
-  ]
-
   const router = useRouter()
   const route = useRoute()
   const toast = useToast()
   const modelSettings = useModelSettingsStore()
+
+  const {
+    contentScrollEl,
+    activeSection,
+    setSectionRef,
+    cancelScrollSync,
+    syncActiveSectionFromScroll,
+    handleContentScroll,
+    scrollToSection,
+    navigateToSection,
+    syncSectionFromHash,
+    getSectionFromHash,
+  } = useSettingsScrollSync()
 
   // ---------------------------------------------------------------------------
   // LLM config state (owned here because header save button + page loading)
@@ -53,96 +55,6 @@ export function useSettingsView() {
   const providerConfigs = reactive<ProviderConfigs>({})
 
   // ---------------------------------------------------------------------------
-  // Settings layout state
-  // ---------------------------------------------------------------------------
-
-  const contentScrollEl = ref<HTMLElement | null>(null)
-  const activeSection = ref<SettingsSectionId>('llm')
-
-  const sectionRefs = new Map<SettingsSectionId, HTMLElement>()
-  let scrollSyncRaf: number | null = null
-
-  function isSectionId(value: string): value is SettingsSectionId {
-    return SETTINGS_SECTIONS.some(section => section.id === value)
-  }
-
-  function getSectionFromHash(hash: string): SettingsSectionId | null {
-    const value = hash.replace(HASH_PREFIX_RE, '')
-    return isSectionId(value) ? value : null
-  }
-
-  function setSectionRef(id: SettingsSectionId, el: Element | null): void {
-    if (el instanceof HTMLElement)
-      sectionRefs.set(id, el)
-    else
-      sectionRefs.delete(id)
-  }
-
-  function cancelScrollSync(): void {
-    if (scrollSyncRaf !== null) {
-      cancelAnimationFrame(scrollSyncRaf)
-      scrollSyncRaf = null
-    }
-  }
-
-  function syncActiveSectionFromScroll(): void {
-    const container = contentScrollEl.value
-    if (!container || sectionRefs.size === 0)
-      return
-
-    const marker = container.scrollTop + 96
-    let nextActive: SettingsSectionId = SETTINGS_SECTIONS[0]?.id ?? 'llm'
-
-    for (const section of SETTINGS_SECTIONS) {
-      const el = sectionRefs.get(section.id)
-      if (!el)
-        continue
-
-      if (el.offsetTop <= marker)
-        nextActive = section.id
-      else
-        break
-    }
-
-    activeSection.value = nextActive
-  }
-
-  function handleContentScroll(): void {
-    cancelScrollSync()
-    scrollSyncRaf = requestAnimationFrame(() => {
-      syncActiveSectionFromScroll()
-      scrollSyncRaf = null
-    })
-  }
-
-  function scrollToSection(id: SettingsSectionId, behavior: ScrollBehavior = 'smooth'): void {
-    const container = contentScrollEl.value
-    const section = sectionRefs.get(id)
-    if (!container || !section)
-      return
-
-    container.scrollTo({
-      top: Math.max(0, section.offsetTop - 20),
-      behavior,
-    })
-  // activeSection is updated only by syncActiveSectionFromScroll (single source of truth)
-  }
-
-  async function navigateToSection(id: SettingsSectionId): Promise<void> {
-    if (route.hash !== `#${id}`)
-      await router.replace({ name: 'SettingsView', hash: `#${id}` })
-
-    await nextTick()
-    scrollToSection(id)
-  }
-
-  async function syncSectionFromHash(behavior: ScrollBehavior = 'auto'): Promise<void> {
-    const target = getSectionFromHash(route.hash) || 'llm'
-    await nextTick()
-    scrollToSection(target, behavior)
-  }
-
-  // ---------------------------------------------------------------------------
   // Coding provider state
   // ---------------------------------------------------------------------------
 
@@ -153,30 +65,6 @@ export function useSettingsView() {
     model: 'kimi-k2.5',
     newApiKey: '',
   })
-
-  // Helper to initialize provider config
-  function initProviderConfig(
-    provider: LLMProviderType,
-    _existingKeyMasked: string | null,
-    apiBase?: string,
-    customMode?: CustomProviderMode,
-    model?: string,
-  ): void {
-    providerConfigs[provider] = {
-      apiKey: '',
-      apiBase: apiBase || (provider === 'custom' ? '' : (DEFAULT_API_BASES[provider] || '')),
-      customMode: customMode || 'openai-compatible',
-      model: model || DEFAULT_MODELS[provider] || '',
-    }
-  }
-
-  // Initialize all provider configs
-  function initAllProviderConfigs() {
-    for (const p of LLM_PROVIDERS) {
-      if (!providerConfigs[p.value])
-        initProviderConfig(p.value, null)
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -227,7 +115,7 @@ export function useSettingsView() {
       port.value = config.port
       apiKeysMasked.value = config.apiKeys ?? {}
 
-      initAllProviderConfigs()
+      initAllProviderConfigs(providerConfigs)
 
       for (const p of LLM_PROVIDERS) {
         const isActiveProvider = p.value === config.provider
@@ -296,7 +184,7 @@ export function useSettingsView() {
         apiKey?: string
         apiBase: string
         model?: string
-        customMode?: CustomProviderMode
+        customMode?: import('@univedge/locus-agent-sdk').CustomProviderMode
         port: number
       } = {
         provider: activeProvider.value,
@@ -340,7 +228,7 @@ export function useSettingsView() {
             apiKey: string
             apiBase?: string
             model?: string
-            customMode?: CustomProviderMode
+            customMode?: import('@univedge/locus-agent-sdk').CustomProviderMode
           } = {
             provider,
             apiKey: keyTrimmed,

@@ -1,10 +1,12 @@
-import type { SkillDetail, SkillFileNode, SkillSummary } from '@univedge/locus-agent-sdk'
+import type { SkillDetail, SkillSummary } from '@univedge/locus-agent-sdk'
 import type { FileTreeNode } from '@univedge/locus-ui'
 import { useToast } from '@univedge/locus-ui'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { createSkill, fetchSkillDetail, fetchSkillFileContent, fetchSkillFiles, fetchSkills, saveSkillFileContent, updateSkillPreference, watchSkillFiles } from '@/api/skills'
-
-const RE_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { fetchSkillDetail, fetchSkillFileContent, fetchSkillFiles, fetchSkills, updateSkillPreference } from '@/api/skills'
+import { useSkillCreator } from '@/composables/skills/useSkillCreator'
+import { useSkillFileEditor } from '@/composables/skills/useSkillFileEditor'
+import { useSkillFileWatcher } from '@/composables/skills/useSkillFileWatcher'
+import { collectDirectoryIds, convertToFileTreeNodes, countFileNodes } from '@/utils/skills'
 
 type SourceFilter = 'all' | 'system' | 'project'
 
@@ -15,54 +17,6 @@ export interface UseSkillsManagerOptions {
   initialQuerySkillName?: string | null
   /** Initial file path from route query */
   initialQueryFile?: string | null
-}
-
-// Parse frontmatter from raw markdown content
-function parseFrontmatter(raw: string): { frontmatter: string, body: string } {
-  if (!raw.startsWith('---\n') && !raw.startsWith('---\r\n'))
-    return { frontmatter: '', body: raw }
-
-  const match = raw.match(RE_FRONTMATTER)
-  if (!match)
-    return { frontmatter: '', body: raw }
-
-  return {
-    frontmatter: match[1] ?? '',
-    body: raw.slice(match[0].length).trim(),
-  }
-}
-
-function convertToFileTreeNodes(nodes: SkillFileNode[]): FileTreeNode[] {
-  return nodes.map(node => ({
-    id: node.path,
-    label: node.name,
-    type: node.type,
-    children: node.children ? convertToFileTreeNodes(node.children) : undefined,
-  }))
-}
-
-function collectDirectoryIds(nodes: SkillFileNode[]): string[] {
-  const ids: string[] = []
-  for (const node of nodes) {
-    if (node.type === 'directory') {
-      ids.push(node.path)
-      if (node.children) {
-        ids.push(...collectDirectoryIds(node.children))
-      }
-    }
-  }
-  return ids
-}
-
-function countFileNodes(nodes: FileTreeNode[]): number {
-  let count = 0
-  for (const node of nodes) {
-    if (node.type === 'file')
-      count++
-    if (node.children)
-      count += countFileNodes(node.children)
-  }
-  return count
 }
 
 export function useSkillsManager(options: UseSkillsManagerOptions) {
@@ -107,45 +61,23 @@ export function useSkillsManager(options: UseSkillsManagerOptions) {
   const fileContent = ref('')
   const fileLanguage = ref('markdown')
   const isLoadingFile = ref(false)
-  const isEditMode = ref(false)
-  const editorContent = ref('')
-  const isSavingFile = ref(false)
-  const hasUnsavedChanges = ref(false)
 
-  // --- Markdown preview ---
-  const isMarkdownFile = computed(() => {
-    if (!selectedFilePath.value)
-      return false
-    return selectedFilePath.value.endsWith('.md') || selectedFilePath.value.endsWith('.markdown')
+  const editor = useSkillFileEditor({
+    selectedSkillId,
+    selectedFilePath,
+    selectedSkill,
+    fileContent,
+    getWorkspaceRoot,
+    toast,
   })
 
-  const parsedFile = computed(() => {
-    if (!isMarkdownFile.value && selectedFilePath.value)
-      return { frontmatter: '', body: fileContent.value }
-    if (selectedFilePath.value === 'SKILL.md' && selectedSkill.value) {
-      return {
-        frontmatter: selectedSkill.value.rawFrontmatter,
-        body: selectedSkill.value.content,
-      }
-    }
-    return parseFrontmatter(fileContent.value)
+  const creator = useSkillCreator({
+    createSkillSource,
+    getWorkspaceRoot,
+    loadSkills,
+    selectedSkillId,
+    toast,
   })
-
-  const previewContent = computed(() => {
-    if (!selectedFilePath.value)
-      return selectedSkill.value?.content ?? ''
-    return parsedFile.value.body
-  })
-
-  // --- Create skill state ---
-  const isCreating = ref(false)
-  const newSkillName = ref('')
-  const isCreateSubmitting = ref(false)
-  const createNameInputRef = ref<HTMLInputElement | null>(null)
-
-  // --- SSE watcher ---
-  let unwatchFiles: (() => void) | null = null
-  let pendingSSERefresh = false
 
   // --- Data loading ---
   async function loadSkills() {
@@ -226,13 +158,12 @@ export function useSkillsManager(options: UseSkillsManagerOptions) {
       return
 
     isLoadingFile.value = true
-    isEditMode.value = false
-    hasUnsavedChanges.value = false
+    editor.exitEditState()
     try {
       const result = await fetchSkillFileContent(selectedSkillId.value, filePath, getWorkspaceRoot())
       fileContent.value = result.content
       fileLanguage.value = result.language
-      editorContent.value = result.content
+      editor.setEditorContent(result.content)
     }
     catch (error) {
       fileContent.value = ''
@@ -247,58 +178,13 @@ export function useSkillsManager(options: UseSkillsManagerOptions) {
   async function onFileSelect(node: FileTreeNode) {
     if (node.type === 'directory')
       return
-    if (hasUnsavedChanges.value) {
+    if (editor.hasUnsavedChanges.value) {
       const confirmed = await toast.confirm('当前文件有未保存的修改，确定要切换文件吗？')
       if (!confirmed)
         return
     }
     selectedFilePath.value = node.id
     loadFileContent(node.id)
-  }
-
-  function enterEditMode() {
-    editorContent.value = fileContent.value
-    isEditMode.value = true
-    hasUnsavedChanges.value = false
-  }
-
-  async function exitEditMode() {
-    if (hasUnsavedChanges.value) {
-      const confirmed = await toast.confirm('当前文件有未保存的修改，确定要退出编辑模式吗？')
-      if (!confirmed)
-        return
-    }
-    isEditMode.value = false
-    hasUnsavedChanges.value = false
-  }
-
-  function onEditorChange(value: string) {
-    editorContent.value = value
-    hasUnsavedChanges.value = value !== fileContent.value
-  }
-
-  async function saveFile() {
-    if (!selectedSkillId.value || !selectedFilePath.value || isSavingFile.value)
-      return
-
-    isSavingFile.value = true
-    try {
-      await saveSkillFileContent({
-        skillId: selectedSkillId.value,
-        filePath: selectedFilePath.value,
-        content: editorContent.value,
-        workspaceRoot: getWorkspaceRoot(),
-      })
-      fileContent.value = editorContent.value
-      hasUnsavedChanges.value = false
-      toast.success('保存成功')
-    }
-    catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存失败')
-    }
-    finally {
-      isSavingFile.value = false
-    }
   }
 
   // --- Preference updates ---
@@ -347,109 +233,27 @@ export function useSkillsManager(options: UseSkillsManagerOptions) {
     await patchSkillPreference({ enabled: nextEnabled })
   }
 
-  // --- Create skill ---
-  function startCreateSkill() {
-    isCreating.value = true
-    newSkillName.value = ''
-    nextTick(() => {
-      createNameInputRef.value?.focus()
-    })
-  }
-
-  function cancelCreateSkill() {
-    isCreating.value = false
-    newSkillName.value = ''
-  }
-
-  async function confirmCreateSkill() {
-    const name = newSkillName.value.trim()
-    if (!name || isCreateSubmitting.value)
-      return
-
-    isCreateSubmitting.value = true
-    try {
-      const result = await createSkill({
-        name,
-        source: createSkillSource.value,
-        workspaceRoot: getWorkspaceRoot(),
-      })
-
-      if (result.success && result.skill) {
-        isCreating.value = false
-        newSkillName.value = ''
-        await loadSkills()
-        selectedSkillId.value = result.skill.id
-        toast.success(`技能 "${name}" 创建成功`)
-      }
-    }
-    catch (error) {
-      toast.error(error instanceof Error ? error.message : '创建技能失败')
-    }
-    finally {
-      isCreateSubmitting.value = false
-    }
-  }
-
-  function handleCreateKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      confirmCreateSkill()
-    }
-    else if (event.key === 'Escape') {
-      cancelCreateSkill()
-    }
-  }
-
   // --- SSE file watcher ---
-  function setupFileWatcher() {
-    unwatchFiles?.()
-    unwatchFiles = null
-
-    unwatchFiles = watchSkillFiles(getWorkspaceRoot(), async () => {
-      if (isEditMode.value && hasUnsavedChanges.value) {
-        pendingSSERefresh = true
-        return
-      }
-      await handleSSERefresh()
-    })
-  }
-
-  async function handleSSERefresh() {
-    pendingSSERefresh = false
-    const prevId = selectedSkillId.value
-    const prevFile = selectedFilePath.value
-
-    await loadSkills()
-
-    if (prevId && selectedSkillId.value === prevId) {
-      try {
-        const detailResult = await fetchSkillDetail(prevId, getWorkspaceRoot())
-        selectedSkill.value = detailResult.skill
-      }
-      catch { /* ignore */ }
-
-      await loadFileTree(prevId)
-
-      if (prevFile && !isEditMode.value) {
-        await loadFileContent(prevFile)
-      }
-    }
-  }
-
-  // --- Lifecycle ---
-  watch(isEditMode, async (editing) => {
-    if (!editing && pendingSSERefresh) {
-      await handleSSERefresh()
-    }
+  const watcher = useSkillFileWatcher({
+    isEditMode: editor.isEditMode,
+    hasUnsavedChanges: editor.hasUnsavedChanges,
+    getWorkspaceRoot,
+    loadSkills,
+    selectedSkillId,
+    selectedFilePath,
+    selectedSkill,
+    loadFileTree,
+    loadFileContent,
   })
 
+  // --- Lifecycle ---
   onMounted(async () => {
     await loadSkills()
-    setupFileWatcher()
+    watcher.setupFileWatcher()
   })
 
   onUnmounted(() => {
-    unwatchFiles?.()
+    watcher.cleanup()
   })
 
   return {
@@ -480,31 +284,31 @@ export function useSkillsManager(options: UseSkillsManagerOptions) {
     fileContent,
     fileLanguage,
     isLoadingFile,
-    isEditMode,
-    editorContent,
-    isSavingFile,
-    hasUnsavedChanges,
-    enterEditMode,
-    exitEditMode,
-    onEditorChange,
-    saveFile,
+    isEditMode: editor.isEditMode,
+    editorContent: editor.editorContent,
+    isSavingFile: editor.isSavingFile,
+    hasUnsavedChanges: editor.hasUnsavedChanges,
+    enterEditMode: editor.enterEditMode,
+    exitEditMode: editor.exitEditMode,
+    onEditorChange: editor.onEditorChange,
+    saveFile: editor.saveFile,
 
     // Markdown preview
-    isMarkdownFile,
-    parsedFile,
-    previewContent,
+    isMarkdownFile: editor.isMarkdownFile,
+    parsedFile: editor.parsedFile,
+    previewContent: editor.previewContent,
 
     // Create skill
-    isCreating,
-    newSkillName,
-    isCreateSubmitting,
-    createNameInputRef,
-    startCreateSkill,
-    cancelCreateSkill,
-    confirmCreateSkill,
-    handleCreateKeydown,
+    isCreating: creator.isCreating,
+    newSkillName: creator.newSkillName,
+    isCreateSubmitting: creator.isCreateSubmitting,
+    createNameInputRef: creator.createNameInputRef,
+    startCreateSkill: creator.startCreateSkill,
+    cancelCreateSkill: creator.cancelCreateSkill,
+    confirmCreateSkill: creator.confirmCreateSkill,
+    handleCreateKeydown: creator.handleCreateKeydown,
 
     // SSE
-    setupFileWatcher,
+    setupFileWatcher: watcher.setupFileWatcher,
   }
 }
