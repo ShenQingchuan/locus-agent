@@ -1,3 +1,56 @@
+## [0.2.1] - 2026-04-04
+
+### Bug Fixes
+
+- Type errors in new dep version
+
+- *(chat)* Change dropdown trigger from hover to click for better usability
+
+
+### Features
+
+- *(server)* Wire missing plugin hook emission points across agent lifecycle
+
+
+### Miscellaneous
+
+- Update README.md
+
+- Bump all dependencies
+
+- Setup simple-git-hooks
+
+- Remake pnpm lockfile
+
+
+### Refactor
+
+- *(web)* Extract ChatInput logic into useChatInput composable
+
+- *(web)* Extract CodingView logic into useCodingView composable
+
+- *(web)* Extract MemoriesView logic into useMemoriesView composable
+
+- *(web)* Extract SettingsView logic into useSettingsView composable
+
+- *(web)* Extract SettingsEmbeddingCard into useSettingsEmbeddingCard composable
+
+- *(web)* Extract NoteEditor logic into useNoteEditor composable
+
+- *(web)* Extract ToolCallItem logic into useToolCallItem composable
+
+- *(web)* Split useToolCallItem; move tool display metadata to agent-sdk
+
+- *(web)* Split useAssistantRuntime into assistant-runtime/ directory
+
+- *(web)* Split chat store into sub-modules under stores/chat/
+
+- *(web)* Extract view components from CodingView and MessageBubble
+
+- *(web)* Split large composables into focused sub-modules
+
+- *(web)* Add shared utilities and constants for refactored modules
+
 ## [0.2.0] - 2026-04-02
 
 ### Bug Fixes
