@@ -1,7 +1,10 @@
 /**
- * Tool-specific summary resolvers.
- * Each entry maps a toolName to a function that returns a summary string from args.
+ * Tool-call display metadata for UIs: one-line summaries from args and
+ * flags for which tools use custom inline output / hide the summary row.
+ * Framework-agnostic; no Vue dependency.
  */
+
+/** Maps toolName -> summary line from invocation args. */
 export const toolSummaryResolvers: Record<string, (args: Record<string, unknown>) => string> = {
   bash: args => String(args.command ?? ''),
   read_file: args => String(args.file_path ?? ''),
@@ -99,13 +102,8 @@ export const toolSummaryResolvers: Record<string, (args: Record<string, unknown>
   },
 }
 
-/**
- * Tools that render their output via a custom inline widget.
- * When listed here the compact summary row is hidden after completion.
- */
+/** Tools that render output via a custom inline widget (compact summary hidden after completion). */
 export const toolsWithOutputWidget = new Set<string>(['bash', 'ask_question', 'delegate'])
 
-/**
- * Tools whose summary row is always hidden (they have dedicated cards).
- */
+/** Tools whose summary row is always hidden (dedicated cards). */
 export const toolsHideSummaryRow = new Set<string>(['manage_todos', 'write_plan', 'plan_exit'])

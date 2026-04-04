@@ -40,8 +40,14 @@ export {
   serializeSSEEvent,
 } from './sse/index.js'
 
-export type * from './types/index.js'
+// Tool display metadata (UI summaries, no Vue)
+export {
+  toolsHideSummaryRow,
+  toolSummaryResolvers,
+  toolsWithOutputWidget,
+} from './tool-display.js'
 
+export type * from './types/index.js'
 export {
   ACP_CODING_PROVIDERS,
   CODING_MODEL_PROVIDERS,
@@ -55,6 +61,7 @@ export {
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './types/index.js'
+
 export {
   DANGEROUS_COMMAND_PREFIXES,
   extractDefaultPattern,
@@ -64,7 +71,6 @@ export {
   MULTI_WORD_COMMANDS,
   TOOL_DEFAULT_RISK,
 } from './types/index.js'
-
 // SDK Message helpers
 export {
   extractAssistantText,
@@ -110,4 +116,5 @@ export {
   truncateText,
   withRetry,
 } from './utils/index.js'
+
 export type { RetryConfig } from './utils/index.js'

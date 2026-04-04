@@ -1,45 +1,18 @@
-import type { RiskLevel } from '@univedge/locus-agent-sdk'
-import type { EmitFn } from 'vue'
-import type { QuestionAnswer } from '@/api/chat'
-import type { ToolCallState } from '@/composables/useAssistantRuntime'
-import { onClickOutside } from '@vueuse/core'
-import { computed, nextTick, ref, toRefs, watch } from 'vue'
+import type { UseToolCallItemProps } from './types'
+import {
+  toolsHideSummaryRow,
+  toolSummaryResolvers,
+  toolsWithOutputWidget,
+} from '@univedge/locus-agent-sdk'
+import { computed } from 'vue'
 import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
 import { parseDelegateMeta, parseQuestionAnswerBlocks } from '@/utils/parsers'
-import { toolsHideSummaryRow, toolSummaryResolvers, toolsWithOutputWidget } from '@/utils/toolSummary'
+import { ACP_SUMMARY_HEURISTIC_KEYS, INLINE_DELEGATE_AGENT_TYPES } from './constants'
 
-export interface UseToolCallItemProps {
-  tool: ToolCallState
-  suggestedPattern?: string
-  riskLevel?: RiskLevel
-  questionData?: {
-    questions: Array<{ question: string, options: string[], multiple?: boolean }>
-  }
-  compact?: boolean
-}
-
-export interface ToolCallItemEmits {
-  approve: [toolCallId: string]
-  reject: [toolCallId: string]
-  whitelist: [toolCallId: string, payload: { pattern?: string, scope: 'session' | 'global' }]
-  questionAnswer: [toolCallId: string, answers: QuestionAnswer[]]
-  delegateResume: [payload: { taskId: string, agentType: string, agentName: string }]
-}
-
-export function useToolCallItem(
-  props: UseToolCallItemProps,
-  _emit: EmitFn<ToolCallItemEmits>,
-) {
-  const modalOpen = ref(false)
-  const inlineDelegateModalOpen = ref(false)
-  const whitelistOpen = ref(false)
-  const whitelistPopoverRef = ref<HTMLElement | null>(null)
-  const terminalRef = ref<HTMLElement | null>(null)
-
-  onClickOutside(whitelistPopoverRef, () => {
-    whitelistOpen.value = false
-  })
-
+/**
+ * Computed display state for a tool call row (diffs, summaries, delegate/plan flags).
+ */
+export function useToolCallItemDisplay(props: UseToolCallItemProps) {
   const statusIcon = computed(() => {
     switch (props.tool.status) {
       case 'pending': return 'i-svg-spinners:90-ring-with-bg'
@@ -118,20 +91,9 @@ export function useToolCallItem(
     isError: props.tool.result?.isError,
   }))
 
-  const HEURISTIC_ARG_KEYS = [
-    'file_path',
-    'command',
-    'pattern',
-    'query',
-    'prompt',
-    'path',
-    'task',
-    'description',
-  ]
-
   const acpSummary = computed(() => {
     const { args } = props.tool.toolCall
-    for (const key of HEURISTIC_ARG_KEYS) {
+    for (const key of ACP_SUMMARY_HEURISTIC_KEYS) {
       const val = args[key]
       if (typeof val === 'string' && val.trim()) {
         const s = val.trim()
@@ -161,13 +123,11 @@ export function useToolCallItem(
 
   const isDelegate = computed(() => props.tool.toolCall.toolName === 'delegate')
 
-  const INLINE_DELEGATE_TYPES = new Set(['memory_tagger', 'memory-tagger'])
-
   const isInlineDelegate = computed(() => {
     if (!isDelegate.value)
       return false
     const agentType = String(props.tool.toolCall.args.agent_type ?? '')
-    return INLINE_DELEGATE_TYPES.has(agentType)
+    return INLINE_DELEGATE_AGENT_TYPES.has(agentType)
   })
 
   const inlineDelegateResultText = computed(() => {
@@ -209,8 +169,6 @@ export function useToolCallItem(
 
   const isBash = computed(() => props.tool.toolCall.toolName === 'bash')
   const isSilentTool = computed(() => props.tool.toolCall.toolName === 'plan_exit')
-
-  const diffExpanded = ref(true)
 
   const delegateArgs = computed(() => {
     if (!isDelegate.value)
@@ -273,21 +231,7 @@ export function useToolCallItem(
     return hasOutputWidget.value && props.tool.status === 'pending'
   })
 
-  watch(terminalOutput, () => {
-    nextTick(() => {
-      if (terminalRef.value) {
-        terminalRef.value.scrollTop = terminalRef.value.scrollHeight
-      }
-    })
-  })
-
   return {
-    ...toRefs(props),
-    modalOpen,
-    inlineDelegateModalOpen,
-    whitelistOpen,
-    whitelistPopoverRef,
-    terminalRef,
     statusIcon,
     statusIconClass,
     inlineDiff,
@@ -306,7 +250,6 @@ export function useToolCallItem(
     writePlanStatus,
     isBash,
     isSilentTool,
-    diffExpanded,
     delegateArgs,
     delegateMeta,
     delegateDeltasFromResult,
@@ -318,3 +261,5 @@ export function useToolCallItem(
     isToolRunning,
   }
 }
+
+export type ToolCallItemDisplay = ReturnType<typeof useToolCallItemDisplay>

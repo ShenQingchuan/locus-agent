@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ToolCallState } from '@/composables/useAssistantRuntime'
+import { toolsWithOutputWidget } from '@univedge/locus-agent-sdk'
 import { computed, nextTick, ref, watch } from 'vue'
-import { toolsWithOutputWidget } from '@/utils/toolSummary'
 
 const props = defineProps<{
   tool: ToolCallState
