@@ -529,7 +529,7 @@ function handleShiftTab() {
       <!-- Build/Plan mode toggle row (Coding 空间独有) -->
       <div v-if="showCodingMode" class="flex items-center justify-between px-3 pt-1.5 gap-2">
         <div class="flex items-center gap-2 min-w-0">
-          <Dropdown :items="codingModeItems" placement="top-start" persistent trigger="hover" @select="handleCodingModeSelect">
+          <Dropdown :items="codingModeItems" placement="top-start" persistent trigger="click" @select="handleCodingModeSelect">
             <template #trigger>
               <button
                 class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors duration-150"
@@ -548,7 +548,7 @@ function handleShiftTab() {
             :items="currentPlanItems"
             placement="top-start"
             persistent
-            trigger="hover"
+            trigger="click"
             @select="handleCurrentPlanSelect"
           >
             <template #trigger>
@@ -578,7 +578,7 @@ function handleShiftTab() {
             <span>图片</span>
           </button>
 
-          <Dropdown :items="modeItems" placement="top-end" persistent @select="handleModeSelect">
+          <Dropdown :items="modeItems" placement="top-end" persistent trigger="click" @select="handleModeSelect">
             <template #trigger>
               <button
                 class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
@@ -619,7 +619,7 @@ function handleShiftTab() {
           <!-- Mode selector dropdown (Chat 页面显示，Coding 页面已移到上方) -->
           <template v-if="!showCodingMode">
             <span class="text-muted-foreground/25 text-xs flex-shrink-0">|</span>
-            <Dropdown :items="modeItems" placement="top-start" persistent @select="handleModeSelect">
+            <Dropdown :items="modeItems" placement="top-start" persistent trigger="click" @select="handleModeSelect">
               <template #trigger>
                 <button
                   class="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 flex-shrink-0"
@@ -646,6 +646,7 @@ function handleShiftTab() {
               placement="top-start"
               size="sm"
               arrow-direction="up"
+              trigger="click"
               @update:model-value="handleCodingExecutorSelect"
             />
 
@@ -657,6 +658,7 @@ function handleShiftTab() {
                 placement="top-start"
                 size="sm"
                 arrow-direction="up"
+                trigger="click"
                 @update:model-value="handleCustomModeChange"
               />
             </template>
