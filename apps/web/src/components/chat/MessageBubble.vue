@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { ImageAttachmentStripItem } from '@univedge/locus-ui'
 import type { QuestionAnswer } from '@/api/chat'
-import type { Message, MessagePart, ToolCallState } from '@/composables/useAssistantRuntime'
-import { DEFAULT_MODELS } from '@univedge/locus-agent-sdk'
+import type { Message } from '@/composables/assistant-runtime'
 import { ImageAttachmentStrip, Modal, Tooltip, useToast } from '@univedge/locus-ui'
 import { useClipboard } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, ref } from 'vue'
 import { useMarkConversationDirty } from '@/composables/useDirtyConversation'
+import { useMessageTokens } from '@/composables/useMessageTokens'
 import { useReasoningBlockState } from '@/composables/useReasoningBlockState'
 import { useRelativeTime } from '@/composables/useRelativeTime'
 import { useChatStore } from '@/stores/chat'
 import { useModelSettingsStore } from '@/stores/modelSettings'
-import { countTextTokens, countUnknownTokens } from '@/utils/tokenizer'
+import { getDisplayParts, getToolCallSlice, isLastTextPart } from '@/utils/messageParts'
 import ToolCallItem from './ToolCallItem.vue'
 
 const props = defineProps<{
@@ -118,121 +118,20 @@ async function handleConfirmDelete() {
   }
 }
 
-const displayParts = computed<MessagePart[]>(() => {
-  if (props.message.parts && props.message.parts.length > 0)
-    return props.message.parts
-
-  // Fallback: tool calls first, then content
-  const parts: MessagePart[] = []
-  if (props.message.toolCalls?.length) {
-    props.message.toolCalls.forEach((_, i) => parts.push({ type: 'tool-call', toolCallIndex: i }))
-  }
-  if (props.message.content) {
-    parts.push({ type: 'text', content: props.message.content })
-  }
-  return parts
-})
-
-function getToolCallSlice(toolCallIndex: number): ToolCallState[] {
-  const tool = props.message.toolCalls?.[toolCallIndex]
-  return tool ? [tool] : []
-}
-
-function isLastTextPart(partIndex: number): boolean {
-  for (let i = displayParts.value.length - 1; i >= 0; i--) {
-    if (displayParts.value[i]?.type === 'text')
-      return i === partIndex
-  }
-  return false
-}
-
-const estimateModelHint = computed(() => {
-  if (props.message.role === 'assistant' && props.message.model)
-    return props.message.model
-  const selectedModel = (modelSettings.modelName || DEFAULT_MODELS[modelSettings.provider] || '').trim()
-  return selectedModel || undefined
-})
-
-function estimateTokensFromText(text: string, modelHint?: string): number {
-  return countTextTokens(text, modelHint)
-}
-
-// Estimate context-window contribution of this message (consistent with ring).
-// Includes assistant text, tool calls, AND tool results since they are
-// visually part of the same message bubble.
-const messageTokens = computed<number | null>(() => {
-  const msg = props.message
-
-  if (msg.isStreaming)
-    return null
-
-  const hint = estimateModelHint.value
-
-  if (msg.role === 'assistant') {
-    // reasoning is NOT sent back as context (messagesToCoreMessages strips it),
-    // so only count content + tool calls + tool results here.
-    let estimate = estimateTokensFromText(msg.content, hint)
-    if (msg.toolCalls && msg.toolCalls.length > 0) {
-      for (const tc of msg.toolCalls) {
-        estimate += estimateTokensFromText(tc.toolCall.toolCallId, hint)
-        estimate += estimateTokensFromText(tc.toolCall.toolName, hint)
-        estimate += countUnknownTokens(tc.toolCall.args, hint)
-        if (tc.result) {
-          estimate += estimateTokensFromText(tc.result.toolCallId, hint)
-          estimate += estimateTokensFromText(tc.result.toolName, hint)
-          estimate += countUnknownTokens(tc.result.result, hint)
-        }
-      }
-    }
-    return estimate > 0 ? estimate : null
-  }
-
-  const estimate = estimateTokensFromText(msg.content, hint)
-  return estimate > 0 ? estimate : null
-})
-
-const isEstimatedTokens = computed(() => {
-  if (props.message.isStreaming)
-    return false
-  return true
-})
-
-const messageTokensText = computed(() => {
-  if (messageTokens.value === null)
-    return null
-  return isEstimatedTokens.value
-    ? `~${messageTokens.value} tokens`
-    : `${messageTokens.value} tokens`
-})
-
-const reasoningTokens = computed<number | null>(() => {
-  const msg = props.message
-  if (msg.role !== 'assistant' || !msg.reasoning)
-    return null
-  return estimateTokensFromText(msg.reasoning, estimateModelHint.value) || null
-})
-
-const messageTokensTitle = computed<string | undefined>(() => {
-  const msg = props.message
-  if (msg.isStreaming)
-    return undefined
-  const parts: string[] = ['上下文贡献估算']
-  if (reasoningTokens.value) {
-    parts.push(`思考: ~${reasoningTokens.value}（不计入上下文）`)
-  }
-  if (msg.role === 'assistant' && msg.usage) {
-    parts.push(`API 用量 — 输出: ${msg.usage.completionTokens} · 输入: ${msg.usage.promptTokens} · 总计: ${msg.usage.totalTokens}`)
-  }
-  return parts.join(' · ')
-})
-
-const assistantModelLabel = computed<string | null>(() => {
-  if (props.message.role !== 'assistant')
-    return null
-  return props.message.model || '未记录模型'
-})
+const displayParts = computed(() => getDisplayParts(props.message))
 
 const isACPMessage = computed(() => !!props.message.model?.startsWith('acp/'))
+
+const {
+  messageTokens,
+  messageTokensText,
+  messageTokensTitle,
+  assistantModelLabel,
+} = useMessageTokens({
+  message: () => props.message,
+  provider: () => modelSettings.provider,
+  modelName: () => modelSettings.modelName,
+})
 
 const fullTextContent = computed(() => {
   const parts = displayParts.value
@@ -404,7 +303,7 @@ const { copy, copied } = useClipboard()
           <!-- Tool call part -->
           <template v-else-if="part.type === 'tool-call'">
             <ToolCallItem
-              v-for="tool in getToolCallSlice(part.toolCallIndex)"
+              v-for="tool in getToolCallSlice(message, part.toolCallIndex)"
               :key="tool.toolCall.toolCallId"
               :tool="tool"
               :compact="isACPMessage"
@@ -427,8 +326,8 @@ const { copy, copied } = useClipboard()
             <MarkdownRender
               :content="part.content"
               custom-id="locus"
-              :typewriter="isLastTextPart(partIdx) && message.isStreaming"
-              :code-block-stream="isLastTextPart(partIdx) && message.isStreaming"
+              :typewriter="isLastTextPart(displayParts, partIdx) && message.isStreaming"
+              :code-block-stream="isLastTextPart(displayParts, partIdx) && message.isStreaming"
             />
           </div>
         </template>

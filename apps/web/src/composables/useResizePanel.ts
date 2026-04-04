@@ -58,8 +58,9 @@ export function useResizePanel(options: ResizePanelOptions) {
       const clamped = Math.max(minWidth, Math.min(maxWidth, newWidth))
 
       width.value = clamped
-      if (panelRef.value) {
-        panelRef.value.style.width = `${clamped}px`
+      const el = panelRef.value ? ((panelRef.value as any).$el ?? panelRef.value) as HTMLElement : null
+      if (el) {
+        el.style.width = `${clamped}px`
       }
       onWidthChange?.(clamped)
       rafId = null

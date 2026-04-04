@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import ChatInput from '@/components/chat/ChatInput.vue'
-import ConversationList from '@/components/chat/ConversationList.vue'
 import ConversationListItem from '@/components/chat/ConversationListItem.vue'
 import MessageList from '@/components/chat/MessageList.vue'
 import CommitDialog from '@/components/code/CommitDialog.vue'
 import PlanViewer from '@/components/code/PlanViewer.vue'
 import SessionChangesPanel from '@/components/code/SessionChangesPanel.vue'
+import CodingSidebar from '@/components/coding/CodingSidebar.vue'
+import ConversationHistoryPanel from '@/components/coding/ConversationHistoryPanel.vue'
 import KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
 import { useCodingView } from '@/composables/useCodingView'
@@ -50,109 +51,17 @@ const {
     <AppNavRail />
 
     <div class="flex-1 min-w-0 flex">
-      <!-- Left sidebar: section nav + optional conversation list (chat section) -->
-      <aside
+      <!-- Left sidebar -->
+      <CodingSidebar
         ref="leftPanelRef"
-        class="min-w-0 border-r border-border bg-sidebar-background flex flex-col relative"
-        :class="[
-          isLeftPanelResizing ? '' : 'transition-[width] duration-150',
-          isLeftSidebarCollapsed ? 'items-center' : '',
-        ]"
-        :style="{ width: isLeftSidebarCollapsed ? '48px' : `${leftPanelWidth}px` }"
-      >
-        <!-- Nav buttons -->
-        <div :class="isLeftSidebarCollapsed ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5'">
-          <!-- 研发对话 -->
-          <button
-            class="flex items-center rounded transition-colors"
-            :class="[
-              isLeftSidebarCollapsed
-                ? 'h-8 w-8 inline-flex items-center justify-center'
-                : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'chat'
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
-            ]"
-            :title="isLeftSidebarCollapsed ? '研发对话' : undefined"
-            @click="activeSection = 'chat'; planStore.closePlan()"
-          >
-            <div v-if="isLeftSidebarCollapsed" class="i-carbon-chat-bot h-4 w-4" />
-            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-streamline-pixel:coding-apps-websites-android h-4 w-4" />
-              研发对话
-            </div>
-          </button>
-
-          <!-- 变更审阅 -->
-          <button
-            class="flex items-center rounded transition-colors"
-            :class="[
-              isLeftSidebarCollapsed
-                ? 'h-8 w-8 inline-flex items-center justify-center'
-                : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'workspace' && !planStore.viewingPlan
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
-            ]"
-            :title="isLeftSidebarCollapsed ? '变更审阅' : undefined"
-            @click="activeSection = 'workspace'; planStore.closePlan()"
-          >
-            <div v-if="isLeftSidebarCollapsed" class="i-lucide:git-pull-request-arrow h-4 w-4" />
-            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-lucide:git-pull-request-arrow h-4 w-4" />
-              变更审阅
-            </div>
-          </button>
-
-          <!-- 任务编排 -->
-          <button
-            class="flex items-center rounded transition-colors"
-            :class="[
-              isLeftSidebarCollapsed
-                ? 'h-8 w-8 inline-flex items-center justify-center'
-                : 'w-full text-left px-2.5 py-2 text-sm',
-              activeSection === 'planning' && !planStore.viewingPlan
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
-            ]"
-            :title="isLeftSidebarCollapsed ? '任务编排' : undefined"
-            @click="activeSection = 'planning'; planStore.closePlan()"
-          >
-            <div v-if="isLeftSidebarCollapsed" class="i-bi:kanban-fill h-4 w-4" />
-            <div v-else class="inline-flex items-center gap-2 whitespace-nowrap">
-              <span class="i-bi:kanban-fill h-4 w-4" />
-              任务编排
-            </div>
-          </button>
-        </div>
-
-        <!-- Collapse / Expand toggle (bottom) -->
-        <div class="mt-auto p-2 flex" :class="isLeftSidebarCollapsed ? 'justify-center' : 'justify-end'">
-          <button
-            class="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            :title="isLeftSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
-            @click="isLeftSidebarCollapsed = !isLeftSidebarCollapsed"
-          >
-            <span
-              class="h-3.5 w-3.5 transition-transform"
-              :class="isLeftSidebarCollapsed ? 'i-carbon-chevron-right' : 'i-carbon-chevron-left'"
-            />
-          </button>
-        </div>
-
-        <!-- Resize handle -->
-        <div
-          v-if="!isLeftSidebarCollapsed"
-          class="absolute top-0 -right-1.5 w-3 h-full cursor-col-resize z-10 group/resize"
-          style="touch-action: none; user-select: none;"
-          @mousedown="handleLeftPanelResizeStart"
-        >
-          <div
-            class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 transition-colors"
-            :class="isLeftPanelResizing ? 'bg-primary/50' : 'bg-transparent group-hover/resize:bg-primary/30'"
-          />
-        </div>
-      </aside>
+        v-model:active-section="activeSection"
+        v-model:is-collapsed="isLeftSidebarCollapsed"
+        :is-resizing="isLeftPanelResizing"
+        :width="leftPanelWidth"
+        :viewing-plan="!!planStore.viewingPlan"
+        @resize-start="handleLeftPanelResizeStart"
+        @close-plan="planStore.closePlan()"
+      />
 
       <!-- Main panel -->
       <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative">
@@ -339,35 +248,16 @@ const {
           </template>
         </template>
 
-        <!-- History slide-out panel (right overlay, chat section only) -->
-        <Transition name="history-panel">
-          <div
-            v-if="isHistoryOpen && activeSection === 'chat'"
-            class="absolute right-0 top-11 bottom-0 w-72 border-l border-border bg-sidebar-background flex flex-col shadow-xl z-20"
-          >
-            <div class="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0">
-              <span class="text-sm font-medium">项目会话历史</span>
-              <button
-                class="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                @click="isHistoryOpen = false"
-              >
-                <span class="i-carbon-close h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div class="flex-1 min-h-0 overflow-y-auto">
-              <ConversationList
-                :conversations="currentProjectConversations"
-                :current-id="chatStore.currentConversationId ?? undefined"
-                :loading="isLoadingConversations"
-                :virtual-scroll="true"
-                :item-height="58"
-                class="h-full"
-                @select="handleSelectConversation"
-                @delete="handleDeleteConversation"
-              />
-            </div>
-          </div>
-        </Transition>
+        <!-- History slide-out panel -->
+        <ConversationHistoryPanel
+          :open="isHistoryOpen && activeSection === 'chat'"
+          :conversations="currentProjectConversations"
+          :current-id="chatStore.currentConversationId ?? undefined"
+          :loading="isLoadingConversations"
+          @close="isHistoryOpen = false"
+          @select="handleSelectConversation"
+          @delete="handleDeleteConversation"
+        />
       </div>
     </div>
 
@@ -397,16 +287,5 @@ const {
   50% {
     left: calc(100% - 5rem);
   }
-}
-
-.history-panel-enter-active,
-.history-panel-leave-active {
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-.history-panel-enter-from,
-.history-panel-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
 }
 </style>
