@@ -59,7 +59,27 @@ catalogs:
   ui-utils:
     panzoom: ^9.4.4
   unocss-family:
-    '@iconify/json': ^2.2.458
+    '@iconify-json/bi': ^1.2.7
+    '@iconify-json/bx': ^1.2.3
+    '@iconify-json/carbon': ^1.2.20
+    '@iconify-json/ic': ^1.2.4
+    '@iconify-json/icon-park-outline': ^1.2.4
+    '@iconify-json/icon-park-solid': ^1.2.4
+    '@iconify-json/ix': ^1.2.11
+    '@iconify-json/lets-icons': ^1.2.2
+    '@iconify-json/lucide': ^1.2.101
+    '@iconify-json/material-symbols': ^1.2.65
+    '@iconify-json/mingcute': ^1.2.7
+    '@iconify-json/octicon': ^1.2.22
+    '@iconify-json/radix-icons': ^1.2.6
+    '@iconify-json/ri': ^1.2.10
+    '@iconify-json/simple-icons': ^1.2.76
+    '@iconify-json/solar': ^1.2.5
+    '@iconify-json/streamline-pixel': ^1.2.0
+    '@iconify-json/streamline-plump': ^1.2.0
+    '@iconify-json/streamline-sharp': ^1.2.0
+    '@iconify-json/svg-spinners': ^1.2.4
+    '@iconify-json/tabler': ^1.2.33
     '@unocss/preset-typography': ^66.6.7
     '@unocss/preset-uno': ^66.6.7
     '@unocss/reset': ^66.6.7
