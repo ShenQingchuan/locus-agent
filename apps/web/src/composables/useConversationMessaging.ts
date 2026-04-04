@@ -1,11 +1,11 @@
 import type { CodingExecutorType, Conversation, CoreMessage, LLMProviderType, MessageImageAttachment, MessageMetadata, PlanBinding } from '@univedge/locus-agent-sdk'
 import type { Ref } from 'vue'
-import type { Message } from '@/composables/useAssistantRuntime'
+import type { Message } from '@/composables/assistant-runtime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
-import { ACP_CODING_PROVIDERS, CODING_PROVIDERS, DEFAULT_MODELS, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { abortChat } from '@/api/chat'
 import { truncateMessages } from '@/api/conversations'
 import { streamAssistantReply } from '@/composables/useAssistantStreaming'
+import { buildAssistantModel, computeBackendKeepCount, createOptimisticConversation } from '@/utils/messaging'
 
 interface RuntimeState {
   messages: Message[]
@@ -72,17 +72,6 @@ interface CreateConversationMessagingOptions {
   callbacks: MessagingCallbacks
 }
 
-function computeBackendKeepCount(history: Message[]): number {
-  let backendKeepCount = 0
-  for (const m of history) {
-    backendKeepCount++
-    if (m.role === 'assistant' && m.toolCalls && m.toolCalls.some(tc => tc.result)) {
-      backendKeepCount++
-    }
-  }
-  return backendKeepCount
-}
-
 export function createConversationMessagingActions(options: CreateConversationMessagingOptions) {
   const { state, runtime, callbacks } = options
 
@@ -103,23 +92,15 @@ export function createConversationMessagingActions(options: CreateConversationMe
     let isNewConversation = false
 
     if (!conversationId) {
-      conversationId = crypto.randomUUID()
+      const optimisticConversation = createOptimisticConversation(
+        content,
+        state.conversationScope.value,
+        state.yoloMode.value,
+      )
+      conversationId = optimisticConversation.id
       isNewConversation = true
       if (!targetConversationId) {
         state.currentConversationId.value = conversationId
-      }
-
-      const now = new Date()
-      const optimisticConversation: Conversation = {
-        id: conversationId,
-        title: trimmedContent
-          ? (trimmedContent.length > 50 ? `${trimmedContent.substring(0, 50)}...` : trimmedContent)
-          : '图片对话',
-        space: state.conversationScope.value.space,
-        projectKey: state.conversationScope.value.projectKey ?? null,
-        confirmMode: !state.yoloMode.value,
-        createdAt: now,
-        updatedAt: now,
       }
       state.conversations.value = [optimisticConversation, ...state.conversations.value]
     }
@@ -147,17 +128,12 @@ export function createConversationMessagingActions(options: CreateConversationMe
       metadata: optionsOverride?.metadata,
     }, conversationId)
 
-    const selectedModel = (state.modelName.value || DEFAULT_MODELS[state.provider.value] || 'unknown').trim()
-    const assistantModel = (() => {
-      const executor = state.codingExecutor.value
-      if (state.conversationScope.value.space === 'coding' && executor) {
-        if (isCodingModelProvider(executor))
-          return `${executor}/${CODING_PROVIDERS.find(cp => cp.value === executor)?.defaultModel || 'unknown'}`
-        if (isACPCodingProvider(executor))
-          return `acp/${ACP_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
-      }
-      return `${state.provider.value}/${selectedModel}`
-    })()
+    const assistantModel = buildAssistantModel({
+      conversationScope: state.conversationScope.value,
+      codingExecutor: state.codingExecutor.value,
+      provider: state.provider.value,
+      modelName: state.modelName.value,
+    })
     const isPlanningTurn = state.conversationScope.value.space === 'coding' && state.codingMode.value === 'plan'
 
     if (isPlanningTurn)

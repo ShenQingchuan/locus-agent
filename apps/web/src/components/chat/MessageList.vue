@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Message } from '@/composables/useAssistantRuntime'
+import type { Message } from '@/composables/assistant-runtime'
 import { nextTick, ref, watch } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 

@@ -1,6 +1,6 @@
 import type { RiskLevel } from '@univedge/locus-agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
-import type { ToolCallState } from '@/composables/useAssistantRuntime'
+import type { ToolCallState } from '@/composables/assistant-runtime'
 
 export interface UseToolCallItemProps {
   tool: ToolCallState

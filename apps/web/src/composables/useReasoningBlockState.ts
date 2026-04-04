@@ -1,4 +1,4 @@
-import type { Message } from '@/composables/useAssistantRuntime'
+import type { Message } from '@/composables/assistant-runtime'
 import { computed, reactive, watch } from 'vue'
 
 export function useReasoningBlockState(getMessage: () => Message) {

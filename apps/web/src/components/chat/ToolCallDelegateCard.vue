@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QuestionAnswer } from '@/api/chat'
-import type { ToolCallState } from '@/composables/useAssistantRuntime'
+import type { ToolCallState } from '@/composables/assistant-runtime'
 import { computed, ref } from 'vue'
 import { parseDelegateMeta, parseQuestionAnswerBlocks } from '@/utils/parsers'
 import DelegateCard from './DelegateCard.vue'
