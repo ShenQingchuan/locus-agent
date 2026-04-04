@@ -1,5 +1,7 @@
 import type { StreamingToolExecutor, ToolExecutor } from '@univedge/locus-agent-sdk'
 import type { ToolName } from './tool-definitions.js'
+import { HookEvent } from '@univedge/locus-agent-sdk'
+import { hookBus } from '../plugins/index.js'
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
 import { executeGrep, formatGrepResult } from './grep.js'
@@ -113,12 +115,43 @@ const formattedOverrides: Partial<Record<ToolName, StreamingToolExecutor>> = {
     )
     return formatManageKanbanResult(result)
   },
+  str_replace: async (args, _callbacks, context) => {
+    const result = await executeStrReplace(args as Parameters<typeof executeStrReplace>[0])
+    if (result.success && hookBus.hasHandlers(HookEvent.ArtifactFileChangeDetected)) {
+      const space = (context?.space ?? 'chat') as 'chat' | 'coding'
+      void hookBus.emit(HookEvent.ArtifactFileChangeDetected, {
+        filePath: result.filePath,
+        changeType: 'modified',
+        toolName: 'str_replace',
+      }, { space, workspaceRoot: context?.workspaceRoot, projectKey: context?.projectKey })
+    }
+    return formatStrReplaceResult(result)
+  },
+  write_file: async (args, _callbacks, context) => {
+    const result = await executeWriteFile(args as Parameters<typeof executeWriteFile>[0])
+    if (hookBus.hasHandlers(HookEvent.ArtifactFileChangeDetected)) {
+      const space = (context?.space ?? 'chat') as 'chat' | 'coding'
+      void hookBus.emit(HookEvent.ArtifactFileChangeDetected, {
+        filePath: result.filePath,
+        changeType: result.created ? 'created' : 'modified',
+        toolName: 'write_file',
+      }, { space, workspaceRoot: context?.workspaceRoot, projectKey: context?.projectKey })
+    }
+    return formatWriteResult(result)
+  },
   write_plan: async (args, _callbacks, context) => {
     requireCodingSpace('write_plan', context?.space)
     const result = await executeWritePlan(
       args as Parameters<typeof executeWritePlan>[0],
       { projectKey: context?.projectKey },
     )
+    if (result.success && hookBus.hasHandlers(HookEvent.ArtifactPlanWritten)) {
+      const space = (context?.space ?? 'coding') as 'chat' | 'coding'
+      void hookBus.emit(HookEvent.ArtifactPlanWritten, {
+        planPath: result.filePath,
+        projectKey: context?.projectKey,
+      }, { space, workspaceRoot: context?.workspaceRoot, projectKey: context?.projectKey })
+    }
     return formatWritePlanResult(result)
   },
   read_plan: async (args, _callbacks, context) => {
@@ -140,8 +173,6 @@ const formattedOverrides: Partial<Record<ToolName, StreamingToolExecutor>> = {
 const simpleFormatters: Partial<Record<ToolName, (result: any) => string>> = {
   read_file: formatReadResult,
   tree: formatTreeResult,
-  str_replace: formatStrReplaceResult,
-  write_file: formatWriteResult,
   search_memory: formatSearchMemoryResult,
 }
 

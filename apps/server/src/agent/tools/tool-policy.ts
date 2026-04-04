@@ -16,6 +16,13 @@ export const trustedBuiltinTools = new Set<string>([
   BuiltinTool.PlanExit,
 ])
 
+/** Tools that must run serially to avoid file-system conflicts */
+export const serialTools = new Set<string>([
+  BuiltinTool.StrReplace,
+  BuiltinTool.WriteFile,
+  BuiltinTool.Bash,
+])
+
 export function isTrustedBuiltinTool(toolName: string): boolean {
   return trustedBuiltinTools.has(toolName)
 }
