@@ -1,3 +1,4 @@
+import type { ComponentPublicInstance } from 'vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 
 export interface ResizePanelOptions {
@@ -27,11 +28,20 @@ export function useResizePanel(options: ResizePanelOptions) {
   } = options
 
   const width = ref(initialWidth)
-  const panelRef = ref<HTMLElement | null>(null)
+  const panelRef = ref<ComponentPublicInstance | HTMLElement | null>(null)
   const isResizing = ref(false)
   const startX = ref(0)
   const startWidth = ref(0)
   let rafId: number | null = null
+
+  function resolvePanelEl(refValue: ComponentPublicInstance | HTMLElement | null): HTMLElement | null {
+    if (!refValue)
+      return null
+    if (refValue instanceof HTMLElement)
+      return refValue
+    const el = refValue.$el
+    return el instanceof HTMLElement ? el : null
+  }
 
   function handleMouseDown(e: MouseEvent) {
     isResizing.value = true
@@ -58,7 +68,7 @@ export function useResizePanel(options: ResizePanelOptions) {
       const clamped = Math.max(minWidth, Math.min(maxWidth, newWidth))
 
       width.value = clamped
-      const el = panelRef.value ? ((panelRef.value as any).$el ?? panelRef.value) as HTMLElement : null
+      const el = resolvePanelEl(panelRef.value)
       if (el) {
         el.style.width = `${clamped}px`
       }

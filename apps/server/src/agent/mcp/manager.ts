@@ -1,11 +1,11 @@
 import type { MCPClient } from '@ai-sdk/mcp'
 import type { MCPServerConfig, MCPServerConnectionStatus, MCPServerStatus } from '@univedge/locus-agent-sdk'
-import type { Tool } from 'ai'
+import type { JSONSchema7, Tool } from 'ai'
 import EventEmitter from 'node:events'
 import process from 'node:process'
 import { createMCPClient } from '@ai-sdk/mcp'
 import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio'
-import { tool } from 'ai'
+import { jsonSchema, tool } from 'ai'
 import { getMCPConfig } from './config.js'
 
 const DEFAULT_EXECUTE_TIMEOUT_MS = 60_000
@@ -291,11 +291,11 @@ class MCPManager extends EventEmitter {
         // Ensure input_schema has "type" field — some MCP servers omit it,
         // which causes Anthropic API to reject the request.
         const schema = (t.inputSchema && typeof t.inputSchema === 'object')
-          ? { type: 'object', ...(t.inputSchema as Record<string, unknown>) }
-          : t.inputSchema
+          ? jsonSchema({ type: 'object', ...(t.inputSchema as Record<string, unknown>) } as JSONSchema7)
+          : undefined
         nextTools[toolName] = tool({
           description: t.description ?? '',
-          inputSchema: schema as any,
+          inputSchema: schema ?? jsonSchema({ type: 'object', properties: {} }),
         })
         if (t.execute) {
           entry.executors.set(toolName, t.execute)

@@ -43,13 +43,28 @@ function getEditorApi(): EditorLike {
   return toEditorLike(editor.value)
 }
 
+interface EditorInstanceLike {
+  view?: {
+    state?: {
+      selection?: {
+        $from?: {
+          parent?: {
+            type?: { name?: string }
+            attrs?: { language?: string }
+          }
+        }
+      }
+    }
+  }
+}
+
 // Derive reactive state from editor updates
 const editorState = useEditorDerivedValue((editorInstance) => {
   const api = toEditorLike(editorInstance)
   const codeBlockActive = isActive(api.nodes.codeBlock)
   let codeBlockLanguage = ''
   if (codeBlockActive) {
-    const view = (editorInstance as any)?.view
+    const view = (editorInstance as EditorInstanceLike).view
     const parent = view?.state?.selection?.$from?.parent
     if (parent?.type?.name === 'codeBlock')
       codeBlockLanguage = parent.attrs?.language ?? ''

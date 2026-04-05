@@ -102,13 +102,13 @@ const {
 
     <div class="mt-4 space-y-3">
       <!-- sqlite-vec unavailable -->
-      <div v-if="!embeddingState.vecAvailable && embeddingState.status !== ('loading' as any)" class="alert alert-destructive text-xs">
+      <div v-if="!embeddingState.vecAvailable && embeddingState.status !== 'loading'" class="alert alert-destructive text-xs">
         <div class="i-carbon-warning-alt h-4 w-4 mr-1.5 flex-shrink-0" />
         <span>sqlite-vec 扩展不可用，语义搜索功能已禁用</span>
       </div>
 
       <!-- Loading -->
-      <div v-else-if="embeddingState.status === ('loading' as any)" class="flex-col-center py-4 text-muted-foreground">
+      <div v-else-if="embeddingState.status === 'loading'" class="flex-col-center py-4 text-muted-foreground">
         <div class="i-carbon-circle-dash h-5 w-5 animate-spin opacity-50" />
         <span class="text-xs mt-1.5 opacity-70">加载中...</span>
       </div>

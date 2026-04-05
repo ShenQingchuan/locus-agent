@@ -1,3 +1,4 @@
+import type { ToolCall, ToolResult } from '@univedge/locus-agent-sdk'
 import { generateText } from 'ai'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -236,8 +237,8 @@ conversationsRoutes.post('/:id/messages', async (c) => {
     role,
     content,
     model,
-    toolCalls: toolCalls as any,
-    toolResults: toolResults as any,
+    toolCalls: toolCalls as ToolCall[] | undefined,
+    toolResults: toolResults as ToolResult[] | undefined,
     usage,
   })
 

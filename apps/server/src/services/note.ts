@@ -179,12 +179,11 @@ export async function listNotes(options?: {
     conditions.push(inArray(notes.id, ids))
   }
 
-  let query = db.select().from(notes)
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as any
-  }
+  const query = conditions.length > 0
+    ? db.select().from(notes).where(and(...conditions))
+    : db.select().from(notes)
 
-  const result = await (query as any)
+  const result = await query
     .orderBy(desc(notes.updatedAt))
     .limit(options?.limit ?? 100)
     .offset(options?.offset ?? 0)

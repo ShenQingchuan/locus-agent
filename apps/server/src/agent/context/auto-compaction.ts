@@ -1,5 +1,5 @@
 import type { CompactionResult } from '@univedge/locus-agent-sdk'
-import type { LanguageModel, ModelMessage } from 'ai'
+import type { LanguageModel, ModelMessage, ToolResultPart } from 'ai'
 import {
   COMPACTION_SYSTEM_PROMPT,
   DEFAULT_RECENT_TURNS_TO_KEEP,
@@ -83,11 +83,11 @@ function formatMessageForSummary(msg: ModelMessage): string {
       return `Assistant: ${msg.content}`
     }
     if (Array.isArray(msg.content)) {
-      const textParts = (msg.content as any[])
+      const textParts = msg.content
         .filter(p => p.type === 'text')
         .map(p => p.text)
         .join('')
-      const toolCalls = (msg.content as any[])
+      const toolCalls = msg.content
         .filter(p => p.type === 'tool-call')
         .map(p => `[called ${p.toolName}]`)
         .join(', ')
@@ -97,13 +97,15 @@ function formatMessageForSummary(msg: ModelMessage): string {
   }
   if (msg.role === 'tool') {
     const parts = Array.isArray(msg.content) ? msg.content : []
-    const summaries = (parts as any[]).map((p) => {
-      const value = p.output?.value ?? ''
-      const truncated = typeof value === 'string' && value.length > 500
-        ? `${value.slice(0, 500)}...[truncated]`
-        : value
-      return `Tool(${p.toolName}): ${truncated}`
-    })
+    const summaries = parts
+      .filter((p): p is ToolResultPart & { output: { value?: string } } => p.type === 'tool-result')
+      .map((p) => {
+        const value = p.output.value ?? ''
+        const truncated = typeof value === 'string' && value.length > 500
+          ? `${value.slice(0, 500)}...[truncated]`
+          : value
+        return `Tool(${p.toolName}): ${truncated}`
+      })
     return summaries.join('\n')
   }
   return `${msg.role}: ${JSON.stringify(msg.content)}`

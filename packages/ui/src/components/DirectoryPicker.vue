@@ -60,7 +60,7 @@ async function collectEntries(
 ): Promise<DirectoryPickerEntry[]> {
   const result: DirectoryPickerEntry[] = []
 
-  for await (const [entryName, handle] of (directoryHandle as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+  for await (const [entryName, handle] of (directoryHandle as FileSystemDirectoryHandle).entries() as AsyncIterable<[string, FileSystemHandle]>) {
     const nextRelativePath = relativePath ? `${relativePath}/${entryName}` : entryName
 
     if (handle.kind === 'file') {

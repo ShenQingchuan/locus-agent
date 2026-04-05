@@ -1,6 +1,7 @@
 import type { EditorState, NoteEditorChange } from '@univedge/locus-agent-sdk'
 import type { NodeJSON } from 'prosekit/core'
 import type { HighlightParser } from 'prosekit/extensions/code-block'
+import type { BundledLanguage } from 'shiki'
 import type { ComponentPublicInstance, EmitFn } from 'vue'
 import { defineBasicExtension } from 'prosekit/basic'
 import { createEditor, defineKeymap, defineNodeSpec, definePlugin, isInCodeBlock, Priority, union, unsetBlockType, withPriority } from 'prosekit/core'
@@ -83,7 +84,7 @@ export function useNoteEditor(
       }
 
       const language = normalizeCodeBlockLanguage(options.language || 'text')
-      if (!unsupportedLanguages.has(language) && !knownLoadedLanguages.has(language) && highlighter.getLoadedLanguages().includes(language as any)) {
+      if (!unsupportedLanguages.has(language) && !knownLoadedLanguages.has(language) && highlighter.getLoadedLanguages().includes(language as BundledLanguage)) {
         knownLoadedLanguages.add(language)
       }
 
@@ -93,7 +94,7 @@ export function useNoteEditor(
           return inFlight
         }
 
-        const task = highlighter.loadLanguage(language as any).then(
+        const task = highlighter.loadLanguage(language as BundledLanguage).then(
           () => {
             knownLoadedLanguages.add(language)
           },

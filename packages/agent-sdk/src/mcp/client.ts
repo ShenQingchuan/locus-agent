@@ -8,6 +8,8 @@
  * @module mcp/client
  */
 
+import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js'
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { MCPServerConfig } from '../types/mcp.js'
 import type { ToolDefinition } from '../types/tool.js'
 import process from 'node:process'
@@ -106,7 +108,7 @@ export async function connectMCPServer(
       const { SSEClientTransport } = await import('@modelcontextprotocol/sdk/client/sse.js')
       transport = new SSEClientTransport(
         new URL(config.url),
-        config.headers ? { requestInit: { headers: config.headers } } as any : undefined,
+        config.headers ? { requestInit: { headers: config.headers } } satisfies SSEClientTransportOptions : undefined,
       )
     }
     else if (transportType === 'http') {
@@ -116,7 +118,7 @@ export async function connectMCPServer(
       const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
       transport = new StreamableHTTPClientTransport(
         new URL(config.url),
-        config.headers ? { requestInit: { headers: config.headers } } as any : undefined,
+        config.headers ? { requestInit: { headers: config.headers } } satisfies StreamableHTTPClientTransportOptions : undefined,
       )
     }
     else {
@@ -130,10 +132,10 @@ export async function connectMCPServer(
     await client.connect(transport)
 
     const toolList = await client.listTools()
-    const tools: ToolDefinition[] = (toolList.tools ?? []).map((mcpTool: any) => ({
+    const tools: ToolDefinition[] = (toolList.tools ?? []).map((mcpTool: { name: string, description?: string, inputSchema?: unknown }) => ({
       name: buildMCPToolName(name, mcpTool.name),
       description: mcpTool.description ?? `MCP tool ${mcpTool.name} from ${name}`,
-      parameters: mcpTool.inputSchema ?? { type: 'object', properties: {} },
+      parameters: (mcpTool.inputSchema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
     }))
 
     return {
@@ -146,8 +148,9 @@ export async function connectMCPServer(
           const result = await client.callTool({ name: toolName, arguments: args })
           let content = ''
           if (result.content) {
-            for (const block of result.content as any[]) {
-              content += block.type === 'text' ? block.text : JSON.stringify(block)
+            for (const block of Array.isArray(result.content) ? result.content : []) {
+              const item = block as { type: string, text?: string }
+              content += item.type === 'text' ? item.text : JSON.stringify(item)
             }
           }
           else {

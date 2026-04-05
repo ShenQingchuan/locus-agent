@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BundledLanguage } from 'shiki'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
 import { getCodeBlockDisplayName, getResolvedLang } from '@/utils/codeBlockDisplayName'
 import { getShikiHighlighter } from '@/utils/shiki'
@@ -36,7 +37,7 @@ watchEffect(async () => {
   let lang = targetLang
   if (!hl.getLoadedLanguages().includes(lang)) {
     try {
-      await hl.loadLanguage(lang as any)
+      await hl.loadLanguage(lang as BundledLanguage)
     }
     catch {
       lang = 'text'

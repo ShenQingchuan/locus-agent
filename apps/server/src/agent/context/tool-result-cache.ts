@@ -42,7 +42,7 @@ export function compactToolResults(
   hotTailCount?: number,
   minSizeToCache?: number,
 ): CacheEntry[] {
-  return compactToolResultsCore(messages as any[], {
+  return compactToolResultsCore(messages, {
     hotTailCount,
     minSizeToCache,
     storage: createFsStorage(),

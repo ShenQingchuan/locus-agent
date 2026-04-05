@@ -5,7 +5,8 @@ const API_BASE = '/api/embedding'
 // ==================== Types ====================
 
 export type EmbeddingStatusType
-  = | 'not_configured'
+  = | 'loading'
+    | 'not_configured'
     | 'indexing'
     | 'ready'
     | 'error'

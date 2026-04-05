@@ -16,7 +16,7 @@ export function useSettingsEmbeddingCard(props: UseSettingsEmbeddingCardProps) {
   const toast = useToast()
 
   const embeddingState = ref<EmbeddingStatus>({
-    status: 'loading' as any,
+    status: 'loading' as const,
     indexedCount: 0,
     indexedWith: null,
     vecAvailable: true,
@@ -94,7 +94,7 @@ export function useSettingsEmbeddingCard(props: UseSettingsEmbeddingCardProps) {
 
   const embeddingStatusLabel = computed(() => {
     switch (embeddingState.value.status) {
-      case 'loading' as any: return '加载中...'
+      case 'loading': return '加载中...'
       case 'not_configured': return '未配置'
       case 'indexing': return '索引中...'
       case 'ready': return '已就绪'
