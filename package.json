@@ -16,6 +16,7 @@
     "build": "turbo run build",
     "lint": "eslint .",
     "typecheck": "turbo run typecheck",
+    "test": "vitest run",
     "db:generate": "pnpm -F @univedge/locus-server db:generate",
     "db:migrate": "pnpm -F @univedge/locus-server db:migrate",
     "db:studio": "pnpm -F @univedge/locus-server db:studio",
@@ -28,7 +29,8 @@
     "git-cliff": "catalog:cli-tools",
     "simple-git-hooks": "catalog:dev-tools",
     "turbo": "catalog:dev-tools",
-    "typescript": "catalog:dev-tools"
+    "typescript": "catalog:dev-tools",
+    "vitest": "catalog:dev-tools"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm run typecheck && pnpm run lint"
