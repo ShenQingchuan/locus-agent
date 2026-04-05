@@ -24,6 +24,10 @@ const userScrolledUp = ref(false)
 let isProgrammaticScroll = false
 // Debounce handle for rAF-based auto-scroll
 let scrollRafId: number | null = null
+// Lock auto-scroll for a short duration after user scrolls up to prevent
+// streaming content updates from fighting the user's scroll intent.
+let scrollLockUntil = 0
+const SCROLL_LOCK_DURATION = 300
 
 // Threshold (px) to consider "at bottom"
 const BOTTOM_THRESHOLD = 80
@@ -46,14 +50,25 @@ function onScroll() {
 
   const atBottom = isAtBottom()
   showScrollButton.value = !atBottom
+  const now = Date.now()
 
   if (atBottom) {
-    // User scrolled back to bottom (manually) → re-enable auto-scroll
-    userScrolledUp.value = false
+    // User scrolled back to bottom (manually) → re-enable auto-scroll,
+    // but only if the scroll-lock cooldown has expired.
+    if (now >= scrollLockUntil) {
+      userScrolledUp.value = false
+    }
   }
   else {
-    // User is not at bottom → they scrolled up, respect their intent
+    // User is not at bottom → they scrolled up, respect their intent.
+    // Cancel any pending programmatic scroll and lock auto-scroll briefly
+    // so streaming deltas don't immediately pull the viewport back down.
     userScrolledUp.value = true
+    scrollLockUntil = now + SCROLL_LOCK_DURATION
+    if (scrollRafId !== null) {
+      cancelAnimationFrame(scrollRafId)
+      scrollRafId = null
+    }
   }
 }
 
@@ -113,6 +128,10 @@ watch(
 
     // If user scrolled up, respect it — don't auto-scroll
     if (userScrolledUp.value && !isInitialLoad)
+      return
+
+    // Also respect the scroll-lock cooldown to prevent jitter
+    if (Date.now() < scrollLockUntil && !isInitialLoad)
       return
 
     await nextTick()

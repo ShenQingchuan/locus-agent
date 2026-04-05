@@ -326,7 +326,7 @@ const { copy, copied } = useClipboard()
             <MarkdownRender
               :content="part.content"
               custom-id="locus"
-              :typewriter="isLastTextPart(displayParts, partIdx) && message.isStreaming"
+              :typewriter="false"
               :code-block-stream="isLastTextPart(displayParts, partIdx) && message.isStreaming"
             />
           </div>
