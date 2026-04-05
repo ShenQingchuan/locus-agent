@@ -1,6 +1,6 @@
 # Locus Agent
 
-![NPM Version](https://img.shields.io/npm/v/%40univedge%2Flocus-cli)
+[![NPM Version](https://img.shields.io/npm/v/%40univedge%2Flocus-cli)](https://www.npmjs.com/package/@univedge/locus-cli)
 
 🤖 这就是我想要的 AI 智能助手！
 
