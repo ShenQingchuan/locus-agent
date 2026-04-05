@@ -4,7 +4,7 @@ import { logger } from 'hono/logger'
 import { mcpManager } from './agent/mcp/manager.js'
 import { pluginManager } from './agent/plugins/index.js'
 import { setLLMConfig } from './agent/providers/index.js'
-import { setServerConfig } from './config.js'
+import { config, setServerConfig } from './config.js'
 import { initDB } from './db/index.js'
 import { approvalRoutes } from './routes/approval.js'
 import { chatRoutes } from './routes/chat.js'
@@ -40,7 +40,7 @@ export function createApp(): Hono {
   app.use(
     '*',
     cors({
-      origin: ['http://localhost:5173', 'http://localhost:3000'],
+      origin: config.allowedOrigins,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
