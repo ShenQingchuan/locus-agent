@@ -11,35 +11,22 @@ import type {
   WorkspaceRootsResponse,
   WorkspaceTreeResponse,
 } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 const API_BASE = '/api'
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(error.error || `Request failed: ${res.status}`)
-  }
-
-  return res.json()
-}
-
 export async function fetchWorkspaceRoots(): Promise<WorkspaceRootsResponse> {
-  return request<WorkspaceRootsResponse>('/workspace/roots')
+  return apiClient.get<WorkspaceRootsResponse>(`${API_BASE}/workspace/roots`)
 }
 
 export async function fetchWorkspaceDirectories(path: string): Promise<WorkspaceListResponse> {
   const query = new URLSearchParams({ path })
-  return request<WorkspaceListResponse>(`/workspace/list?${query.toString()}`)
+  return apiClient.get<WorkspaceListResponse>(`${API_BASE}/workspace/list?${query.toString()}`)
 }
 
 export async function openWorkspace(path: string): Promise<WorkspaceTreeResponse> {
   const query = new URLSearchParams({ path })
-  return request<WorkspaceTreeResponse>(`/workspace/tree?${query.toString()}`)
+  return apiClient.get<WorkspaceTreeResponse>(`${API_BASE}/workspace/tree?${query.toString()}`)
 }
 
 export async function fetchMentionSearch(
@@ -52,12 +39,12 @@ export async function fetchMentionSearch(
     params.set('basePath', basePath)
   if (includeHidden)
     params.set('includeHidden', 'true')
-  return request<MentionSearchResponse>(`/workspace/mention-search?${params.toString()}`)
+  return apiClient.get<MentionSearchResponse>(`${API_BASE}/workspace/mention-search?${params.toString()}`)
 }
 
 export async function fetchGitStatus(path: string): Promise<GitStatusResponse> {
   const query = new URLSearchParams({ path })
-  return request<GitStatusResponse>(`/workspace/git/status?${query.toString()}`)
+  return apiClient.get<GitStatusResponse>(`${API_BASE}/workspace/git/status?${query.toString()}`)
 }
 
 export async function fetchGitDiff(path: string, file?: string, staged?: boolean): Promise<GitDiffResponse> {
@@ -66,47 +53,29 @@ export async function fetchGitDiff(path: string, file?: string, staged?: boolean
     params.set('file', file)
   if (staged !== undefined)
     params.set('staged', String(staged))
-  return request<GitDiffResponse>(`/workspace/git/diff?${params.toString()}`)
+  return apiClient.get<GitDiffResponse>(`${API_BASE}/workspace/git/diff?${params.toString()}`)
 }
 
 export async function stageFiles(path: string, filePaths: string[]): Promise<GitStageResponse> {
-  return request<GitStageResponse>('/workspace/git/stage', {
-    method: 'POST',
-    body: JSON.stringify({ path, filePaths }),
-  })
+  return apiClient.post<GitStageResponse>(`${API_BASE}/workspace/git/stage`, { path, filePaths })
 }
 
 export async function unstageFiles(path: string, filePaths: string[]): Promise<GitUnstageResponse> {
-  return request<GitUnstageResponse>('/workspace/git/unstage', {
-    method: 'POST',
-    body: JSON.stringify({ path, filePaths }),
-  })
+  return apiClient.post<GitUnstageResponse>(`${API_BASE}/workspace/git/unstage`, { path, filePaths })
 }
 
 export async function commitChanges(path: string, message: string, filePaths: string[] = []): Promise<GitCommitResponse> {
-  return request<GitCommitResponse>('/workspace/git/commit', {
-    method: 'POST',
-    body: JSON.stringify({ path, message, filePaths }),
-  })
+  return apiClient.post<GitCommitResponse>(`${API_BASE}/workspace/git/commit`, { path, message, filePaths })
 }
 
 export async function discardChanges(path: string, filePaths: string[] = []): Promise<GitDiscardResponse> {
-  return request<GitDiscardResponse>('/workspace/git/discard', {
-    method: 'POST',
-    body: JSON.stringify({ path, filePaths }),
-  })
+  return apiClient.post<GitDiscardResponse>(`${API_BASE}/workspace/git/discard`, { path, filePaths })
 }
 
 export async function pushChanges(path: string): Promise<GitPushResponse> {
-  return request<GitPushResponse>('/workspace/git/push', {
-    method: 'POST',
-    body: JSON.stringify({ path }),
-  })
+  return apiClient.post<GitPushResponse>(`${API_BASE}/workspace/git/push`, { path })
 }
 
 export async function suggestCommitMessage(path: string): Promise<{ message: string }> {
-  return request<{ message: string }>('/workspace/git/suggest-commit-message', {
-    method: 'POST',
-    body: JSON.stringify({ path }),
-  })
+  return apiClient.post<{ message: string }>(`${API_BASE}/workspace/git/suggest-commit-message`, { path })
 }

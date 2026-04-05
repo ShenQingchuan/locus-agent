@@ -1,6 +1,7 @@
 import type { AddToWhitelistPayload } from '@univedge/locus-agent-sdk'
 import type { ChatStreamOptions, ConversationPlansResponse, QuestionAnswer } from './chat-types.js'
 import { consumeSSEStream } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 export type { ChatStreamOptions, ConversationPlansResponse, PendingApproval, PendingQuestion, QuestionAnswer } from './chat-types.js'
 export type { DelegateDeltaEvent } from './chat-types.js'
@@ -83,16 +84,9 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
 
 export async function fetchConversationPlans(conversationId: string): Promise<ConversationPlansResponse | null> {
   try {
-    const response = await fetch(`/api/chat/plans/${conversationId}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!response.ok)
-      return null
-    return await response.json() as ConversationPlansResponse
+    return await apiClient.get<ConversationPlansResponse>(`/api/chat/plans/${conversationId}`)
   }
-  catch (error) {
-    console.error('Failed to fetch conversation plans:', error)
+  catch {
     return null
   }
 }
@@ -105,14 +99,10 @@ export async function abortChat(conversationId: string): Promise<void> {
   }
 
   try {
-    await fetch(`/api/chat/abort`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId }),
-    })
+    await apiClient.post('/api/chat/abort', { conversationId })
   }
-  catch (error) {
-    console.error('Failed to abort chat on server:', error)
+  catch {
+    // ignore
   }
 }
 
@@ -124,28 +114,16 @@ export async function approveToolCall(
   addToWhitelist?: AddToWhitelistPayload,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/chat/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        conversationId,
-        toolCallId,
-        approved,
-        switchToYolo,
-        addToWhitelist,
-      }),
+    const result = await apiClient.post<{ success: boolean }>('/api/chat/approve', {
+      conversationId,
+      toolCallId,
+      approved,
+      switchToYolo,
+      addToWhitelist,
     })
-
-    if (!response.ok) {
-      console.error('Failed to approve tool call:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
     return result.success
   }
-  catch (error) {
-    console.error('Failed to approve tool call:', error)
+  catch {
     return false
   }
 }
@@ -155,22 +133,10 @@ export async function answerQuestion(
   answers: QuestionAnswer[],
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/chat/answer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ toolCallId, answers }),
-    })
-
-    if (!response.ok) {
-      console.error('Failed to answer question:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
+    const result = await apiClient.post<{ success: boolean }>('/api/chat/answer', { toolCallId, answers })
     return result.success
   }
-  catch (error) {
-    console.error('Failed to answer question:', error)
+  catch {
     return false
   }
 }

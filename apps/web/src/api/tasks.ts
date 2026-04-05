@@ -5,60 +5,37 @@ import type {
   Task,
   UpdateTaskInput,
 } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 const API_BASE = '/api'
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(error.error || `Request failed: ${res.status}`)
-  }
-  return res.json()
-}
-
 export async function fetchTasks(projectKey: string): Promise<Task[]> {
-  const { tasks } = await request<ListTasksResponse>(
-    `/tasks?projectKey=${encodeURIComponent(projectKey)}`,
+  const { tasks } = await apiClient.get<ListTasksResponse>(
+    `${API_BASE}/tasks?projectKey=${encodeURIComponent(projectKey)}`,
   )
   return tasks
 }
 
 export async function fetchTask(id: string): Promise<{ task: Task, conversationIds: string[] }> {
-  return request(`/tasks/${id}`)
+  return apiClient.get(`${API_BASE}/tasks/${id}`)
 }
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
-  return request<Task>('/tasks', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+  return apiClient.post<Task>(`${API_BASE}/tasks`, input)
 }
 
 export async function updateTask(id: string, input: UpdateTaskInput): Promise<Task> {
-  return request<Task>(`/tasks/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  })
+  return apiClient.patch<Task>(`${API_BASE}/tasks/${id}`, input)
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await request(`/tasks/${id}`, { method: 'DELETE' })
+  await apiClient.del(`${API_BASE}/tasks/${id}`)
 }
 
 export async function reorderTask(id: string, input: ReorderTaskInput): Promise<Task> {
-  return request<Task>(`/tasks/${id}/reorder`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+  return apiClient.post<Task>(`${API_BASE}/tasks/${id}/reorder`, input)
 }
 
 export async function linkTaskConversation(taskId: string, conversationId: string): Promise<void> {
-  await request(`/tasks/${taskId}/link-conversation`, {
-    method: 'POST',
-    body: JSON.stringify({ conversationId }),
-  })
+  await apiClient.post(`${API_BASE}/tasks/${taskId}/link-conversation`, { conversationId })
 }

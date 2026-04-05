@@ -1,3 +1,5 @@
+import { apiClient } from './client.js'
+
 const API_BASE = '/api/embedding'
 
 // ==================== Types ====================
@@ -56,21 +58,6 @@ export interface ModelFileProgress {
 
 // ==================== Helpers ====================
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || body.message || `Request failed: ${res.status}`)
-  }
-  return res.json()
-}
-
 function consumeSSE(
   url: string,
   method: 'POST' | 'GET',
@@ -127,23 +114,17 @@ function consumeSSE(
 // ==================== Status ====================
 
 export function fetchEmbeddingStatus(): Promise<EmbeddingStatus> {
-  return request<EmbeddingStatus>('/status')
+  return apiClient.get<EmbeddingStatus>(`${API_BASE}/status`)
 }
 
 // ==================== Provider ====================
 
 export function setEmbeddingProvider(provider: EmbeddingProvider): Promise<EmbeddingStatus & { success: boolean }> {
-  return request<EmbeddingStatus & { success: boolean }>('/provider', {
-    method: 'POST',
-    body: JSON.stringify({ provider }),
-  })
+  return apiClient.post<EmbeddingStatus & { success: boolean }>(`${API_BASE}/provider`, { provider })
 }
 
 export function setLocalEmbeddingFamily(family: EmbeddingLocalFamily): Promise<EmbeddingStatus & { success: boolean }> {
-  return request<EmbeddingStatus & { success: boolean }>('/local-family', {
-    method: 'POST',
-    body: JSON.stringify({ family }),
-  })
+  return apiClient.post<EmbeddingStatus & { success: boolean }>(`${API_BASE}/local-family`, { family })
 }
 
 // ==================== Model management ====================
@@ -153,7 +134,7 @@ export function fetchModelStatus(): Promise<{
   downloading: boolean
   files: { name: string, size: number }[]
 }> {
-  return request('/model/status')
+  return apiClient.get(`${API_BASE}/model/status`)
 }
 
 export function startModelDownload(
@@ -169,7 +150,7 @@ export function startModelDownload(
 }
 
 export function deleteModel(): Promise<{ success: boolean }> {
-  return request('/model', { method: 'DELETE' })
+  return apiClient.del(`${API_BASE}/model`)
 }
 
 // ==================== Reindex ====================
@@ -189,7 +170,7 @@ export function startReindex(
 // ==================== ONNX runtime deps ====================
 
 export function fetchRuntimeStatus(): Promise<{ installed: boolean }> {
-  return request('/runtime/status')
+  return apiClient.get(`${API_BASE}/runtime/status`)
 }
 
 export function startRuntimeInstall(
@@ -205,11 +186,11 @@ export function startRuntimeInstall(
 }
 
 export function uninstallRuntime(): Promise<{ success: boolean }> {
-  return request('/runtime', { method: 'DELETE' })
+  return apiClient.del(`${API_BASE}/runtime`)
 }
 
 // ==================== Error ====================
 
 export function clearEmbeddingError(): Promise<EmbeddingStatus & { success: boolean }> {
-  return request<EmbeddingStatus & { success: boolean }>('/clear-error', { method: 'POST' })
+  return apiClient.post<EmbeddingStatus & { success: boolean }>(`${API_BASE}/clear-error`)
 }

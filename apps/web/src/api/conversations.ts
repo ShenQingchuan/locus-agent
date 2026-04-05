@@ -1,4 +1,5 @@
 import type { Conversation, ListConversationsResponse, Message } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 export async function fetchConversations(scope?: {
   space?: 'chat' | 'coding'
@@ -14,23 +15,10 @@ export async function fetchConversations(scope?: {
     const query = params.toString()
     const url = query ? `/api/conversations?${query}` : '/api/conversations'
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch conversations:', response.statusText)
-      return []
-    }
-
-    const data: ListConversationsResponse = await response.json()
+    const data = await apiClient.get<ListConversationsResponse>(url)
     return data.conversations
   }
-  catch (error) {
-    console.error('Failed to fetch conversations:', error)
+  catch {
     return []
   }
 }
@@ -39,27 +27,16 @@ export async function fetchConversation(
   conversationId: string,
 ): Promise<{ conversation: Conversation, messages: Message[] } | null> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch conversation:', response.statusText)
-      return null
-    }
-
-    const data = await response.json()
-    const { messages: msgs, ...conversation } = data
+    const data = await apiClient.get<{
+      conversation: Conversation
+      messages: Message[]
+    }>(`/api/conversations/${conversationId}`)
     return {
-      conversation: conversation as Conversation,
-      messages: msgs as Message[],
+      conversation: data.conversation,
+      messages: data.messages,
     }
   }
-  catch (error) {
-    console.error('Failed to fetch conversation:', error)
+  catch {
     return null
   }
 }
@@ -70,28 +47,16 @@ export async function createConversation(options?: {
   projectKey?: string
 }): Promise<Conversation | null> {
   try {
-    const response = await fetch(`/api/conversations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title: options?.title,
-        space: options?.space,
-        projectKey: options?.projectKey,
-      }),
+    const data = await apiClient.post<{
+      conversation: Conversation
+    }>('/api/conversations', {
+      title: options?.title,
+      space: options?.space,
+      projectKey: options?.projectKey,
     })
-
-    if (!response.ok) {
-      console.error('Failed to create conversation:', response.statusText)
-      return null
-    }
-
-    const data = await response.json()
     return data.conversation
   }
-  catch (error) {
-    console.error('Failed to create conversation:', error)
+  catch {
     return null
   }
 }
@@ -101,27 +66,13 @@ export async function truncateMessages(
   keepCount: number,
 ): Promise<boolean> {
   try {
-    const response = await fetch(
+    const result = await apiClient.post<{ success: boolean }>(
       `/api/conversations/${conversationId}/truncate`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ keepCount }),
-      },
+      { keepCount },
     )
-
-    if (!response.ok) {
-      console.error('Failed to truncate messages:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
     return result.success
   }
-  catch (error) {
-    console.error('Failed to truncate messages:', error)
+  catch {
     return false
   }
 }
@@ -131,69 +82,29 @@ export async function updateConversation(
   data: { title?: string, confirmMode?: boolean },
 ): Promise<Conversation | null> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    })
-
-    if (!response.ok) {
-      console.error('Failed to update conversation:', response.statusText)
-      return null
-    }
-
-    return await response.json()
+    return await apiClient.patch<Conversation>(`/api/conversations/${conversationId}`, data)
   }
-  catch (error) {
-    console.error('Failed to update conversation:', error)
+  catch {
     return null
   }
 }
 
 export async function generateConversationTitle(conversationId: string): Promise<string | null> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}/generate-title`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to generate title:', response.statusText)
-      return null
-    }
-
-    const data = await response.json()
+    const data = await apiClient.post<{ title?: string }>(`/api/conversations/${conversationId}/generate-title`)
     return data.title ?? null
   }
-  catch (error) {
-    console.error('Failed to generate title:', error)
+  catch {
     return null
   }
 }
 
 export async function deleteConversation(conversationId: string): Promise<boolean> {
   try {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to delete conversation:', response.statusText)
-      return false
-    }
-
-    const result = await response.json()
+    const result = await apiClient.del<{ success: boolean }>(`/api/conversations/${conversationId}`)
     return result.success
   }
-  catch (error) {
-    console.error('Failed to delete conversation:', error)
+  catch {
     return false
   }
 }

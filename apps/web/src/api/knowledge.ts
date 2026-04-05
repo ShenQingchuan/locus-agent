@@ -13,20 +13,9 @@ import type {
   UpdateFolderInput,
   UpdateNoteInput,
 } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 const API_BASE = '/api'
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(error.error || `Request failed: ${res.status}`)
-  }
-  return res.json()
-}
 
 // ==================== Notes ====================
 
@@ -51,95 +40,74 @@ export async function fetchNotes(params?: {
     searchParams.set('offset', String(params.offset))
 
   const query = searchParams.toString()
-  const { notes } = await request<ListNotesResponse>(`/notes${query ? `?${query}` : ''}`)
+  const { notes } = await apiClient.get<ListNotesResponse>(`${API_BASE}/notes${query ? `?${query}` : ''}`)
   return notes
 }
 
 export async function fetchNote(id: string): Promise<NoteWithTags> {
-  return request<NoteWithTags>(`/notes/${id}`)
+  return apiClient.get<NoteWithTags>(`${API_BASE}/notes/${id}`)
 }
 
 export async function createNote(input: CreateNoteInput): Promise<NoteWithTags> {
-  return request<NoteWithTags>('/notes', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+  return apiClient.post<NoteWithTags>(`${API_BASE}/notes`, input)
 }
 
 export async function updateNote(id: string, input: UpdateNoteInput): Promise<NoteWithTags> {
-  return request<NoteWithTags>(`/notes/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  })
+  return apiClient.patch<NoteWithTags>(`${API_BASE}/notes/${id}`, input)
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  await request(`/notes/${id}`, { method: 'DELETE' })
+  await apiClient.del(`${API_BASE}/notes/${id}`)
 }
 
 export async function searchNotes(query: string): Promise<NoteWithTags[]> {
-  const { notes } = await request<SearchNotesResponse>(`/notes/search?q=${encodeURIComponent(query)}`)
+  const { notes } = await apiClient.get<SearchNotesResponse>(`${API_BASE}/notes/search?q=${encodeURIComponent(query)}`)
   return notes
 }
 
 export async function searchByTags(tagNames: string[]): Promise<NoteWithTags[]> {
-  const { notes } = await request<SearchNotesResponse>('/notes/search-by-tags', {
-    method: 'POST',
-    body: JSON.stringify({ tags: tagNames }),
-  })
+  const { notes } = await apiClient.post<SearchNotesResponse>(`${API_BASE}/notes/search-by-tags`, { tags: tagNames })
   return notes
 }
 
 export async function fetchMemoryStats(): Promise<MemoryStats> {
-  return request<MemoryStats>('/notes/stats')
+  return apiClient.get<MemoryStats>(`${API_BASE}/notes/stats`)
 }
 
 // ==================== Folders ====================
 
 export async function fetchFolders(): Promise<Folder[]> {
-  const { folders } = await request<ListFoldersResponse>('/folders')
+  const { folders } = await apiClient.get<ListFoldersResponse>(`${API_BASE}/folders`)
   return folders
 }
 
 export async function createFolder(input: CreateFolderInput): Promise<Folder> {
-  return request<Folder>('/folders', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+  return apiClient.post<Folder>(`${API_BASE}/folders`, input)
 }
 
 export async function updateFolder(id: string, input: UpdateFolderInput): Promise<Folder> {
-  return request<Folder>(`/folders/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  })
+  return apiClient.patch<Folder>(`${API_BASE}/folders/${id}`, input)
 }
 
 export async function deleteFolder(id: string): Promise<void> {
-  await request(`/folders/${id}`, { method: 'DELETE' })
+  await apiClient.del(`${API_BASE}/folders/${id}`)
 }
 
 // ==================== Tags ====================
 
 export async function fetchTags(): Promise<TagWithCount[]> {
-  const { tags } = await request<ListTagsResponse>('/tags')
+  const { tags } = await apiClient.get<ListTagsResponse>(`${API_BASE}/tags`)
   return tags
 }
 
 export async function createTag(name: string) {
-  return request<Tag>('/tags', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  })
+  return apiClient.post<Tag>(`${API_BASE}/tags`, { name })
 }
 
 export async function renameTag(id: string, name: string): Promise<void> {
-  await request(`/tags/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ name }),
-  })
+  await apiClient.patch(`${API_BASE}/tags/${id}`, { name })
 }
 
 export async function deleteTag(id: string): Promise<void> {
-  await request(`/tags/${id}`, { method: 'DELETE' })
+  await apiClient.del(`${API_BASE}/tags/${id}`)
 }

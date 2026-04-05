@@ -1,4 +1,5 @@
 import type { MCPServersConfig, MCPServerStatus } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 export interface MCPStatusChangeEvent {
   name: string
@@ -10,13 +11,9 @@ export interface MCPStatusChangeEvent {
 
 export async function fetchMCPConfig(): Promise<MCPServersConfig | null> {
   try {
-    const response = await fetch('/api/mcp/config')
-    if (!response.ok)
-      return null
-    return await response.json()
+    return await apiClient.get<MCPServersConfig>('/api/mcp/config')
   }
-  catch (error) {
-    console.error('Failed to fetch MCP config:', error)
+  catch {
     return null
   }
 }
@@ -25,16 +22,15 @@ export async function updateMCPConfig(
   config: MCPServersConfig,
 ): Promise<{ success: boolean, message?: string, status?: MCPServerStatus[] }> {
   try {
-    const response = await fetch('/api/mcp/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    })
-    const json = await response.json().catch(() => null) as { success?: boolean, message?: string, status?: MCPServerStatus[] } | null
-    if (!response.ok || json?.success === false) {
-      return { success: false, message: json?.message || 'Failed to update MCP config' }
+    const json = await apiClient.put<{
+      success?: boolean
+      message?: string
+      status?: MCPServerStatus[]
+    }>('/api/mcp/config', config)
+    if (json.success === false) {
+      return { success: false, message: json.message || 'Failed to update MCP config' }
     }
-    return { success: true, status: json?.status }
+    return { success: true, status: json.status }
   }
   catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
@@ -43,13 +39,9 @@ export async function updateMCPConfig(
 
 export async function fetchMCPStatus(): Promise<MCPServerStatus[]> {
   try {
-    const response = await fetch('/api/mcp/status')
-    if (!response.ok)
-      return []
-    return await response.json()
+    return await apiClient.get<MCPServerStatus[]>('/api/mcp/status')
   }
-  catch (error) {
-    console.error('Failed to fetch MCP status:', error)
+  catch {
     return []
   }
 }
@@ -57,16 +49,12 @@ export async function fetchMCPStatus(): Promise<MCPServerStatus[]> {
 export async function fetchMCPLogs(limit = 1000): Promise<string[]> {
   try {
     const safeLimit = Math.max(1, Math.min(limit, 1000))
-    const response = await fetch(`/api/mcp/logs?limit=${safeLimit}`)
-    if (!response.ok)
-      return []
-    const json = await response.json().catch(() => null) as { lines?: string[] } | null
-    if (!json?.lines || !Array.isArray(json.lines))
+    const json = await apiClient.get<{ lines?: string[] }>(`/api/mcp/logs?limit=${safeLimit}`)
+    if (!json.lines || !Array.isArray(json.lines))
       return []
     return json.lines
   }
-  catch (error) {
-    console.error('Failed to fetch MCP logs:', error)
+  catch {
     return []
   }
 }
@@ -76,12 +64,15 @@ export async function restartMCPServer(
 ): Promise<{ success: boolean, message?: string, status?: MCPServerStatus[] }> {
   try {
     const url = name ? `/api/mcp/restart/${encodeURIComponent(name)}` : '/api/mcp/restart'
-    const response = await fetch(url, { method: 'POST' })
-    const json = await response.json().catch(() => null) as { success?: boolean, message?: string, status?: MCPServerStatus[] } | null
-    if (!response.ok || json?.success === false) {
-      return { success: false, message: json?.message || 'Failed to restart MCP server' }
+    const json = await apiClient.post<{
+      success?: boolean
+      message?: string
+      status?: MCPServerStatus[]
+    }>(url)
+    if (json.success === false) {
+      return { success: false, message: json.message || 'Failed to restart MCP server' }
     }
-    return { success: true, status: json?.status }
+    return { success: true, status: json.status }
   }
   catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }

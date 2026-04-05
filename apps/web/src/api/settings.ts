@@ -1,4 +1,5 @@
 import type { CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
+import { apiClient } from './client.js'
 
 export interface SettingsConfigResponse {
   setupCompleted: boolean
@@ -35,44 +36,22 @@ export async function fetchSettings(): Promise<{
   contextWindow: number
 } | null> {
   try {
-    const response = await fetch(`/api/settings`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch settings:', response.statusText)
-      return null
-    }
-
-    return await response.json()
+    return await apiClient.get<{
+      provider: string
+      model: string
+      contextWindow: number
+    }>('/api/settings')
   }
-  catch (error) {
-    console.error('Failed to fetch settings:', error)
+  catch {
     return null
   }
 }
 
 export async function fetchSettingsConfig(): Promise<SettingsConfigResponse | null> {
   try {
-    const response = await fetch(`/api/settings/config`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch settings config:', response.statusText)
-      return null
-    }
-
-    return await response.json()
+    return await apiClient.get<SettingsConfigResponse>('/api/settings/config')
   }
-  catch (error) {
-    console.error('Failed to fetch settings config:', error)
+  catch {
     return null
   }
 }
@@ -86,41 +65,24 @@ export async function updateSettingsConfig(
   config?: SettingsConfigResponse
 }> {
   try {
-    const response = await fetch(`/api/settings/config`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    })
-
-    const json = await response.json().catch(() => null) as {
+    const json = await apiClient.put<{
       success?: boolean
       message?: string
       requiresRestart?: boolean
       config?: SettingsConfigResponse
-    } | null
+    }>('/api/settings/config', data)
 
-    if (!response.ok) {
-      const msg = json?.message || response.statusText || 'Request failed'
-      const friendly = response.status >= 500 ? '服务器内部错误，请稍后重试' : msg
+    if (json.success === false) {
       return {
         success: false,
-        message: friendly,
-      }
-    }
-
-    if (json?.success === false) {
-      return {
-        success: false,
-        message: json?.message || '保存失败',
+        message: json.message || '保存失败',
       }
     }
 
     return {
       success: true,
-      requiresRestart: !!json?.requiresRestart,
-      config: json?.config,
+      requiresRestart: !!json.requiresRestart,
+      config: json.config,
     }
   }
   catch (error) {
@@ -141,20 +103,15 @@ export async function updateKimiCodeSettings(data: {
   model?: string
 }): Promise<{ success: boolean, message?: string, config?: SettingsConfigResponse }> {
   try {
-    const res = await fetch('/api/settings/coding/kimi', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const json = await res.json().catch(() => null) as {
+    const json = await apiClient.put<{
       success?: boolean
       message?: string
       config?: SettingsConfigResponse
-    } | null
-    if (!res.ok || json?.success === false) {
-      return { success: false, message: json?.message || 'Failed to save Kimi Code settings' }
+    }>('/api/settings/coding/kimi', data)
+    if (json.success === false) {
+      return { success: false, message: json.message || 'Failed to save Kimi Code settings' }
     }
-    return { success: true, config: json?.config }
+    return { success: true, config: json.config }
   }
   catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
