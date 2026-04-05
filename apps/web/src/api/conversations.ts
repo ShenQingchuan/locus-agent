@@ -27,13 +27,13 @@ export async function fetchConversation(
   conversationId: string,
 ): Promise<{ conversation: Conversation, messages: Message[] } | null> {
   try {
-    const data = await apiClient.get<{
-      conversation: Conversation
-      messages: Message[]
-    }>(`/api/conversations/${conversationId}`)
+    const data = await apiClient.get<Conversation & { messages: Message[] }>(
+      `/api/conversations/${conversationId}`,
+    )
+    const { messages: msgs, ...conversation } = data
     return {
-      conversation: data.conversation,
-      messages: data.messages,
+      conversation,
+      messages: msgs,
     }
   }
   catch {
