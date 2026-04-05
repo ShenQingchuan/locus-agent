@@ -76,49 +76,6 @@ const {
 <template>
   <div class="w-full max-w-3xl mx-auto">
     <div
-      v-if="chatStore.todoTasks.length > 0"
-      class="mb-2 overflow-hidden rounded-md border border-border bg-background"
-    >
-      <div class="flex items-center justify-between border-b border-border px-2.5 py-1.5">
-        <div class="flex items-center gap-2 text-sm text-foreground">
-          <div class="i-octicon:tasklist-16 h-4 w-4 text-foreground/70" />
-          <span class="font-medium">当前待办</span>
-          <span class="text-xs text-muted-foreground">{{ chatStore.todoTasks.length }} 项</span>
-        </div>
-        <div class="flex items-center gap-1.5 text-xs">
-          <span class="text-muted-foreground">
-            已完成 {{ chatStore.completedTodoCount }}
-          </span>
-          <span class="text-muted-foreground">
-            进行中 {{ chatStore.inProgressTodoCount }}
-          </span>
-        </div>
-      </div>
-
-      <div class="max-h-36 overflow-y-auto px-1.5 py-1.5">
-        <div
-          v-for="task in chatStore.todoTasks"
-          :key="task.id"
-          class="mb-0.5 flex items-center gap-1.5 rounded px-1.5 py-1 last:mb-0 hover:bg-muted/50"
-        >
-          <div
-            class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
-            :class="task.status === 'completed' ? 'i-lets-icons:done-ring-round' : 'i-icon-park-outline:hourglass-full'"
-          />
-          <span
-            class="flex-1 text-[13px] leading-5"
-            :class="task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'"
-          >
-            {{ task.content }}
-          </span>
-          <span class="text-[11px] text-muted-foreground inline-flex items-center gap-0.5">
-            {{ task.status === 'completed' ? '已完成' : '进行中' }}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <div
       class="relative flex flex-col rounded border border-border bg-muted/30 transition-colors duration-150 focus-within:border-border/80 focus-within:bg-muted/50"
     >
       <!-- Queue panel: shows pending messages above the editor -->

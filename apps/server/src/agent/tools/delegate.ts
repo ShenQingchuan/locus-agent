@@ -86,7 +86,8 @@ IMPORTANT:
   }),
 })
 
-const SUB_AGENT_TOOL_TIMEOUT_MS = 60_000
+const SUB_AGENT_TOOL_TIMEOUT_MS = 90_000
+const DELEGATE_TOTAL_TIMEOUT_MS = 240_000
 
 function buildSubAgentMessages(args: DelegateArgs): ModelMessage[] {
   const content = [`## Task\n${args.task}`]
@@ -166,26 +167,45 @@ export async function executeDelegate(
   }
 
   try {
-    const result: AgentLoopResult = await runAgentLoop({
-      messages: [...session.messages],
-      systemPrompt: session.systemPrompt,
-      model: config.model as LanguageModel ?? defaultModel,
-      maxIterations: config.maxIterations ?? 10,
-      thinkingMode: config.thinkingMode ?? true,
-      space: callbacks?.space,
-      codingMode: callbacks?.codingMode,
-      conversationId: callbacks?.conversationId,
-      projectKey: callbacks?.projectKey,
-      workspaceRoot: callbacks?.workspaceRoot,
-      toolTimeoutMs: SUB_AGENT_TOOL_TIMEOUT_MS,
-      toolAllowlist: config.tools,
-      onTextDelta: callbacks?.onTextDelta,
-      onReasoningDelta: callbacks?.onReasoningDelta,
-      onToolCallStart: callbacks?.onToolCallStart ?? ((_id, name, _args) => {
-        console.warn(`[SubAgent:${config.name}] Tool: ${name}`)
-      }),
-      onToolCallResult: callbacks?.onToolCallResult,
-    })
+    const abortController = new AbortController()
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+    const result: AgentLoopResult = await (async () => {
+      try {
+        return await Promise.race([
+          runAgentLoop({
+            messages: [...session.messages],
+            systemPrompt: session.systemPrompt,
+            model: config.model as LanguageModel ?? defaultModel,
+            maxIterations: config.maxIterations ?? 10,
+            thinkingMode: config.thinkingMode ?? true,
+            space: callbacks?.space,
+            codingMode: callbacks?.codingMode,
+            conversationId: callbacks?.conversationId,
+            projectKey: callbacks?.projectKey,
+            workspaceRoot: callbacks?.workspaceRoot,
+            abortSignal: abortController.signal,
+            toolTimeoutMs: SUB_AGENT_TOOL_TIMEOUT_MS,
+            toolAllowlist: config.tools,
+            onTextDelta: callbacks?.onTextDelta,
+            onReasoningDelta: callbacks?.onReasoningDelta,
+            onToolCallStart: callbacks?.onToolCallStart ?? ((_id, name, _args) => {
+              console.warn(`[SubAgent:${config.name}] Tool: ${name}`)
+            }),
+            onToolCallResult: callbacks?.onToolCallResult,
+          }),
+          new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              abortController.abort()
+              reject(new Error(`Delegate "${config.name}" timed out after ${DELEGATE_TOTAL_TIMEOUT_MS}ms`))
+            }, DELEGATE_TOTAL_TIMEOUT_MS)
+          }),
+        ])
+      }
+      finally {
+        if (timeoutHandle)
+          clearTimeout(timeoutHandle)
+      }
+    })()
 
     session.messages = result.messages
     session.updatedAt = Date.now()

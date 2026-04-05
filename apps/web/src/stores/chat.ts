@@ -1,4 +1,5 @@
 import type { Conversation, MessageImageAttachment } from '@univedge/locus-agent-sdk'
+import type { ActiveDelegate } from '@/composables/assistant-runtime/types'
 import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -157,9 +158,53 @@ export const useChatStore = defineStore('chat', () => {
   const completedTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'completed').length)
   const inProgressTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'in_progress').length)
 
+  /**
+   * Delegates from the most recent assistant message that contains any delegate tool calls.
+   * Derived from messages — no separate state needed. Resets naturally when a new turn
+   * starts and the latest assistant message no longer contains delegates.
+   */
+  const activeDelegates = computed<ActiveDelegate[]>(() => {
+    const msgs = messages.value
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const msg = msgs[i]
+      if (msg?.role !== 'assistant' || !msg.toolCalls?.length)
+        continue
+      const delegates = msg.toolCalls.filter(tc => tc.toolCall.toolName === 'delegate')
+      if (delegates.length === 0)
+        break // latest assistant message has no delegates — stop looking
+      return delegates.map((tc): ActiveDelegate => ({
+        toolCallId: tc.toolCall.toolCallId,
+        agentName: String(tc.toolCall.args?.agent_name ?? tc.toolCall.args?.agent_type ?? '子代理'),
+        agentType: String(tc.toolCall.args?.agent_type ?? 'custom'),
+        task: String(tc.toolCall.args?.task ?? ''),
+        status: tc.status === 'completed'
+          ? 'completed'
+          : (tc.status === 'error' || tc.status === 'interrupted')
+              ? 'error'
+              : 'pending',
+      }))
+    }
+    return []
+  })
+
   const currentConversation = computed(() =>
     conversations.value.find(c => c.id === currentConversationId.value),
   )
+
+  /**
+   * toolCallId of the delegate card that the user wants to scroll into view.
+   * MessageList (or any consumer) can watch this ref and perform the scroll.
+   * Reset to null after consumption.
+   */
+  const pendingJumpToolCallId = ref<string | null>(null)
+
+  function jumpToDelegate(toolCallId: string) {
+    pendingJumpToolCallId.value = toolCallId
+  }
+
+  function clearJumpTarget() {
+    pendingJumpToolCallId.value = null
+  }
 
   // Incremented when newConversation is called; ChatInput watches this to focus the prompt input
   const focusInputTrigger = ref(0)
@@ -423,6 +468,10 @@ export const useChatStore = defineStore('chat', () => {
     queuedMessageCount,
     completedTodoCount,
     inProgressTodoCount,
+    activeDelegates,
+    pendingJumpToolCallId,
+    jumpToDelegate,
+    clearJumpTarget,
     currentConversation,
     contextTokensUsed,
     contextUsagePercentage,

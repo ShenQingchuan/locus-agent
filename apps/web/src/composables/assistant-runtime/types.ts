@@ -52,6 +52,14 @@ export interface Message {
 
 export type { TodoTask } from '@/utils/parsers'
 
+export interface ActiveDelegate {
+  toolCallId: string
+  agentName: string
+  agentType: string
+  task: string
+  status: 'pending' | 'completed' | 'error'
+}
+
 export type AssistantError = { code: string, message: string } | null
 
 export interface ConversationRuntimeState {

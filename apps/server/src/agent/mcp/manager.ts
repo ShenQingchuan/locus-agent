@@ -84,6 +84,26 @@ class MCPManager extends EventEmitter {
     await this.initialize()
   }
 
+  /**
+   * Fire-and-forget: kick off reconnects for all servers that are currently
+   * sleeping (disconnected) or in error state, without blocking the caller.
+   * Servers already connected or in the middle of connecting are skipped.
+   * The connectServer() dedup logic ensures a single in-flight connect per server.
+   */
+  reconnectDisconnected(): void {
+    for (const [name, entry] of this.servers.entries()) {
+      if (entry.disabled || entry.status === 'connected' || entry.status === 'connecting')
+        continue
+      const config = this.serverConfigs.get(name)
+      if (!config || config.disabled)
+        continue
+      this.logServer('info', name, 'proactive reconnect triggered (was sleeping/error)')
+      this.connectServer(name, config).catch((err) => {
+        this.logServer('warn', name, `proactive reconnect failed: ${this.formatErrorMessage(err)}`)
+      })
+    }
+  }
+
   async restartServer(name: string): Promise<void> {
     await this.disconnectServer(name, { preserveEntry: true, reason: 'manual-restart' })
 

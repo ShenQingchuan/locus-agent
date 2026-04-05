@@ -15,7 +15,12 @@ import { parseManageTodosResult } from '@/utils/parsers'
 
 export function reconstructToolCallStates(
   toolCalls: ToolCall[],
-  nextMessage: ApiMessage | undefined,
+  /**
+   * All consecutive tool messages that follow the assistant message.
+   * Parallel tool calls produce one tool message each, so we must
+   * scan all of them to pair every tool-call with its result.
+   */
+  toolMessages: ApiMessage[],
 ): { toolCallStates: ToolCallState[], parts: MessagePart[], todos: TodoTask[] } {
   const parts: MessagePart[] = []
   let todos: TodoTask[] = []
@@ -25,8 +30,10 @@ export function reconstructToolCallStates(
     return { toolCall: tc, status: 'completed' as const }
   })
 
-  if (nextMessage && nextMessage.role === 'tool' && nextMessage.toolResults) {
-    for (const toolResult of nextMessage.toolResults) {
+  for (const toolMsg of toolMessages) {
+    if (toolMsg.role !== 'tool' || !toolMsg.toolResults)
+      continue
+    for (const toolResult of toolMsg.toolResults) {
       const toolCallIndex = toolCallStates.findIndex(
         tc => tc.toolCall.toolCallId === toolResult.toolCallId,
       )
@@ -56,7 +63,7 @@ export function reconstructToolCallStates(
 
 export function convertApiMessageToUIMessage(
   m: ApiMessage,
-  nextMessage: ApiMessage | undefined,
+  toolMessages: ApiMessage[],
 ): { message: Message, todos: TodoTask[] } {
   const parts: MessagePart[] = []
   let toolCallStates: ToolCallState[] | undefined
@@ -67,7 +74,7 @@ export function convertApiMessageToUIMessage(
   }
 
   if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
-    const result = reconstructToolCallStates(m.toolCalls, nextMessage)
+    const result = reconstructToolCallStates(m.toolCalls, toolMessages)
     toolCallStates = result.toolCallStates
     parts.push(...result.parts)
     todos = result.todos
@@ -144,7 +151,17 @@ export function applyConversationData(
     if (m.role === 'tool')
       continue
 
-    const { message, todos } = convertApiMessageToUIMessage(m, data.messages[i + 1])
+    // Collect ALL consecutive tool messages that follow this message.
+    // Parallel tool calls each produce a separate tool message, so a single
+    // assistant turn can be followed by N tool messages (one per parallel call).
+    const followingToolMessages: ApiMessage[] = []
+    let j = i + 1
+    while (j < data.messages.length && data.messages[j]!.role === 'tool') {
+      followingToolMessages.push(data.messages[j]!)
+      j++
+    }
+
+    const { message, todos } = convertApiMessageToUIMessage(m, followingToolMessages)
     convertedMessages.push(message)
     if (todos.length > 0)
       latestTodos = todos

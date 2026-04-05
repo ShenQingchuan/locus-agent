@@ -140,6 +140,11 @@ export interface DelegateDelta {
   toolName?: string
   /** 是否错误（仅 tool_result 类型有） */
   isError?: boolean
+  /**
+   * Sub-agent tool call ID — used to correctly pair tool_start / tool_result
+   * deltas when multiple tools run in parallel inside a delegate.
+   */
+  toolCallId?: string
 }
 
 /**

@@ -60,86 +60,121 @@ const statusConfig = computed(() => {
   }
 })
 
-// 是否有正在进行的工具调用（有 tool_start 但没有 tool_result）
-// 注意：如果子代理已完成，即使有未完成的工具调用，也不显示 spinner
+// 是否有正在进行的工具调用（有 tool_start 但没有对应 tool_result）
+// 支持并行工具：计算所有未配对的 tool_start 数量。
+// 子代理已完成时不显示 spinner。
 const hasPendingToolCall = computed(() => {
-  // 子代理已完成，不显示 pending
   if (props.status === 'completed' || props.status === 'error')
     return false
-  // 检查最后一个 delta
-  const lastDelta = props.deltas.at(-1)
-  if (!lastDelta)
-    return false
-  // 如果最后一个是 tool_start，说明有正在进行的调用
-  return lastDelta.type === 'tool_start'
+  let pending = 0
+  for (const delta of props.deltas) {
+    if (delta.type === 'tool_start')
+      pending++
+    else if (delta.type === 'tool_result')
+      pending--
+  }
+  return pending > 0
 })
 
-// 按顺序处理 deltas，构建用于渲染的条目列表
+// 按顺序处理 deltas，构建用于渲染的条目列表。
+// 支持并行工具调用：通过 toolCallId 精确配对 tool_start / tool_result，
+// 避免并行时第二个 tool_start 到来就把第一个标记为"无结果"。
 const timelineItems = computed(() => {
-  const items: Array<
-    | { type: 'reasoning', content: string }
-    | { type: 'tool', toolName: string, input: string, output?: string, isError?: boolean }
-    | { type: 'text', content: string }
-  > = []
+  interface ToolItem { type: 'tool', toolName: string, input: string, output?: string, isError?: boolean }
+  type Item
+    = | { type: 'reasoning', content: string }
+      | ToolItem
+      | { type: 'text', content: string }
 
+  const items: Item[] = []
+
+  // For parallel tools: map sub-tool-call-id → ToolItem reference already in items[].
+  // Mutating the object directly updates the rendered entry without re-pushing.
+  const pendingById = new Map<string, ToolItem>()
+
+  // Fallback for legacy deltas that don't carry toolCallId (sequential state machine).
+  let currentTool: ToolItem | null = null
   let currentReasoning = ''
   let currentText = ''
-  let currentTool: { toolName: string, input: string, output?: string, isError?: boolean } | null = null
 
   function flushReasoning() {
-    if (currentReasoning) {
-      items.push({ type: 'reasoning', content: currentReasoning })
-      currentReasoning = ''
-    }
+    if (!currentReasoning)
+      return
+    items.push({ type: 'reasoning', content: currentReasoning })
+    currentReasoning = ''
   }
 
   function flushText() {
-    if (currentText) {
-      items.push({ type: 'text', content: currentText })
-      currentText = ''
-    }
+    if (!currentText)
+      return
+    items.push({ type: 'text', content: currentText })
+    currentText = ''
   }
 
-  function flushTool() {
-    if (currentTool) {
-      items.push({ type: 'tool', ...currentTool })
-      currentTool = null
-    }
+  function flushCurrentTool() {
+    if (!currentTool)
+      return
+    items.push(currentTool)
+    currentTool = null
   }
 
   for (const delta of props.deltas) {
     switch (delta.type) {
       case 'reasoning':
-        flushTool()
+        flushCurrentTool()
         flushText()
         currentReasoning += delta.content
         break
-      case 'tool_start':
+
+      case 'tool_start': {
         flushReasoning()
         flushText()
-        if (currentTool) {
-          // 上一个工具没有收到 result，先 flush 它
-          items.push({ type: 'tool', ...currentTool })
+        const toolItem: ToolItem = {
+          type: 'tool',
+          toolName: delta.toolName || 'unknown',
+          input: delta.content,
         }
-        currentTool = { toolName: delta.toolName || 'unknown', input: delta.content }
+        if (delta.toolCallId) {
+          // Parallel-safe path: register by ID and push the live reference.
+          // When the matching tool_result arrives, we mutate this object in-place.
+          pendingById.set(delta.toolCallId, toolItem)
+          items.push(toolItem)
+        }
+        else {
+          // Legacy sequential path.
+          flushCurrentTool()
+          currentTool = toolItem
+        }
         break
-      case 'tool_result':
-        if (currentTool) {
+      }
+
+      case 'tool_result': {
+        if (delta.toolCallId && pendingById.has(delta.toolCallId)) {
+          // Parallel-safe: find the matching start and fill in the result.
+          const pending = pendingById.get(delta.toolCallId)!
+          pending.output = delta.content
+          pending.isError = delta.isError
+          pendingById.delete(delta.toolCallId)
+        }
+        else if (currentTool) {
+          // Sequential fallback.
           currentTool.output = delta.content
           currentTool.isError = delta.isError
-          flushTool()
+          flushCurrentTool()
         }
         break
+      }
+
       case 'text':
-        flushTool()
+        flushCurrentTool()
         flushReasoning()
         currentText += delta.content
         break
     }
   }
 
-  // Flush any remaining content
-  flushTool()
+  // Flush any remaining buffered content.
+  flushCurrentTool()
   flushReasoning()
   flushText()
 

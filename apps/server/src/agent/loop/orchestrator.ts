@@ -6,6 +6,7 @@ import { processDecisions } from '@univedge/locus-plugin-kit'
 import { streamText } from 'ai'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
+import { mcpManager } from '../mcp/manager.js'
 import { hookBus } from '../plugins/index.js'
 import {
   BUILD_WITH_PLAN_PROMPT,
@@ -17,7 +18,7 @@ import {
 } from '../prompts/index.js'
 import { getCurrentModelInfo } from '../providers/index.js'
 import { getMergedToolsForContext } from '../tools/registry.js'
-import { interactiveTools, serialTools } from '../tools/tool-policy.js'
+import { sequentialInteractiveTools, serialTools } from '../tools/tool-policy.js'
 import { getWorkspaceRoot } from '../tools/workspace-root.js'
 import { buildAssistantStepMessage, buildToolResultMessage, normalizeToolCallMessageSequence } from './message-utils.js'
 import { consumeResponseStream } from './stream-consumer.js'
@@ -25,14 +26,44 @@ import { executePendingToolCall } from './tool-call-pipeline.js'
 
 /**
  * Whether a tool call can run concurrently with others.
- * Interactive tools and serial write tools must be sequenced.
+ * - sequentialInteractiveTools (AskQuestion): user can only answer one prompt at a time → serial
+ * - serialTools (bash, str_replace, write_file): filesystem mutations → serial
+ * - everything else (including Delegate): parallel
  */
 function canRunInParallel(tc: PendingToolCall): boolean {
-  if (interactiveTools.has(tc.toolName))
+  if (sequentialInteractiveTools.has(tc.toolName))
     return false
   if (serialTools.has(tc.toolName))
     return false
   return true
+}
+
+const DEFAULT_TOOL_TIMEOUT_MS = 90_000
+
+/** Max number of tool calls that may run concurrently within a single parallel batch. */
+const PARALLEL_TOOL_CONCURRENCY = 3
+
+/**
+ * Run tasks concurrently up to `concurrency` at a time, preserving result order.
+ * Works like Promise.all but with a concurrency ceiling.
+ */
+async function concurrentMap<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number,
+): Promise<R[]> {
+  if (items.length === 0)
+    return []
+  const results: R[] = Array.from({ length: items.length })
+  let next = 0
+  async function worker() {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+  return results
 }
 
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoopResult> {
@@ -60,9 +91,16 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     projectKey,
     workspaceRoot: workspaceRootOption,
     onDelegateDelta,
-    toolTimeoutMs = 0,
+    toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS,
     toolAllowlist,
   } = options
+
+  // Proactively wake up any sleeping MCP servers at the start of each top-level
+  // agent loop so tools are ready before the LLM's first tool call. Sub-agent
+  // loops (which receive an explicit toolAllowlist) skip this to avoid churn.
+  if (!toolAllowlist || toolAllowlist.length === 0) {
+    mcpManager.reconnectDisconnected()
+  }
 
   const shouldConfirm = typeof confirmModeOpt === 'function' ? confirmModeOpt : () => confirmModeOpt
   const messages: ModelMessage[] = [...initialMessages]
@@ -300,13 +338,13 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           toolTimeoutMs,
         }
 
-        // 1. 并行执行所有可并行的只读工具
+        // 1. 并行执行所有可并行的只读工具（并发上限 PARALLEL_TOOL_CONCURRENCY）
         if (parallelBatch.length > 0) {
-          const parallelResults = await Promise.all(
-            parallelBatch.map(tc =>
-              executePendingToolCall({ pendingToolCall: tc, ...pipelineOpts })
-                .then(result => ({ tc, result })),
-            ),
+          const parallelResults = await concurrentMap(
+            parallelBatch,
+            tc => executePendingToolCall({ pendingToolCall: tc, ...pipelineOpts })
+              .then(result => ({ tc, result })),
+            PARALLEL_TOOL_CONCURRENCY,
           )
 
           const toolMessages = await Promise.all(

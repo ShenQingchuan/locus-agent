@@ -119,17 +119,23 @@ export function getMergedToolsForContext(
   codingMode?: 'build' | 'plan',
   allowlist?: string[],
 ): Record<string, Tool> {
-  // When an explicit allowlist is provided (sub-agents), pick from ALL defined
-  // tools — the allowlist itself is the authority, space filtering is irrelevant.
+  const mcpTools = mcpManager.getAllTools()
+
   if (allowlist && allowlist.length > 0) {
+    // The allowlist restricts built-in tools only (e.g. preventing a read-only
+    // sub-agent from writing files). MCP tools are user-installed external
+    // services and should always be accessible to sub-agents — they are never
+    // restricted by the allowlist.
     const set = new Set(allowlist)
-    const allTools = { ...tools, ...mcpManager.getAllTools() }
-    const filtered: Record<string, Tool> = {}
-    for (const [name, tool] of Object.entries(allTools)) {
+    const filteredBuiltins: Record<string, Tool> = {}
+    for (const [name, t] of Object.entries(tools)) {
       if (set.has(name))
-        filtered[name] = tool
+        filteredBuiltins[name] = t
     }
-    return filtered
+    return {
+      ...filteredBuiltins,
+      ...mcpTools,
+    }
   }
 
   const builtinTools = space === 'coding'
@@ -140,7 +146,7 @@ export function getMergedToolsForContext(
 
   return {
     ...builtinTools,
-    ...mcpManager.getAllTools(),
+    ...mcpTools,
   }
 }
 

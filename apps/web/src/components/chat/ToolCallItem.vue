@@ -82,7 +82,7 @@ const {
 </script>
 
 <template>
-  <div v-if="!isSilentTool" :class="compact ? 'my-0.5 text-sm' : 'my-2 text-sm'">
+  <div v-if="!isSilentTool" :data-tool-call-id="tool.toolCall.toolCallId" :class="compact ? 'my-0.5 text-sm' : 'my-2 text-sm'">
     <!-- ===== ACP compact mode ===== -->
     <template v-if="compact">
       <DelegateCard

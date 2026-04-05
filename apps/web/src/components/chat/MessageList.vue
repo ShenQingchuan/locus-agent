@@ -136,8 +136,22 @@ function handleScrollToBottomClick() {
   scrollToBottom(false) // smooth scroll for explicit user action
 }
 
-// Expose scroll to bottom for external use
-defineExpose({ scrollToBottom })
+// Scroll a specific tool-call card into view (used by jump-to-delegate).
+// Use querySelectorAll + last element so that if the same toolCallId appears in
+// multiple turns (some providers reuse sequential IDs across API calls), we
+// always scroll to the most recent card — which is lowest in the DOM.
+function scrollToToolCall(toolCallId: string) {
+  const els = containerRef.value?.querySelectorAll(`[data-tool-call-id="${toolCallId}"]`)
+  if (els && els.length > 0) {
+    // Convert to array so we can use standard indexing; take the last match so
+    // that if toolCallIds collide across turns we always land on the newest card.
+    const last = Array.from(els).at(-1)
+    last?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+}
+
+// Expose scroll helpers for external use
+defineExpose({ scrollToBottom, scrollToToolCall })
 </script>
 
 <template>

@@ -289,7 +289,26 @@ export function createConversationMessagingActions(options: CreateConversationMe
       return
 
     await abortChat(conversationId)
-    runtime.updateMessage(runtimeState.currentStreamingMessageId, { isStreaming: false }, conversationId)
+
+    // Interrupt any tool calls that were mid-execution when the user stopped.
+    // Without this, their loading spinners remain visible indefinitely.
+    const streamingMessage = runtimeState.messages.find(
+      m => m.id === runtimeState.currentStreamingMessageId,
+    )
+    const interruptedToolCalls = streamingMessage?.toolCalls?.map(tc =>
+      tc.status === 'pending' || tc.status === 'awaiting-approval' || tc.status === 'awaiting-question'
+        ? { ...tc, status: 'interrupted' as const }
+        : tc,
+    )
+
+    runtime.updateMessage(
+      runtimeState.currentStreamingMessageId,
+      {
+        isStreaming: false,
+        ...(interruptedToolCalls ? { toolCalls: interruptedToolCalls } : {}),
+      },
+      conversationId,
+    )
     runtimeState.currentStreamingMessageId = null
     runtimeState.isLoading = false
 

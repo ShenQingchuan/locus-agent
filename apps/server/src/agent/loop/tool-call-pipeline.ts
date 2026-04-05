@@ -186,23 +186,25 @@ export async function executePendingToolCall(
               }
               : undefined,
             onToolCallStart: onDelegateDelta
-              ? async (_id, toolName, toolArgs) => {
+              ? async (subToolCallId, toolName, toolArgs) => {
                 const d = {
                   type: 'tool_start' as const,
                   content: JSON.stringify(toolArgs),
                   toolName,
+                  toolCallId: subToolCallId,
                 }
                 delegateDeltas.push(d)
                 await onDelegateDelta(tc.toolCallId, d)
               }
               : undefined,
             onToolCallResult: onDelegateDelta
-              ? async (_id, toolName, toolResult, isError) => {
+              ? async (subToolCallId, toolName, toolResult, isError) => {
                 const d = {
                   type: 'tool_result' as const,
                   content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
                   toolName,
                   isError,
+                  toolCallId: subToolCallId,
                 }
                 delegateDeltas.push(d)
                 await onDelegateDelta(tc.toolCallId, d)
@@ -223,7 +225,8 @@ export async function executePendingToolCall(
           }, hookScope)
         }
 
-        // Full result (with deltas) for SSE display; compact result for LLM messages
+        // Full result (with deltas) for SSE display; compact result for LLM messages.
+        // Propagate sub-agent failure so the UI can surface it (status badge, error state).
         const pipelineResult: ExecuteToolPipelineResult = {
           result: {
             ...delegateResult,
@@ -231,10 +234,10 @@ export async function executePendingToolCall(
             isSubAgentResult: true,
           },
           contextResult: formatDelegateResult(delegateResult),
-          isError: false,
+          isError: !delegateResult.success,
           isInterrupted: false,
         }
-        emitToolAfter(JSON.stringify(pipelineResult.result).length, false)
+        emitToolAfter(JSON.stringify(pipelineResult.result).length, !delegateResult.success)
         return pipelineResult
       }
       else {

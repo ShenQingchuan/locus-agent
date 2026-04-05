@@ -4,6 +4,7 @@ import { useQueryCache } from '@pinia/colada'
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ChatInput from '@/components/chat/ChatInput.vue'
+import InputContextPanel from '@/components/chat/InputContextPanel.vue'
 import MessageList from '@/components/chat/MessageList.vue'
 import Sidebar from '@/components/chat/Sidebar.vue'
 import AppNavRail from '@/components/layout/AppNavRail.vue'
@@ -17,6 +18,17 @@ const modelSettings = useModelSettingsStore()
 const route = useRoute()
 const router = useRouter()
 const queryCache = useQueryCache()
+
+const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
+
+// Consume pendingJumpToolCallId from the store and scroll to the target card.
+watch(() => chatStore.pendingJumpToolCallId, async (toolCallId) => {
+  if (!toolCallId)
+    return
+  await nextTick()
+  messageListRef.value?.scrollToToolCall(toolCallId)
+  chatStore.clearJumpTarget()
+})
 const chatScope = { space: 'chat' as const }
 
 // Title editing state
@@ -319,6 +331,7 @@ async function handleGenerateTitle() {
       <!-- Messages area -->
       <main class="flex-1 overflow-hidden">
         <MessageList
+          ref="messageListRef"
           :messages="chatStore.visibleMessages"
           :is-loading="chatStore.isLoading"
           :is-streaming="chatStore.isStreaming"
@@ -345,7 +358,16 @@ async function handleGenerateTitle() {
       </div>
 
       <!-- Input area -->
-      <footer class="flex-shrink-0 border-t border-border bg-background px-4 py-4">
+      <footer class="flex-shrink-0 border-t border-border bg-background px-4 pt-3 pb-4">
+        <!-- Context panel lives here, separate from ChatInput, sharing the same max-width column -->
+        <div class="w-full max-w-3xl mx-auto">
+          <InputContextPanel
+            v-if="chatStore.todoTasks.length > 0 || chatStore.activeDelegates.length > 0"
+            :todo-tasks="chatStore.todoTasks"
+            :active-delegates="chatStore.activeDelegates"
+            @jump-to-delegate="chatStore.jumpToDelegate"
+          />
+        </div>
         <ChatInput
           :is-streaming="chatStore.isStreaming"
           @send="handleSend"
