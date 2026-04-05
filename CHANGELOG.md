@@ -1,3 +1,9 @@
+## [0.2.2] - 2026-04-05
+
+### Features
+
+- *(web)* Reduce bundle size and improve build tooling
+
 ## [0.2.1] - 2026-04-04
 
 ### Bug Fixes
