@@ -1,0 +1,25 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@univedge/locus-web#build": {
+      "dependsOn": [],
+      "outputs": ["dist/**"]
+    },
+    "@univedge/locus-server#build": {
+      "dependsOn": ["@univedge/locus-web#build"],
+      "outputs": ["dist/**"]
+    },
+    "@univedge/locus-cli#build": {
+      "dependsOn": ["@univedge/locus-server#build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {}
+  }
+}

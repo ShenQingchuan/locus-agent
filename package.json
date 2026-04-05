@@ -13,13 +13,12 @@
     "dev": "bun scripts/dev.ts",
     "dev:server": "pnpm -F @univedge/locus-server dev",
     "dev:web": "pnpm -F @univedge/locus-web dev",
-    "build": "pnpm -r build",
+    "build": "turbo run build",
     "lint": "eslint .",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "turbo run typecheck",
     "db:generate": "pnpm -F @univedge/locus-server db:generate",
     "db:migrate": "pnpm -F @univedge/locus-server db:migrate",
     "db:studio": "pnpm -F @univedge/locus-server db:studio",
-    "reexport:chains": "node scripts/find-reexport-chains.mjs",
     "release": "bun scripts/release.ts"
   },
   "devDependencies": {
@@ -28,6 +27,7 @@
     "eslint": "catalog:dev-tools",
     "git-cliff": "catalog:cli-tools",
     "simple-git-hooks": "catalog:dev-tools",
+    "turbo": "catalog:dev-tools",
     "typescript": "catalog:dev-tools"
   },
   "simple-git-hooks": {

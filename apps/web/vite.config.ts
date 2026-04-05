@@ -20,8 +20,8 @@ export default defineConfig({
   plugins: [
     Vue(),
     UnoCSS(),
-    DevTools(),
-  ],
+    isAnalyze ? DevTools() : null,
+  ].filter(Boolean),
   resolve: {
     conditions: ['dev'],
     alias: {

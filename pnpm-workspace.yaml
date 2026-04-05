@@ -39,6 +39,7 @@ catalogs:
     eslint: ^10.1.0
     simple-git-hooks: ^2.13.1
     tsdown: ^0.21.7
+    turbo: ^2.5.0
     typescript: ^6.0.2
   embedding:
     '@huggingface/transformers': ^4.0.1
