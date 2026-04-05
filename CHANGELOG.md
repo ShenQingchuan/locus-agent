@@ -1,3 +1,14 @@
+## [0.2.3] - 2026-04-05
+
+### Features
+
+- *(web)* Enhance chat interface with input context panel and delegate management
+
+
+### Miscellaneous
+
+- Update README for npm link
+
 ## [0.2.2] - 2026-04-05
 
 ### Features
