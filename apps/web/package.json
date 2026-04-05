@@ -63,6 +63,7 @@
     "@unocss/preset-typography": "catalog:unocss-family",
     "@unocss/preset-uno": "catalog:unocss-family",
     "@unocss/reset": "catalog:unocss-family",
+    "@vitejs/devtools": "catalog:vite-family",
     "@vitejs/plugin-vue": "catalog:vite-family",
     "@vue/tsconfig": "catalog:vue-family",
     "unocss": "catalog:unocss-family",

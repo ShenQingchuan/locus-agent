@@ -1,10 +1,16 @@
 /// <reference types="bun" />
-import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
 async function runBuild() {
   const root = import.meta.dir
+  const distDir = resolve(root, 'dist')
+
+  // Clean dist before build to remove stale files
+  if (existsSync(distDir))
+    rmSync(distDir, { recursive: true, force: true })
+  mkdirSync(distDir, { recursive: true })
 
   const result = await Bun.build({
     entrypoints: [

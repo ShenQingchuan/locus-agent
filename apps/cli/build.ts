@@ -1,10 +1,15 @@
 /// <reference types="bun" />
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
 const root = import.meta.dir
 const distDir = resolve(root, 'dist')
+
+// Clean dist before build to remove stale files
+if (existsSync(distDir))
+  rmSync(distDir, { recursive: true, force: true })
+mkdirSync(distDir, { recursive: true })
 
 // Build
 const result = await Bun.build({
@@ -15,7 +20,7 @@ const result = await Bun.build({
     '@huggingface/transformers',
     'onnxruntime-node',
   ],
-  sourcemap: 'external',
+  sourcemap: false,
   minify: false,
   define: {
     'import.meta.main': 'false',

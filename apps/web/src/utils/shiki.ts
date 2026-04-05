@@ -1,9 +1,12 @@
 import type { HighlighterGeneric } from 'shiki'
-import { createHighlighter } from 'shiki'
+import { createHighlighter, createJavaScriptRegexEngine } from 'shiki'
 
 /**
- * 全局唯一的 Shiki highlighter 实例（单例）
- * 统一加载所有需要的主题，供 CodeBlock 和 ShikiCode 共享
+ * Singleton Shiki highlighter shared across CodeBlock and ShikiCode.
+ *
+ * Uses the JavaScript regex engine instead of the default Oniguruma WASM engine,
+ * which eliminates 6x WASM chunk duplication in the Vite production build and
+ * removes the ~3.6 MB wasm-*.js files entirely.
  */
 let instance: Promise<HighlighterGeneric<any, any>> | null = null
 
@@ -12,7 +15,8 @@ export function getShikiHighlighter(): Promise<HighlighterGeneric<any, any>> {
     instance = createHighlighter({
       themes: ['github-dark-default', 'min-light', 'github-dark', 'github-light'],
       langs: ['text'],
+      engine: createJavaScriptRegexEngine(),
     })
   }
-  return instance
+  return instance!
 }

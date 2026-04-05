@@ -87,9 +87,15 @@ async function waitForViteReady(vite: Subprocess, timeoutMs: number = 30_000): P
 }
 
 // 1. Start Vite dev server as a managed background process (HMR)
+// When ANALYZE=true, inherit Vite's stdio so DevTools auth prompts are visible and interactive.
+const isAnalyze = process.env.ANALYZE === 'true'
 const vite = Bun.spawn(
   ['pnpm', '-F', '@univedge/locus-web', 'exec', 'vite', '--port', String(VITE_PORT), '--strictPort'],
-  { stdout: 'ignore', stderr: 'inherit' },
+  {
+    stdout: isAnalyze ? 'inherit' : 'ignore',
+    stderr: 'inherit',
+    stdin: isAnalyze ? 'inherit' : 'ignore',
+  },
 )
 
 // Wait until Vite is reachable
