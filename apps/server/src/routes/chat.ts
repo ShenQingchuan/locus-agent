@@ -1,507 +1,37 @@
 import type {
   ChatRequest,
-  MessageImageAttachment,
   SSEEvent,
   ToolCall,
   ToolResult,
 } from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
-import type { AddMessageInput } from '../services/message.js'
-import { Buffer } from 'node:buffer'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { BuiltinTool, CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { runKimiCLI } from '../agent/acp/kimi-cli.js'
 import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
-import {
-  requestApproval,
-} from '../agent/approval.js'
+import { requestApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
-import { normalizeToolCallMessageSequence } from '../agent/loop/message-utils.js'
 import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
 import { getWorkspaceRoot } from '../agent/tools/workspace-root.js'
 import { config } from '../config.js'
+import { cleanupSession, hasAbortController, setAbortController, setConfirmModeState, setSessionTimestamp, startSessionCleanupTask } from '../services/chat-session.js'
 import { conversationExists, createScopedConversation, getConversation, touchConversation } from '../services/conversation.js'
+import { agentMessagesToDbInputs, createUserMessage, dbMessagesToModelMessages } from '../services/message-formatter.js'
 import { addMessage, addMessages, getLastNMessages, getMessages } from '../services/message.js'
+import { buildPlanInjectedMessage, extractLatestPlanFromDbMessages, resolvePlanSnapshot } from '../services/plan.js'
 import { resolveAllowedDirectory } from '../services/workspace-access.js'
 
-const RE_BASE64_DATA_URL = /^data:.*?;base64,(.+)$/
-const RE_NON_WORD_OR_HYPHEN = /[^\w-]/g
-const RE_PLAN_TAG = /<plan\b[^>]*>[\s\S]*?<\/plan>/gi
-const RE_PLAN_REF_TAG = /<plan_ref\b[^>]*>[\s\S]*?<\/plan_ref>/gi
+export { abortSession, getActiveConfirmModeState, updateActiveConfirmMode } from '../services/chat-session.js'
 
 export const chatRoutes = new Hono()
-
-/**
- * 活跃的 AbortController 映射
- * key: conversationId
- *
- * 清理策略（防止内存泄漏）：
- * 1. 流正常完成/异常：finally 块调用 cleanupSession()
- * 2. 客户端中止：/abort 端点调用 cleanupSession()
- * 3. 超时清理：后台任务定期清理超时会话
- */
-const activeAbortControllers = new Map<string, AbortController>()
-
-/**
- * 活跃会话的可变 confirmMode 状态
- * key: conversationId, value: 可变引用，可由 approve 端点或 conversation 更新实时变更
- *
- * 清理策略：同 activeAbortControllers
- */
-const activeConfirmModes = new Map<string, { value: boolean }>()
-
-/**
- * 活跃会话的创建时间戳（用于超时检测）
- * key: conversationId, value: 创建时间戳（ms）
- */
-const activeSessionTimestamps = new Map<string, number>()
-
-/**
- * 清理超时会话的间隔和超时时间
- */
-const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000 // 每 5 分钟检查一次
-const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 分钟未活动则清理
-
-/**
- * 清理指定会话的所有活跃状态
- * 安全地处理已中止的控制器
- */
-function cleanupSession(conversationId: string): void {
-  const controller = activeAbortControllers.get(conversationId)
-  if (controller) {
-    try {
-      controller.abort()
-    }
-    catch {
-      // 忽略已中止的控制器错误
-    }
-  }
-  activeAbortControllers.delete(conversationId)
-  activeConfirmModes.delete(conversationId)
-  activeSessionTimestamps.delete(conversationId)
-}
-
-/**
- * 后台清理任务：定期清理超时的会话
- */
-function startSessionCleanupTask(): void {
-  setInterval(() => {
-    const now = Date.now()
-    const expired: string[] = []
-
-    for (const [conversationId, timestamp] of activeSessionTimestamps.entries()) {
-      if (now - timestamp > SESSION_TIMEOUT) {
-        expired.push(conversationId)
-      }
-    }
-
-    for (const conversationId of expired) {
-      cleanupSession(conversationId)
-    }
-  }, SESSION_CLEANUP_INTERVAL)
-}
 
 // 启动后台清理任务
 startSessionCleanupTask()
 
-/**
- * 更新活跃会话的 confirmMode（供外部路由调用）
- */
-export function updateActiveConfirmMode(conversationId: string, confirmMode: boolean): void {
-  const state = activeConfirmModes.get(conversationId)
-  if (state) {
-    state.value = confirmMode
-  }
-}
-
-/**
- * 获取活跃会话的 confirmMode 可变引用（供 approval 路由直接修改）
- */
-export function getActiveConfirmModeState(conversationId: string): { value: boolean } | undefined {
-  return activeConfirmModes.get(conversationId)
-}
-
-/**
- * 中止指定会话的活跃流并清理状态
- * @returns 是否成功中止（false 表示没有活跃的流）
- */
-export function abortSession(conversationId: string): boolean {
-  const controller = activeAbortControllers.get(conversationId)
-  if (controller) {
-    try {
-      controller.abort()
-    }
-    catch {
-      // 忽略已中止的控制器错误
-    }
-    cleanupSession(conversationId)
-    return true
-  }
-  return false
-}
-
 const createSSEEvent = createSSEEventPayload
-
-function toModelImagePayload(attachment: MessageImageAttachment): string | Uint8Array {
-  const match = attachment.dataUrl.match(RE_BASE64_DATA_URL)
-  if (!match?.[1])
-    return attachment.dataUrl
-  return Uint8Array.from(Buffer.from(match[1], 'base64'))
-}
-
-/**
- * 将用户消息转换为 CoreMessage 格式
- */
-function createUserMessage(content: string, attachments?: MessageImageAttachment[]): ModelMessage {
-  if (!attachments || attachments.length === 0) {
-    return {
-      role: 'user',
-      content,
-    }
-  }
-
-  return {
-    role: 'user',
-    content: [
-      ...(content.trim().length > 0 ? [{ type: 'text' as const, text: content }] : []),
-      ...attachments.map(attachment => ({
-        type: 'image' as const,
-        image: toModelImagePayload(attachment),
-        mimeType: attachment.mimeType,
-      })),
-    ],
-  }
-}
-
-function normalizeToolArgs(args: unknown): Record<string, unknown> {
-  if (typeof args === 'string') {
-    try {
-      const parsed = JSON.parse(args)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
-        return parsed as Record<string, unknown>
-    }
-    catch {
-      // Ignore non-JSON strings and preserve them below.
-    }
-  }
-
-  return args && typeof args === 'object' && !Array.isArray(args)
-    ? args as Record<string, unknown>
-    : { value: args }
-}
-
-function buildAssistantMessageFromDbMessage(message: {
-  content: string
-  reasoning?: string | null
-  toolCalls?: unknown[] | null
-}): ModelMessage | null {
-  const content: Array<
-    | { type: 'reasoning', text: string }
-    | { type: 'text', text: string }
-    | { type: 'tool-call', toolCallId: string, toolName: string, input: Record<string, unknown> }
-  > = []
-
-  if (message.reasoning) {
-    content.push({
-      type: 'reasoning',
-      text: message.reasoning,
-    })
-  }
-
-  const toolCalls = message.toolCalls as Array<{ toolCallId: string, toolName: string, args: unknown }> | null
-  if (toolCalls?.length) {
-    for (const toolCall of toolCalls) {
-      if (!toolCall?.toolCallId || !toolCall.toolName)
-        continue
-      content.push({
-        type: 'tool-call',
-        toolCallId: toolCall.toolCallId,
-        toolName: toolCall.toolName,
-        input: normalizeToolArgs(toolCall.args),
-      })
-    }
-  }
-
-  if (message.content) {
-    content.push({
-      type: 'text',
-      text: message.content,
-    })
-  }
-
-  return content.length > 0
-    ? {
-        role: 'assistant',
-        content,
-      }
-    : null
-}
-
-function buildToolMessageFromDbMessage(message: {
-  toolResults?: unknown[] | null
-}): ModelMessage | null {
-  const toolResults = message.toolResults as Array<{ toolCallId: string, toolName: string, result: unknown, isError?: boolean }> | null
-  if (!toolResults?.length)
-    return null
-
-  const content = toolResults
-    .filter(toolResult => toolResult?.toolCallId && toolResult.toolName)
-    .map(toolResult => ({
-      type: 'tool-result' as const,
-      toolCallId: toolResult.toolCallId,
-      toolName: toolResult.toolName,
-      output: toolResult.isError
-        ? { type: 'error-text' as const, value: typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result) }
-        : { type: 'text' as const, value: typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result) },
-    }))
-
-  if (content.length === 0)
-    return null
-
-  return {
-    role: 'tool',
-    content,
-  }
-}
-
-function decodeToolOutput(output: {
-  type: string
-  value?: unknown
-  reason?: string
-}): {
-  result: unknown
-  isError?: boolean
-} {
-  switch (output.type) {
-    case 'error-text':
-      return {
-        result: output.value ?? '',
-        isError: true,
-      }
-    case 'error-json':
-      return {
-        result: output.value,
-        isError: true,
-      }
-    case 'execution-denied':
-      return {
-        result: output.reason ?? 'Tool execution denied.',
-        isError: true,
-      }
-    case 'json':
-    case 'content':
-    case 'text':
-    default:
-      return {
-        result: output.value ?? '',
-      }
-  }
-}
-
-function agentMessagesToDbInputs(
-  messages: ModelMessage[],
-  assistantModel: string,
-  usage: AddMessageInput['usage'],
-): AddMessageInput[] {
-  const dbInputs: AddMessageInput[] = []
-
-  for (const message of messages) {
-    if (message.role === 'assistant') {
-      if (typeof message.content === 'string') {
-        if (!message.content)
-          continue
-        dbInputs.push({
-          role: 'assistant',
-          content: message.content,
-          model: assistantModel,
-        })
-        continue
-      }
-
-      let content = ''
-      let reasoning = ''
-      const toolCalls: ToolCall[] = []
-
-      for (const part of message.content) {
-        switch (part.type) {
-          case 'text':
-            content += part.text
-            break
-          case 'reasoning':
-            reasoning += part.text
-            break
-          case 'tool-call':
-            toolCalls.push({
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              args: normalizeToolArgs(part.input),
-            })
-            break
-        }
-      }
-
-      if (!content && !reasoning && toolCalls.length === 0)
-        continue
-
-      dbInputs.push({
-        role: 'assistant',
-        content,
-        reasoning: reasoning || undefined,
-        model: assistantModel,
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      })
-      continue
-    }
-
-    if (message.role === 'tool' && Array.isArray(message.content)) {
-      const toolResults: ToolResult[] = []
-
-      for (const part of message.content) {
-        if (part.type !== 'tool-result')
-          continue
-        const decoded = decodeToolOutput(part.output as { type: string, value?: unknown, reason?: string })
-        toolResults.push({
-          toolCallId: part.toolCallId,
-          toolName: part.toolName,
-          result: decoded.result,
-          isError: decoded.isError,
-        })
-      }
-
-      if (toolResults.length === 0)
-        continue
-
-      dbInputs.push({
-        role: 'tool',
-        content: '',
-        toolResults,
-      })
-    }
-  }
-
-  for (let i = dbInputs.length - 1; i >= 0; i--) {
-    if (dbInputs[i]?.role === 'assistant') {
-      dbInputs[i] = {
-        ...dbInputs[i]!,
-        usage,
-      }
-      break
-    }
-  }
-
-  return dbInputs
-}
-
-/**
- * 将数据库 Message 记录转换为 AI SDK 的 ModelMessage[]
- */
-function dbMessagesToModelMessages(dbMsgs: Array<{
-  role: string
-  content: string
-  attachments?: MessageImageAttachment[] | null
-  reasoning?: string | null
-  toolCalls?: unknown[] | null
-  toolResults?: unknown[] | null
-}>): ModelMessage[] {
-  const result: ModelMessage[] = []
-  for (const msg of dbMsgs) {
-    switch (msg.role) {
-      case 'user':
-        result.push(createUserMessage(msg.content, msg.attachments ?? undefined))
-        break
-      case 'assistant': {
-        const assistantMessage = buildAssistantMessageFromDbMessage(msg)
-        if (assistantMessage)
-          result.push(assistantMessage)
-        break
-      }
-      case 'tool': {
-        const toolMessage = buildToolMessageFromDbMessage(msg)
-        if (toolMessage)
-          result.push(toolMessage)
-        break
-      }
-      case 'system':
-        result.push({ role: 'system', content: msg.content })
-        break
-    }
-  }
-  return normalizeToolCallMessageSequence(result)
-}
-
-interface PlanSnapshot {
-  filename: string
-  filePath: string
-}
-
-type PlanBindingPayload = ChatRequest['planBinding']
-
-const PLANS_BASE_DIR = join(homedir(), '.local', 'share', 'locus-agent', 'coding-plans')
-
-function normalizeProjectKey(projectKey?: string): string | null {
-  const key = projectKey?.trim()
-  if (!key)
-    return null
-  const safe = key.replace(RE_NON_WORD_OR_HYPHEN, '_')
-  return safe.length > 0 ? safe : null
-}
-
-function getPlansDir(projectKey?: string): string {
-  const normalized = normalizeProjectKey(projectKey)
-  if (!normalized)
-    return join(PLANS_BASE_DIR, 'global')
-  return join(PLANS_BASE_DIR, normalized)
-}
-
-function extractLatestPlanFromDbMessages(
-  dbMsgs: Array<{ toolCalls?: unknown[] | null }>,
-  projectKey?: string,
-): PlanSnapshot | null {
-  for (let i = dbMsgs.length - 1; i >= 0; i--) {
-    const toolCalls = dbMsgs[i]?.toolCalls
-    if (!toolCalls || toolCalls.length === 0)
-      continue
-
-    for (let j = toolCalls.length - 1; j >= 0; j--) {
-      const item = toolCalls[j] as { toolName?: unknown, args?: unknown }
-      if (item?.toolName !== BuiltinTool.WritePlan)
-        continue
-      const args = item.args as { filename?: unknown }
-      const filename = typeof args?.filename === 'string' ? args.filename.trim() : ''
-      if (!filename)
-        continue
-      return {
-        filename,
-        filePath: join(getPlansDir(projectKey), filename),
-      }
-    }
-  }
-  return null
-}
-
-function resolvePlanSnapshot(
-  binding: PlanBindingPayload | undefined,
-  dbMsgs: Array<{ toolCalls?: unknown[] | null }>,
-  projectKey?: string,
-): PlanSnapshot | null {
-  if (binding?.mode === 'none')
-    return null
-
-  return extractLatestPlanFromDbMessages(dbMsgs, projectKey)
-}
-
-function buildPlanInjectedMessage(message: string, plan: PlanSnapshot): string {
-  const stripped = message
-    .replace(RE_PLAN_TAG, '')
-    .replace(RE_PLAN_REF_TAG, '')
-    .trim()
-  return `${stripped}\n\n<plan_ref>\nfilename: ${plan.filename}\npath: ${plan.filePath}\nread_with: read_plan(action=\"read\", filename=\"${plan.filename}\")\n</plan_ref>`
-}
 
 chatRoutes.get('/plans/:conversationId', async (c) => {
   const conversationId = c.req.param('conversationId')
@@ -641,20 +171,20 @@ chatRoutes.post('/', async (c) => {
   })
 
   // 如果该会话已有活跃请求，先清理旧的
-  if (activeAbortControllers.has(conversationId)) {
+  if (hasAbortController(conversationId)) {
     cleanupSession(conversationId)
   }
 
   // 创建新的会话状态
   const abortController = new AbortController()
-  activeAbortControllers.set(conversationId, abortController)
+  setAbortController(conversationId, abortController)
 
   // 可变 confirmMode 状态，approve 端点收到 switchToYolo 时会实时更新
   const confirmModeState = { value: confirmMode ?? config.confirmMode }
-  activeConfirmModes.set(conversationId, confirmModeState)
+  setConfirmModeState(conversationId, confirmModeState)
 
   // 记录会话创建时间戳，用于超时清理
-  activeSessionTimestamps.set(conversationId, Date.now())
+  setSessionTimestamp(conversationId, Date.now())
 
   return streamSSE(c, async (stream) => {
     // 用于生成消息 ID
