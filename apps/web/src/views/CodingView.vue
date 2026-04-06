@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref, unref } from 'vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ConversationListItem from '@/components/chat/ConversationListItem.vue'
 import MessageList from '@/components/chat/MessageList.vue'
@@ -46,9 +47,18 @@ const {
 } = useCodingView()
 
 function handleSubmitAnnotations(message: string) {
+  // Always start from a blank session so the review prompt opens in a new conversation after send.
+  chatStore.newConversation()
+  chatStore.setComposerDraft(message)
   activeSection.value = 'chat'
-  handleSend({ content: message, attachments: [] })
 }
+
+const sessionChangesPanelRef = ref<InstanceType<typeof SessionChangesPanel> | null>(null)
+const isReviewPanelOpen = ref(false)
+
+const reviewAnnotationCountForHeader = computed(() =>
+  unref(sessionChangesPanelRef.value?.reviewAnnotationCount ?? 0),
+)
 </script>
 
 <template>
@@ -83,6 +93,28 @@ function handleSubmitAnnotations(message: string) {
           </div>
 
           <div class="flex items-center gap-1">
+            <button
+              v-if="activeSection === 'workspace' && currentProjectKey"
+              type="button"
+              class="h-7 px-2 rounded text-xs transition-colors inline-flex items-center gap-1"
+              :class="[
+                isReviewPanelOpen
+                  ? 'bg-primary/10 text-primary border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent',
+              ]"
+              title="审阅批注面板"
+              @click="isReviewPanelOpen = !isReviewPanelOpen"
+            >
+              <span class="i-carbon-pen h-3.5 w-3.5" />
+              <span class="whitespace-nowrap hidden sm:inline">审阅批注</span>
+              <span
+                v-if="reviewAnnotationCountForHeader > 0"
+                class="text-xs tabular-nums min-w-[1rem] text-center"
+              >
+                {{ reviewAnnotationCountForHeader }}
+              </span>
+            </button>
+
             <button
               v-if="activeSection === 'planning' && !planStore.viewingPlan"
               class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded px-1.5 py-1 transition-colors"
@@ -209,6 +241,8 @@ function handleSubmitAnnotations(message: string) {
             <div class="flex-1 min-h-0">
               <SessionChangesPanel
                 v-if="currentProjectKey"
+                ref="sessionChangesPanelRef"
+                v-model:review-panel-open="isReviewPanelOpen"
                 :project-key="currentProjectKey"
                 :files="gitStatus.files.value"
                 :summary="gitStatus.summary.value"

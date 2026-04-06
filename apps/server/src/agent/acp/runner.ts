@@ -16,6 +16,7 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionNotification,
+  ToolCallContent,
   WriteTextFileRequest,
   WriteTextFileResponse,
 } from '@agentclientprotocol/sdk'
@@ -85,6 +86,10 @@ interface PendingTool {
   toolName: string
   args: Record<string, unknown>
   started: boolean
+  /** Accumulated content text from in_progress updates (for providers that stream input via content). */
+  lastContentText: string
+  /** Length of content text at the time of the last onToolOutputDelta call, used to compute deltas. */
+  prevContentLen: number
 }
 
 interface RuntimeState {
@@ -94,6 +99,45 @@ interface RuntimeState {
   sessionId?: string
   usage: ACPResult['usage']
   pendingTools: Map<string, PendingTool>
+}
+
+// ---------------------------------------------------------------------------
+// Provider-agnostic helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve tool name from ACP update fields.
+ * Priority: provider-specific _meta → pending state → ACP-standard title.
+ */
+function resolveToolName(
+  update: { _meta?: unknown, title?: string | null },
+  pending?: PendingTool,
+): string {
+  const meta = update._meta as { claudeCode?: { toolName?: string } } | null | undefined
+  if (meta?.claudeCode?.toolName)
+    return meta.claudeCode.toolName
+  if (pending?.toolName && pending.toolName !== 'unknown')
+    return pending.toolName
+  if (update.title)
+    return update.title.split(':')[0].trim()
+  return 'unknown'
+}
+
+/**
+ * Extract the first text string from an ACP ToolCallContent array.
+ * Returns `undefined` when no text content is present.
+ */
+function extractContentText(content?: ToolCallContent[] | null): string | undefined {
+  if (!content?.length)
+    return undefined
+  const first = content[0]
+  if (first.type === 'content' && first.content?.type === 'text')
+    return first.content.text || undefined
+  return undefined
+}
+
+function isNonEmptyRecord(v: unknown): v is Record<string, unknown> {
+  return v != null && typeof v === 'object' && Object.keys(v).length > 0
 }
 
 // ---------------------------------------------------------------------------
@@ -122,40 +166,72 @@ async function mapSessionUpdate(
     }
 
     case 'tool_call': {
-      const meta = update._meta as { claudeCode?: { toolName?: string } } | null | undefined
-      const toolName = meta?.claudeCode?.toolName ?? update.title ?? 'unknown'
+      const toolName = resolveToolName(update)
       const rawInput = update.rawInput as Record<string, unknown> | undefined
-      const hasCompleteArgs = rawInput != null && Object.keys(rawInput).length > 0
+      const hasCompleteArgs = isNonEmptyRecord(rawInput)
+      const contentText = extractContentText(update.content) ?? ''
 
       if (hasCompleteArgs) {
-        state.pendingTools.set(update.toolCallId, { toolName, args: rawInput, started: true })
+        state.pendingTools.set(update.toolCallId, {
+          toolName,
+          args: rawInput,
+          started: true,
+          lastContentText: contentText,
+          prevContentLen: 0,
+        })
         await callbacks.onToolCallStart?.(update.toolCallId, toolName, rawInput)
       }
       else {
-        state.pendingTools.set(update.toolCallId, { toolName, args: {}, started: false })
+        state.pendingTools.set(update.toolCallId, {
+          toolName,
+          args: {},
+          started: false,
+          lastContentText: contentText,
+          prevContentLen: 0,
+        })
       }
       break
     }
 
     case 'tool_call_update': {
-      const updateMeta = update._meta as { claudeCode?: { toolName?: string } } | null | undefined
-      const toolName = updateMeta?.claudeCode?.toolName ?? 'unknown'
       const rawInput = update.rawInput as Record<string, unknown> | undefined
       const isTerminal = update.status === 'completed' || update.status === 'failed'
       const pending = state.pendingTools.get(update.toolCallId)
+      const toolName = resolveToolName(update, pending)
+      const contentText = extractContentText(update.content)
 
+      // --- Non-terminal: accumulate content, stream deltas, handle rawInput ---
       if (!isTerminal) {
-        if (rawInput != null && Object.keys(rawInput).length > 0) {
-          const name = pending?.toolName ?? toolName
+        if (isNonEmptyRecord(rawInput)) {
           if (pending)
             pending.args = rawInput
           if (!pending?.started) {
             if (pending)
               pending.started = true
-            await callbacks.onToolCallStart?.(update.toolCallId, name, rawInput)
+            await callbacks.onToolCallStart?.(update.toolCallId, toolName, rawInput)
           }
         }
+
+        if (contentText != null && pending) {
+          const delta = contentText.slice(pending.prevContentLen)
+          pending.lastContentText = contentText
+          pending.prevContentLen = contentText.length
+          if (delta)
+            await callbacks.onToolOutputDelta?.(update.toolCallId, 'stdout', delta)
+        }
         break
+      }
+
+      // --- Terminal: finalise args from content, emit start + result ---
+
+      // If args were never populated via rawInput, try parsing accumulated content text
+      if (pending && !isNonEmptyRecord(pending.args) && pending.lastContentText) {
+        try {
+          const parsed = JSON.parse(pending.lastContentText)
+          if (isNonEmptyRecord(parsed))
+            pending.args = parsed
+        }
+        catch { /* content was not valid JSON — that's fine */ }
       }
 
       if (pending && !pending.started) {
@@ -163,10 +239,12 @@ async function mapSessionUpdate(
         pending.started = true
       }
 
+      const result = update.rawOutput ?? contentText ?? { status: update.status }
+
       await callbacks.onToolCallResult?.(
         update.toolCallId,
         pending?.toolName ?? toolName,
-        update.rawOutput ?? { status: update.status },
+        result,
         update.status === 'failed',
       )
       state.pendingTools.delete(update.toolCallId)

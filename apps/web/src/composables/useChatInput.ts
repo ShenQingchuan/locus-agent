@@ -1,7 +1,7 @@
 import type { MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { EmitFn } from 'vue'
 import type PromptEditor from '@/components/chat/prompt-editor/PromptEditor.vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useEscConfirm } from '@/composables/useEscConfirm'
 import { useImageAttachments } from '@/composables/useImageAttachments'
 import { useChatStore } from '@/stores/chat'
@@ -120,6 +120,35 @@ export function useChatInput(
   watch(() => props.isStreaming, (streaming) => {
     if (!streaming)
       clearEscConfirm()
+  })
+
+  async function applyComposerDraftFromStore() {
+    if (!props.showCodingMode)
+      return
+    const text = chatStore.pendingComposerDraft
+    if (!text?.trim())
+      return
+    if (chatStore.editingMessageId)
+      chatStore.cancelEditMessage()
+    resetComposerAttachments()
+    await nextTick()
+    if (!promptEditorRef.value) {
+      await nextTick()
+      if (!promptEditorRef.value)
+        return
+    }
+    promptEditorRef.value.setText(text)
+    chatStore.clearComposerDraft()
+    await nextTick()
+    promptEditorRef.value?.focus()
+  }
+
+  watch(() => chatStore.composerDraftNonce, () => {
+    applyComposerDraftFromStore()
+  })
+
+  onMounted(() => {
+    applyComposerDraftFromStore()
   })
 
   return {

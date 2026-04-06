@@ -2,7 +2,7 @@ import type KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import { useQueryCache } from '@pinia/colada'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as workspaceApi from '@/api/workspace'
 import { getConversationListQueryKey } from '@/composables/queries'
 import { getTasksListQueryKey } from '@/composables/taskQueries'
@@ -16,6 +16,21 @@ import { createProjectKey } from '@/utils/projectKey'
 export type CodingSection = 'chat' | 'planning' | 'workspace'
 
 const STORAGE_KEY_LEFT_PANEL_WIDTH = 'locus-agent:coding-left-panel-width'
+
+function firstQueryString(value: unknown): string | undefined {
+  if (typeof value === 'string')
+    return value
+  if (Array.isArray(value) && typeof value[0] === 'string')
+    return value[0]
+  return undefined
+}
+
+function parseSectionQuery(value: unknown): CodingSection | null {
+  const s = firstQueryString(value)
+  if (s === 'chat' || s === 'workspace' || s === 'planning')
+    return s
+  return null
+}
 
 function getStoredPanelWidth(storageKey: string, fallback: number, min: number, max: number): number {
   if (typeof window === 'undefined')
@@ -44,6 +59,7 @@ export function useCodingViewWorkspace() {
   const isCodingViewActive = ref(true)
 
   const route = useRoute()
+  const router = useRouter()
   const chatStore = useChatStore()
   const modelSettings = useModelSettingsStore()
   const workspaceStore = useWorkspaceStore()
@@ -117,15 +133,69 @@ export function useCodingViewWorkspace() {
     }
   })
 
+  /** `conversation` in URL only while 研发对话 is active; strip it for 变更审阅 / 任务编排. */
+  function codingRouteMatchesDesired(): boolean {
+    if (route.name !== 'CodingView')
+      return true
+    const wantSection = activeSection.value
+    const curSection = parseSectionQuery(route.query.section)
+    if (curSection !== wantSection)
+      return false
+    const wantConv = wantSection === 'chat' ? (chatStore.currentConversationId ?? undefined) : undefined
+    const curConv = firstQueryString(route.query.conversation)
+    return wantConv === curConv
+  }
+
+  function syncCodingRouteQuery() {
+    if (route.name !== 'CodingView')
+      return
+    if (codingRouteMatchesDesired())
+      return
+
+    const next = { ...route.query } as Record<string, string | string[] | undefined>
+    next.section = activeSection.value
+
+    if (activeSection.value === 'chat' && chatStore.currentConversationId)
+      next.conversation = chatStore.currentConversationId
+    else
+      delete next.conversation
+
+    router.replace({ query: next as Record<string, string | string[]> })
+  }
+
+  watch(
+    () => [activeSection.value, chatStore.currentConversationId] as const,
+    () => {
+      syncCodingRouteQuery()
+    },
+  )
+
+  watch(() => route.query.section, () => {
+    if (route.name !== 'CodingView')
+      return
+    const parsed = parseSectionQuery(route.query.section)
+    if (parsed && parsed !== activeSection.value)
+      activeSection.value = parsed
+  })
+
   onMounted(async () => {
     await modelSettings.loadModelSettings()
     await initWorkspaceProjectKey()
     await nextTick()
-    const conversationId = route.query.conversation as string | undefined
-    if (conversationId) {
+
+    const conversationId = firstQueryString(route.query.conversation)
+    const urlSection = parseSectionQuery(route.query.section)
+
+    if (conversationId)
       chatStore.switchConversation(conversationId)
+
+    if (urlSection)
+      activeSection.value = urlSection
+    else if (conversationId)
       activeSection.value = 'chat'
-    }
+
+    await nextTick()
+    syncCodingRouteQuery()
   })
 
   onActivated(async () => {
@@ -142,6 +212,10 @@ export function useCodingViewWorkspace() {
     }
 
     refreshCodingDataOnActivate()
+
+    const urlSection = parseSectionQuery(route.query.section)
+    if (urlSection && urlSection !== activeSection.value)
+      activeSection.value = urlSection
   })
 
   onDeactivated(() => {

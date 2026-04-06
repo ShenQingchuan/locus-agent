@@ -100,7 +100,7 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="px-4 py-3 space-y-3">
             <!-- Group selector -->
             <div class="space-y-1.5">
-              <label class="text-xs font-medium text-muted-foreground">意见组</label>
+              <label class="text-xs font-medium text-muted-foreground">所属批次</label>
               <div v-if="!isCreatingGroup && groups.length > 0" class="flex items-center gap-2">
                 <select
                   v-model="selectedGroupId"
@@ -118,14 +118,14 @@ function handleKeydown(e: KeyboardEvent) {
                   class="h-8 px-2 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
                   @click="isCreatingGroup = true"
                 >
-                  新建组
+                  新建批次
                 </button>
               </div>
               <div
                 v-else
                 class="flex items-center gap-2 text-xs text-muted-foreground"
               >
-                <span class="tabular-nums">新建意见组 #{{ groups.length + 1 }}</span>
+                <span class="tabular-nums dark:text-white">批次 #{{ groups.length + 1 }}</span>
                 <button
                   v-if="groups.length > 0"
                   type="button"

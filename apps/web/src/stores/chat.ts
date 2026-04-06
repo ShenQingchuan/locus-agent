@@ -196,6 +196,19 @@ export const useChatStore = defineStore('chat', () => {
 
   const focusInputTrigger = ref(0)
 
+  /** Pending text for Coding chat composer (e.g. review annotations); applied when ChatInput mounts or updates. */
+  const pendingComposerDraft = ref('')
+  const composerDraftNonce = ref(0)
+
+  function setComposerDraft(text: string) {
+    pendingComposerDraft.value = text
+    composerDraftNonce.value += 1
+  }
+
+  function clearComposerDraft() {
+    pendingComposerDraft.value = ''
+  }
+
   // Conversation lifecycle helpers
   const conversationHelpers = useChatConversation({
     currentConversationId,
@@ -376,6 +389,12 @@ export const useChatStore = defineStore('chat', () => {
 
     // Focus input trigger
     focusInputTrigger,
+
+    // Composer draft (Coding /review → chat input)
+    pendingComposerDraft,
+    composerDraftNonce,
+    setComposerDraft,
+    clearComposerDraft,
 
     // Computed
     hasError,

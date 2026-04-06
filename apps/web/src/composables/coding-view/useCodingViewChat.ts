@@ -3,7 +3,6 @@ import type { ComputedRef, Ref } from 'vue'
 import { useQueryCache } from '@pinia/colada'
 import { useToast } from '@univedge/locus-ui'
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { getConversationListQueryKey, useConversationListQuery, useConversationQuery } from '@/composables/queries'
 import { getTasksListQueryKey } from '@/composables/taskQueries'
 import { provideMarkConversationDirty } from '@/composables/useDirtyConversation'
@@ -16,8 +15,6 @@ export function useCodingViewChat(
   activeSection: Ref<'chat' | 'planning' | 'workspace'>,
 ) {
   const toast = useToast()
-  const route = useRoute()
-  const router = useRouter()
   const chatStore = useChatStore()
   const queryCache = useQueryCache()
 
@@ -30,18 +27,6 @@ export function useCodingViewChat(
 
   const { data: conversationsData, isPending: isLoadingConversations } = useConversationListQuery(() => codingScope.value)
   const { data: conversationData } = useConversationQuery(() => chatStore.currentConversationId)
-
-  watch(() => chatStore.currentConversationId, (id) => {
-    const q = route.query
-    if (id) {
-      if (q.conversation !== id)
-        router.replace({ query: { ...q, conversation: id } })
-    }
-    else if (q.conversation) {
-      const { conversation: _, ...rest } = q
-      router.replace({ query: rest })
-    }
-  })
 
   watch(conversationsData, (data) => {
     if (data) {

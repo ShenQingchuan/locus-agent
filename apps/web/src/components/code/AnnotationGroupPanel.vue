@@ -43,7 +43,7 @@ const {
         <button
           v-if="hasAnnotations"
           class="h-6 px-2 text-xs rounded text-primary hover:bg-primary/10 transition-colors"
-          title="提交所有批注给 AI"
+          title="提交所有批注"
           @click="emit('submitAll')"
         >
           提交批注
@@ -110,7 +110,7 @@ const {
               <button
                 v-if="group.annotations.length > 0"
                 class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"
-                title="提交该组给 AI"
+                title="提交该批次"
                 @click="emit('submitGroup', group.id)"
               >
                 <span class="i-carbon-send h-3 w-3" />
@@ -138,7 +138,7 @@ const {
                   @click="emit('selectFile', filePath)"
                 >
                   <span class="i-carbon-document h-3.5 w-3.5 flex-shrink-0" />
-                  <span class="truncate">{{ basename(filePath) }}</span>
+                  <span class="font-mono truncate">{{ basename(filePath) }}</span>
                 </button>
               </div>
               <div
@@ -156,11 +156,13 @@ const {
                     </p>
                   </div>
                   <button
-                    class="h-5 w-5 flex-shrink-0 inline-flex items-center justify-center rounded text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                    title="删除批注"
+                    type="button"
+                    class="h-5 w-5 flex-shrink-0 inline-flex items-center justify-center rounded text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-primary hover:bg-primary/10 transition-all"
+                    title="标记为解决"
+                    aria-label="标记为解决"
                     @click="emit('removeAnnotation', group.id, ann.id)"
                   >
-                    <span class="i-carbon-close h-3 w-3" />
+                    <span class="i-material-symbols:check-circle h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
               </div>

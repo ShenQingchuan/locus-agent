@@ -34,7 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const diffStyle = ref<'unified' | 'split'>('unified')
-const isReviewPanelOpen = ref(false)
+const reviewPanelOpen = defineModel<boolean>('reviewPanelOpen', { default: false })
 
 const reviewAnnotations = useReviewAnnotations(toRef(props, 'projectKey'))
 
@@ -70,8 +70,8 @@ function handlePopoverSubmit(payload: { groupId: string, comment: string }) {
     popoverLineEnd.value,
     payload.comment,
   )
-  if (!isReviewPanelOpen.value)
-    isReviewPanelOpen.value = true
+  if (!reviewPanelOpen.value)
+    reviewPanelOpen.value = true
 }
 
 function handlePopoverCreateGroup(payload: { comment: string }) {
@@ -86,8 +86,8 @@ function handlePopoverCreateGroup(payload: { comment: string }) {
     popoverLineEnd.value,
     payload.comment,
   )
-  if (!isReviewPanelOpen.value)
-    isReviewPanelOpen.value = true
+  if (!reviewPanelOpen.value)
+    reviewPanelOpen.value = true
 }
 
 function handleSubmitGroup(groupId: string) {
@@ -137,6 +137,10 @@ function goToNext() {
     emit('select', file.filePath, file.staged)
   }
 }
+
+defineExpose({
+  reviewAnnotationCount: reviewAnnotations.totalAnnotationCount,
+})
 </script>
 
 <template>
@@ -179,25 +183,6 @@ function goToNext() {
           变更详情
         </span>
         <div class="flex-shrink-0 ml-auto flex items-center gap-1">
-          <!-- Review panel toggle -->
-          <button
-            class="h-6 px-1.5 rounded text-xs transition-colors flex items-center gap-1"
-            :class="[
-              isReviewPanelOpen
-                ? 'bg-primary/10 text-primary border border-primary/30'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-            ]"
-            title="审阅批注面板"
-            @click="isReviewPanelOpen = !isReviewPanelOpen"
-          >
-            <span class="i-carbon-pen h-3 w-3" />
-            <span v-if="reviewAnnotations.totalAnnotationCount.value > 0" class="text-xs tabular-nums">
-              {{ reviewAnnotations.totalAnnotationCount.value }}
-            </span>
-          </button>
-
-          <span class="w-px h-4 bg-border mx-1" />
-
           <!-- Split / Unified toggle -->
           <button
             class="h-6 px-1.5 rounded text-xs transition-colors"
@@ -288,7 +273,7 @@ function goToNext() {
 
     <!-- Right: Annotation review panel -->
     <aside
-      v-if="isReviewPanelOpen"
+      v-if="reviewPanelOpen"
       class="min-h-0 w-[280px] flex-shrink-0 border-l border-border"
     >
       <AnnotationGroupPanel
