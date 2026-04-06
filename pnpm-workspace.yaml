@@ -93,7 +93,7 @@ catalogs:
     vite: ^8.0.3
   vue-family:
     '@ai-sdk/vue': ^3.0.145
-    '@pierre/diffs': ^1.1.10
+    '@pierre/diffs': ^1.1.12
     '@pinia/colada': ^1.1.0
     '@tanstack/vue-virtual': ^3.13.23
     '@vue/tsconfig': ^0.9.1

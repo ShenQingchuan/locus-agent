@@ -71,6 +71,20 @@
       "when": 1773208301353,
       "tag": "0009_giant_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1775466483456,
+      "tag": "0010_careless_korvac",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1775468604384,
+      "tag": "0011_bored_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

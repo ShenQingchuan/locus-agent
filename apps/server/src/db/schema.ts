@@ -193,6 +193,41 @@ export const noteConversations = sqliteTable('note_conversations', {
   primaryKey({ columns: [t.noteId, t.conversationId] }),
 ])
 
+// ==================== Review Annotations ====================
+
+/** Review annotation groups (batch of code review comments) */
+export const reviewAnnotationGroups = sqliteTable('review_annotation_groups', {
+  id: text('id').primaryKey(),
+  projectKey: text('project_key').notNull(),
+  title: text('title').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_review_groups_project_key').on(t.projectKey),
+])
+
+/** Individual review annotation within a group */
+export const reviewAnnotations = sqliteTable('review_annotations', {
+  id: text('id').primaryKey(),
+  groupId: text('group_id')
+    .notNull()
+    .references(() => reviewAnnotationGroups.id, { onDelete: 'cascade' }),
+  filePath: text('file_path').notNull(),
+  side: text('side', { enum: ['additions', 'deletions'] }).notNull(),
+  lineStart: integer('line_start').notNull(),
+  lineEnd: integer('line_end').notNull(),
+  comment: text('comment').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_review_annotations_group').on(t.groupId),
+])
+
 // ==================== Relations ====================
 
 export const conversationsRelations = relations(conversations, ({ many }) => ({
@@ -332,6 +367,17 @@ export const taskConversationsRelations = relations(taskConversations, ({ one })
   }),
 }))
 
+export const reviewAnnotationGroupsRelations = relations(reviewAnnotationGroups, ({ many }) => ({
+  annotations: many(reviewAnnotations),
+}))
+
+export const reviewAnnotationsRelations = relations(reviewAnnotations, ({ one }) => ({
+  group: one(reviewAnnotationGroups, {
+    fields: [reviewAnnotations.groupId],
+    references: [reviewAnnotationGroups.id],
+  }),
+}))
+
 // ==================== Plugins ====================
 
 /** Installed plugin records */
@@ -383,3 +429,7 @@ export type Task = typeof tasks.$inferSelect
 export type NewTask = typeof tasks.$inferInsert
 export type PluginRow = typeof plugins.$inferSelect
 export type NewPluginRow = typeof plugins.$inferInsert
+export type ReviewAnnotationGroup = typeof reviewAnnotationGroups.$inferSelect
+export type NewReviewAnnotationGroup = typeof reviewAnnotationGroups.$inferInsert
+export type ReviewAnnotationRow = typeof reviewAnnotations.$inferSelect
+export type NewReviewAnnotationRow = typeof reviewAnnotations.$inferInsert

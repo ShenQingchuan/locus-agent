@@ -14,6 +14,7 @@ import { foldersRoutes } from './routes/folders.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { notesRoutes } from './routes/notes.js'
 import { pluginRoutes } from './routes/plugins.js'
+import { reviewAnnotationsRoutes } from './routes/reviewAnnotations.js'
 import { settingsRoutes } from './routes/settings.js'
 import { skillsRoutes } from './routes/skills.js'
 import { tagsRoutes } from './routes/tags.js'
@@ -65,6 +66,7 @@ export function createApp(): Hono {
   app.route('/api/tasks', tasksRoutes)
   app.route('/api/workspace', workspaceRoutes)
   app.route('/api/plugins', pluginRoutes)
+  app.route('/api/review-annotations', reviewAnnotationsRoutes)
 
   return app
 }

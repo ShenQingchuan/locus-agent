@@ -44,6 +44,11 @@ const {
   currentProjectConversations,
   recentConversations,
 } = useCodingView()
+
+function handleSubmitAnnotations(message: string) {
+  activeSection.value = 'chat'
+  handleSend({ content: message, attachments: [] })
+}
 </script>
 
 <template>
@@ -204,6 +209,7 @@ const {
             <div class="flex-1 min-h-0">
               <SessionChangesPanel
                 v-if="currentProjectKey"
+                :project-key="currentProjectKey"
                 :files="gitStatus.files.value"
                 :summary="gitStatus.summary.value"
                 :is-loading="gitStatus.isLoading.value"
@@ -221,6 +227,7 @@ const {
                 @discard="handleDiscard"
                 @stage="gitStatus.stage"
                 @unstage="gitStatus.unstage"
+                @submit-annotations="handleSubmitAnnotations"
               />
               <div v-else class="h-full flex items-center justify-center">
                 <div class="text-center">
