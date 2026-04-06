@@ -1,3 +1,34 @@
+## [0.2.4] - 2026-04-06
+
+### Bug Fixes
+
+- *(web)* Correct fetchConversation response shape after apiClient refactor
+
+- *(web)* Prevent auto-scroll conflicts during user interaction
+
+
+### Features
+
+- *(build)* Introduce turborepo and fix build pipeline
+
+- *(server)* Integrate Codex ACP into chat functionality
+
+
+### Refactor
+
+- *(server)* Split chat route into focused service modules
+
+- *(web)* Unify API layer with apiClient
+
+- *(all)* Replace unsafe  with type narrowing and proper types
+
+- *(server)* Split workspace route and make CORS configurable
+
+
+### Testing
+
+- Setup vitest and add initial unit tests
+
 ## [0.2.3] - 2026-04-05
 
 ### Features
