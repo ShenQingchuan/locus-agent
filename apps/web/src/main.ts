@@ -6,10 +6,10 @@ import App from './App.vue'
 import CodeBlock from './components/code/CodeBlock.vue'
 import router from './router'
 
+import 'virtual:uno.css'
 import '@unocss/reset/tailwind.css'
 import 'markstream-vue/index.css'
 import './styles/main.css'
-import 'virtual:uno.css'
 
 declare global {
   interface Window {

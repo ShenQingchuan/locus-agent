@@ -12,6 +12,13 @@ const isAnalyze = process.env.ANALYZE === 'true'
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'))
 
+/**
+ * When `scripts/dev.ts` sets LOCUS_VITE_FRONT=1, Vite owns the browser origin (:3000)
+ * and proxies API to Bun (:3001). This avoids Bun-fetch → Vite static proxy, which breaks
+ * Vite's CSS/HMR pipeline and causes dev FOUC.
+ */
+const viteFront = process.env.LOCUS_VITE_FRONT === '1'
+
 export default defineConfig({
   devtools: isAnalyze ? { enabled: true } : undefined,
   define: {
@@ -52,12 +59,18 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    // HMR connects directly to Vite's port, since browser page is served from Bun (:3000)
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 5173,
-    },
-  },
+  server: viteFront
+    ? {
+        port: 3000,
+        strictPort: true,
+        proxy: {
+          '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true, ws: true },
+          '/health': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+        },
+        hmr: { protocol: 'ws', host: 'localhost', port: 3000 },
+      }
+    : {
+        port: 5173,
+        hmr: { protocol: 'ws', host: 'localhost', port: 5173 },
+      },
 })

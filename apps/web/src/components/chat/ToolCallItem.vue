@@ -2,13 +2,13 @@
 import type { RiskLevel } from '@univedge/locus-agent-sdk'
 import type { QuestionAnswer } from '@/api/chat'
 import type { ToolCallState } from '@/composables/assistant-runtime'
-import DiffViewer from '@/components/code/DiffViewer.vue'
 import { useToolCallItem } from '@/composables/tool-call-item'
 import DelegateCard from './DelegateCard.vue'
 import InlineDelegateModal from './InlineDelegateModal.vue'
 import PlanCard from './PlanCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import ToolCallBashCard from './ToolCallBashCard.vue'
+import ToolCallInlineDiff from './ToolCallInlineDiff.vue'
 import ToolCallModal from './ToolCallModal.vue'
 import WhitelistPopover from './WhitelistPopover.vue'
 
@@ -111,26 +111,13 @@ const {
           {{ tool.output.trim().split('\n').at(-1) }}
         </div>
 
-        <!-- Inline diff for compact mode -->
-        <div
+        <ToolCallInlineDiff
           v-if="inlineDiff && tool.status !== 'pending'"
-          class="mt-1 rounded-md border border-border overflow-hidden"
-        >
-          <div
-            class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-muted/50 transition-colors"
-            @click="diffExpanded = !diffExpanded"
-          >
-            <div class="i-carbon-code h-3 w-3 flex-shrink-0 text-muted-foreground" />
-            <code class="text-xs font-mono text-muted-foreground truncate">{{ inlineDiffFilePath }}</code>
-            <div
-              class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 i-carbon-chevron-down flex-shrink-0"
-              :class="[diffExpanded ? 'rotate-180' : '']"
-            />
-          </div>
-          <div v-show="diffExpanded" class="max-h-[400px] overflow-y-auto border-t border-border">
-            <DiffViewer :patch="inlineDiff" :file-path="inlineDiffFilePath" />
-          </div>
-        </div>
+          v-model:expanded="diffExpanded"
+          :patch="inlineDiff"
+          :file-path="inlineDiffFilePath"
+          variant="compact"
+        />
       </template>
     </template>
 
@@ -199,26 +186,13 @@ const {
           </button>
         </div>
 
-        <!-- Inline diff for awaiting-approval -->
-        <div
+        <ToolCallInlineDiff
           v-if="inlineDiff"
-          class="border-t border-border rounded-b-lg overflow-hidden"
-        >
-          <div
-            class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-muted/50 transition-colors"
-            @click="diffExpanded = !diffExpanded"
-          >
-            <div class="i-carbon-code h-3 w-3 flex-shrink-0 text-muted-foreground" />
-            <code class="text-xs font-mono text-muted-foreground truncate">{{ inlineDiffFilePath }}</code>
-            <div
-              class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 i-carbon-chevron-down flex-shrink-0"
-              :class="[diffExpanded ? 'rotate-180' : '']"
-            />
-          </div>
-          <div v-show="diffExpanded" class="max-h-[400px] overflow-y-auto border-t border-border">
-            <DiffViewer :patch="inlineDiff" :file-path="inlineDiffFilePath" />
-          </div>
-        </div>
+          v-model:expanded="diffExpanded"
+          :patch="inlineDiff"
+          :file-path="inlineDiffFilePath"
+          variant="embedded-approval"
+        />
       </div>
 
       <!-- Awaiting question: question card -->
@@ -343,26 +317,13 @@ const {
         :status="writePlanStatus"
       />
 
-      <!-- Inline diff for completed / error states -->
-      <div
+      <ToolCallInlineDiff
         v-if="inlineDiff && tool.status !== 'pending' && tool.status !== 'awaiting-approval'"
-        class="mt-1.5 rounded-md border border-border overflow-hidden"
-      >
-        <div
-          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-muted/50 transition-colors"
-          @click="diffExpanded = !diffExpanded"
-        >
-          <div class="i-carbon-code h-3 w-3 flex-shrink-0 text-muted-foreground" />
-          <code class="text-xs font-mono text-muted-foreground truncate">{{ inlineDiffFilePath }}</code>
-          <div
-            class="ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 i-carbon-chevron-down flex-shrink-0"
-            :class="[diffExpanded ? 'rotate-180' : '']"
-          />
-        </div>
-        <div v-show="diffExpanded" class="max-h-[400px] overflow-y-auto border-t border-border">
-          <DiffViewer :patch="inlineDiff" :file-path="inlineDiffFilePath" />
-        </div>
-      </div>
+        v-model:expanded="diffExpanded"
+        :patch="inlineDiff"
+        :file-path="inlineDiffFilePath"
+        variant="standalone"
+      />
 
       <!-- Detail modal -->
       <ToolCallModal

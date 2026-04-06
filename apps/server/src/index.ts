@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -87,12 +88,26 @@ function startDev() {
     apiBase: undefined,
     model: undefined,
   }
-  const port = getServerPort()
   const yoloMode = isYoloMode()
 
-  const VITE_DEV_PORT = 5173
-  if (port === VITE_DEV_PORT) {
-    throw new Error(`Server port ${port} conflicts with Vite dev server. Change it via \`locus-agent config\`.`)
+  /**
+   * Unified dev (`pnpm dev`): Bun serves API only on LOCUS_API_PORT (e.g. 3001); Vite is the browser entry on :3000.
+   * Legacy: Bun on `server.port` (e.g. 3000) and proxies static assets to Vite on 5173.
+   */
+  const apiOnlyPort = process.env.LOCUS_API_PORT
+  const port = apiOnlyPort != null && apiOnlyPort !== ''
+    ? Number(apiOnlyPort)
+    : getServerPort()
+
+  if (apiOnlyPort != null && apiOnlyPort !== '' && Number.isNaN(port)) {
+    throw new Error(`Invalid LOCUS_API_PORT: ${apiOnlyPort}`)
+  }
+
+  const VITE_LEGACY_PORT = 5173
+  if (apiOnlyPort == null || apiOnlyPort === '') {
+    if (port === VITE_LEGACY_PORT) {
+      throw new Error(`Server port ${port} conflicts with Vite dev server. Change it via \`locus-agent config\`.`)
+    }
   }
 
   // 3. Inject configs (same as CLI mode)
@@ -112,28 +127,26 @@ function startDev() {
   // 5. Create app
   const app = createApp()
 
-  // 6. Dev proxy: forward non-API requests to Vite dev server for HMR support.
-  //    Uses middleware + next() so API routes are tried first;
-  //    only unmatched requests (pages, assets) are proxied to Vite.
-  app.use('*', async (c, next) => {
-    // Let Hono routes handle API and health requests
-    if (c.req.path.startsWith('/api/') || c.req.path === '/health') {
-      return next()
-    }
-    // Proxy everything else to Vite dev server
-    const url = new URL(c.req.url)
-    url.host = 'localhost'
-    url.port = String(VITE_DEV_PORT)
-    const proxied = await fetch(url.toString(), {
-      method: c.req.method,
-      headers: c.req.raw.headers,
-      body: c.req.raw.body,
+  // 6. Legacy dev only: Bun proxies static/HMR to Vite. When LOCUS_API_PORT is set, Vite fronts the browser instead.
+  if (apiOnlyPort == null || apiOnlyPort === '') {
+    app.use('*', async (c, next) => {
+      if (c.req.path.startsWith('/api/') || c.req.path === '/health') {
+        return next()
+      }
+      const url = new URL(c.req.url)
+      url.host = 'localhost'
+      url.port = String(VITE_LEGACY_PORT)
+      const proxied = await fetch(url.toString(), {
+        method: c.req.method,
+        headers: c.req.raw.headers,
+        body: c.req.raw.body,
+      })
+      return new Response(proxied.body, {
+        status: proxied.status,
+        headers: proxied.headers,
+      })
     })
-    return new Response(proxied.body, {
-      status: proxied.status,
-      headers: proxied.headers,
-    })
-  })
+  }
 
   return { fetch: app.fetch, port, idleTimeout: 255 }
 }

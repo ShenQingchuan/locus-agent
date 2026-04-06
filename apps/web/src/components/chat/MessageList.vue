@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Message } from '@/composables/assistant-runtime'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, provide, ref, watch } from 'vue'
+import { chatMessageListScrollRootKey } from '@/composables/chatMessageListContext'
 import MessageBubble from './MessageBubble.vue'
 
 const props = withDefaults(defineProps<{
@@ -17,6 +18,8 @@ const props = withDefaults(defineProps<{
 
 const containerRef = ref<HTMLElement | null>(null)
 const previousMessagesLength = ref(0)
+
+provide(chatMessageListScrollRootKey, containerRef)
 
 // --- Virtual scroll ---
 const virtualizer = useVirtualizer(computed(() => ({
