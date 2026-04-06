@@ -3,6 +3,76 @@
  * for rendering with DiffViewer.
  */
 
+// ---------------------------------------------------------------------------
+// Normalized diff extraction — provider-agnostic
+// ---------------------------------------------------------------------------
+
+export interface DiffableToolArgs {
+  type: 'replace' | 'new_file'
+  filePath: string
+  oldText?: string
+  newText: string
+}
+
+/**
+ * Extract diff-renderable arguments from a tool call, regardless of provider.
+ * Returns `null` when the tool is not a recognised file-editing operation.
+ *
+ * To add a new provider convention, append a branch here — no other file
+ * needs to change.
+ */
+export function extractDiffableArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+): DiffableToolArgs | null {
+  // --- Our agent: str_replace { file_path, old_string, new_string } ---
+  if (toolName === 'str_replace' && typeof args.old_string === 'string') {
+    return {
+      type: 'replace',
+      filePath: String(args.file_path ?? ''),
+      oldText: args.old_string,
+      newText: String(args.new_string ?? ''),
+    }
+  }
+
+  // --- Our agent: write_file { file_path, content } ---
+  if (toolName === 'write_file' && typeof args.content === 'string') {
+    return {
+      type: 'new_file',
+      filePath: String(args.file_path ?? ''),
+      newText: args.content,
+    }
+  }
+
+  // --- Kimi CLI: StrReplaceFile { path, edit: { old, new } } ---
+  if (toolName === 'StrReplaceFile') {
+    const edit = args.edit as { old?: string, new?: string } | undefined
+    if (edit && typeof edit.old === 'string') {
+      return {
+        type: 'replace',
+        filePath: String(args.path ?? ''),
+        oldText: edit.old,
+        newText: String(edit.new ?? ''),
+      }
+    }
+  }
+
+  // --- Kimi CLI: WriteFile { path, content } ---
+  if (toolName === 'WriteFile' && typeof args.content === 'string') {
+    return {
+      type: 'new_file',
+      filePath: String(args.path ?? ''),
+      newText: args.content,
+    }
+  }
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Unified diff builders
+// ---------------------------------------------------------------------------
+
 /**
  * Build a unified diff for a str_replace operation.
  *

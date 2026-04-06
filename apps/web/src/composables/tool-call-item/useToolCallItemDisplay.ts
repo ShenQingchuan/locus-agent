@@ -5,7 +5,7 @@ import {
   toolsWithOutputWidget,
 } from '@univedge/locus-agent-sdk'
 import { computed } from 'vue'
-import { buildNewFileDiff, buildReplaceDiff } from '@/utils/diff'
+import { buildNewFileDiff, buildReplaceDiff, extractDiffableArgs } from '@/utils/diff'
 import { parseDelegateMeta, parseQuestionAnswerBlocks } from '@/utils/parsers'
 import { ACP_SUMMARY_HEURISTIC_KEYS, INLINE_DELEGATE_AGENT_TYPES } from './constants'
 
@@ -34,24 +34,20 @@ export function useToolCallItemDisplay(props: UseToolCallItemProps) {
     }
   })
 
+  const diffable = computed(() =>
+    extractDiffableArgs(props.tool.toolCall.toolName, props.tool.toolCall.args),
+  )
+
   const inlineDiff = computed<string | null>(() => {
-    const { toolName, args } = props.tool.toolCall
-    const filePath = String(args.file_path ?? '')
-
-    if (toolName === 'str_replace' && typeof args.old_string === 'string') {
-      return buildReplaceDiff(filePath, args.old_string, String(args.new_string ?? ''))
-    }
-
-    if (toolName === 'write_file' && typeof args.content === 'string') {
-      return buildNewFileDiff(filePath, args.content)
-    }
-
-    return null
+    const d = diffable.value
+    if (!d)
+      return null
+    return d.type === 'replace'
+      ? buildReplaceDiff(d.filePath, d.oldText!, d.newText)
+      : buildNewFileDiff(d.filePath, d.newText)
   })
 
-  const inlineDiffFilePath = computed(() =>
-    String(props.tool.toolCall.args.file_path ?? ''),
-  )
+  const inlineDiffFilePath = computed(() => diffable.value?.filePath ?? '')
 
   const defaultSummary = computed(() => {
     const { status, toolCall, result } = props.tool
