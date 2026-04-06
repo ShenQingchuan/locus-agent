@@ -58,6 +58,7 @@
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "@univedge/locus-agent-sdk": "workspace:*",
     "@univedge/locus-plugin-kit": "workspace:*",
+    "@zed-industries/codex-acp": "catalog:ai-sdk",
     "ai": "catalog:ai-sdk",
     "consola": "catalog:cli-tools",
     "drizzle-orm": "catalog:database",

@@ -8,6 +8,7 @@ import type { ModelMessage } from 'ai'
 import { CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import { runCodexACP } from '../agent/acp/codex-acp.js'
 import { runKimiCLI } from '../agent/acp/kimi-cli.js'
 import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
 import { requestApproval } from '../agent/approval.js'
@@ -194,6 +195,10 @@ chatRoutes.post('/', async (c) => {
     let assistantText = ''
     let assistantReasoning = ''
 
+    // ACP 模式下手动收集工具调用与结果（ACP runner 不返回 generatedMessages）
+    const acpToolCalls: ToolCall[] = []
+    const acpToolResults: ToolResult[] = []
+
     // Delegate results keyed by toolCallId (for persisting deltas to DB)
     const delegateFullResults = new Map<string, unknown>()
 
@@ -247,6 +252,7 @@ chatRoutes.post('/', async (c) => {
             toolName,
             args: args as Record<string, unknown>,
           }
+          acpToolCalls.push(toolCall)
           await stream.writeSSE(createSSEEvent({
             type: 'tool-call-start',
             toolCall,
@@ -264,6 +270,7 @@ chatRoutes.post('/', async (c) => {
             isError,
             isInterrupted,
           }
+          acpToolResults.push(toolResult)
           await stream.writeSSE(createSSEEvent({
             type: 'tool-call-result',
             toolResult,
@@ -309,7 +316,11 @@ chatRoutes.post('/', async (c) => {
 
       let result
       if (codingExecutor && isACPCodingProvider(codingExecutor)) {
-        const acpRunner = codingExecutor === 'kimi-cli' ? runKimiCLI : runLocalClaudeCode
+        const acpRunner = codingExecutor === 'kimi-cli'
+          ? runKimiCLI
+          : codingExecutor === 'codex'
+            ? runCodexACP
+            : runLocalClaudeCode
 
         // Build a lightweight prior-context summary from the conversation history
         // so that a fresh ACP session (e.g. after switching providers) has context.
@@ -339,10 +350,41 @@ chatRoutes.post('/', async (c) => {
           ...streamCallbacks,
         })
 
+        // Reconstruct generatedMessages for ACP so tool calls are persisted.
+        const generatedMessages: ModelMessage[] = []
+        if (assistantText || assistantReasoning || acpToolCalls.length > 0) {
+          const content: Array<
+            | { type: 'reasoning', text: string }
+            | { type: 'tool-call', toolCallId: string, toolName: string, input: Record<string, unknown> }
+            | { type: 'text', text: string }
+          > = []
+          if (assistantReasoning)
+            content.push({ type: 'reasoning', text: assistantReasoning })
+          for (const tc of acpToolCalls) {
+            content.push({ type: 'tool-call', toolCallId: tc.toolCallId, toolName: tc.toolName, input: tc.args })
+          }
+          if (assistantText)
+            content.push({ type: 'text', text: assistantText })
+          generatedMessages.push({ role: 'assistant', content })
+        }
+        if (acpToolResults.length > 0) {
+          generatedMessages.push({
+            role: 'tool',
+            content: acpToolResults.map(tr => ({
+              type: 'tool-result' as const,
+              toolCallId: tr.toolCallId,
+              toolName: tr.toolName,
+              output: tr.isError
+                ? { type: 'error-text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) }
+                : { type: 'text' as const, value: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result) },
+            })),
+          })
+        }
+
         result = {
           finishReason: acpResult.finishReason,
           usage: acpResult.usage,
-          generatedMessages: [] as ModelMessage[],
+          generatedMessages,
         }
 
         await stream.writeSSE(createSSEEvent({

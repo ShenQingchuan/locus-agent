@@ -80,7 +80,7 @@ const statusLabel = computed(() => {
 <template>
   <Modal
     :open="visible"
-    max-width="max-w-2xl"
+    max-width="max-w-4xl"
     panel-class="rounded-xl border-white/10 shadow-2xl"
     @close="emit('close')"
   >

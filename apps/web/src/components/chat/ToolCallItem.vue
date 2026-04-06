@@ -97,11 +97,11 @@ const {
       />
       <template v-else>
         <div
-          class="flex items-center gap-1.5 text-muted-foreground cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
+          class="flex items-center gap-1.5 text-muted-foreground cursor-pointer rounded -mx-1 my-1 px-1 py-2 hover:bg-muted/50 transition-colors"
           @click="modalOpen = true"
         >
           <div class="h-3 w-3 flex-shrink-0" :class="[statusIcon, statusIconClass]" />
-          <code class="text-xs font-mono text-foreground/80">{{ tool.toolCall.toolName }}</code>
+          <code class="text-xs font-mono text-foreground/80 whitespace-nowrap">{{ tool.toolCall.toolName }}</code>
           <span v-if="acpSummary" class="text-xs font-mono truncate">{{ acpSummary }}</span>
         </div>
         <div

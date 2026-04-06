@@ -39,6 +39,9 @@ catalogs:
     '@openrouter/ai-sdk-provider':
       specifier: ^2.3.3
       version: 2.3.3
+    '@zed-industries/codex-acp':
+      specifier: ^0.11.1
+      version: 0.11.1
     ai:
       specifier: ^6.0.145
       version: 6.0.146
@@ -379,6 +382,9 @@ importers:
       '@univedge/locus-plugin-kit':
         specifier: workspace:*
         version: link:../../packages/plugin-kit
+      '@zed-industries/codex-acp':
+        specifier: catalog:ai-sdk
+        version: 0.11.1
       ai:
         specifier: catalog:ai-sdk
         version: 6.0.146(zod@4.3.6)
@@ -3069,6 +3075,46 @@ packages:
 
   '@zag-js/utils@1.39.0':
     resolution: {integrity: sha512-GRkMz5mZeqB5TbKl+ez0MRxxTqSFt7W/AXNuypPbKyI+pX2Jgp11Cy1LYG5pGSDNiX3caR6NCFIRb0sFgSMXZg==}
+
+  '@zed-industries/codex-acp-darwin-arm64@0.11.1':
+    resolution: {integrity: sha512-zJ/CsOSH1NniKGF/liBtWokdkFtymTWeELV4lDlgMgzVSqMHQTB+t6fFSrxhwOcXHK86TErxAT81Z61e+bq5gg==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@zed-industries/codex-acp-darwin-x64@0.11.1':
+    resolution: {integrity: sha512-UZjIsEZPLeYMk+fj2ot1oT+tWuJpw+iZS9awnbmJYxTEEXMpY8BE6xQXMy7iyyxJ346We5MEpAdxg730vcem5Q==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@zed-industries/codex-acp-linux-arm64@0.11.1':
+    resolution: {integrity: sha512-I1f6WoSLbLlsWq4zH+vtwdoc4Y41mqRXPpSkfgIifxBw34QmWJmi37etZ7lKTYp6R+J/Z4PUN0rsmnsmKpBZTw==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  '@zed-industries/codex-acp-linux-x64@0.11.1':
+    resolution: {integrity: sha512-30vSoZuW1DP6Nuz24Gg3jgVC37IYe0bZ/Fgc5+372gc0h72NN4zHYAbu5bRd/gUJ9GdwABKrrEPCoFPlOTVTnQ==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@zed-industries/codex-acp-win32-arm64@0.11.1':
+    resolution: {integrity: sha512-yisGPG7JMJBtOTOB6qwzroOLfiQebDrBnybzvjOfWiSIHeha25Jf1nTlWrlZcEiV/eeX3/lERuU1MxftjK3Vgg==}
+    cpu: [arm64]
+    os: [win32]
+    hasBin: true
+
+  '@zed-industries/codex-acp-win32-x64@0.11.1':
+    resolution: {integrity: sha512-nOdlp/xHQGzqt+GnB2rrpk0sT7pPJVKkL9M+UhmoFPSFwjWrkzAOJukbT4P59wU1mVBTe84dEW6UnzydWIrGJw==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
+
+  '@zed-industries/codex-acp@0.11.1':
+    resolution: {integrity: sha512-My2VSlBtvJipJhImHjFDej2ut/p00QqOISRnZgLgLrSIzjgvdcQvAhaZviWj7XPhk4UIdIb0OoA+Lrls824uiQ==}
+    hasBin: true
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -8785,6 +8831,33 @@ snapshots:
       csstype: 3.2.3
 
   '@zag-js/utils@1.39.0': {}
+
+  '@zed-industries/codex-acp-darwin-arm64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp-darwin-x64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp-linux-arm64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp-linux-x64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp-win32-arm64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp-win32-x64@0.11.1':
+    optional: true
+
+  '@zed-industries/codex-acp@0.11.1':
+    optionalDependencies:
+      '@zed-industries/codex-acp-darwin-arm64': 0.11.1
+      '@zed-industries/codex-acp-darwin-x64': 0.11.1
+      '@zed-industries/codex-acp-linux-arm64': 0.11.1
+      '@zed-industries/codex-acp-linux-x64': 0.11.1
+      '@zed-industries/codex-acp-win32-arm64': 0.11.1
+      '@zed-industries/codex-acp-win32-x64': 0.11.1
 
   accepts@2.0.0:
     dependencies:
