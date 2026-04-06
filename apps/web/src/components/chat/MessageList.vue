@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Message } from '@/composables/assistant-runtime'
-import { useVirtualizer } from '@tanstack/vue-virtual'
-import { computed, nextTick, provide, ref, watch } from 'vue'
+import { provide, ref } from 'vue'
 import { chatMessageListScrollRootKey } from '@/composables/chatMessageListContext'
+import { useMessageListScroll } from '@/composables/message-list/useMessageListScroll'
+import { useMessageListVirtualizer } from '@/composables/message-list/useMessageListVirtualizer'
 import MessageBubble from './MessageBubble.vue'
 
 const props = withDefaults(defineProps<{
@@ -17,136 +18,32 @@ const props = withDefaults(defineProps<{
 })
 
 const containerRef = ref<HTMLElement | null>(null)
-const previousMessagesLength = ref(0)
+const scrollMeasureRef = ref<HTMLElement | null>(null)
+/** Shared: scroll composable + Virtualizer resize compensation — stops stream from pulling viewport when user reads up */
+const userScrolledUp = ref(false)
 
 provide(chatMessageListScrollRootKey, containerRef)
 
-// --- Virtual scroll ---
-const virtualizer = useVirtualizer(computed(() => ({
-  count: props.messages.length,
-  getScrollElement: () => containerRef.value,
-  estimateSize: () => 80,
-  measureElement: (el: HTMLElement) => el.getBoundingClientRect().height,
-  overscan: 5,
-})))
+const { virtualizer } = useMessageListVirtualizer({
+  messageCount: () => props.messages.length,
+  scrollRoot: containerRef,
+  userScrolledUp,
+})
 
-// --- Smart scroll state ---
-const userScrolledUp = ref(false)
-let isProgrammaticScroll = false
-let scrollRafId: number | null = null
-let scrollLockUntil = 0
-const SCROLL_LOCK_DURATION = 300
-
-const BOTTOM_THRESHOLD = 80
-
-function isAtBottom(): boolean {
-  const el = containerRef.value
-  if (!el)
-    return true
-  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD
-}
-
-const showScrollButton = ref(false)
-
-function onScroll() {
-  if (isProgrammaticScroll)
-    return
-
-  const atBottom = isAtBottom()
-  showScrollButton.value = !atBottom
-  const now = Date.now()
-
-  if (atBottom) {
-    if (now >= scrollLockUntil) {
-      userScrolledUp.value = false
-    }
-  }
-  else {
-    userScrolledUp.value = true
-    scrollLockUntil = now + SCROLL_LOCK_DURATION
-    if (scrollRafId !== null) {
-      cancelAnimationFrame(scrollRafId)
-      scrollRafId = null
-    }
-  }
-}
-
-function scrollToBottom(instant = true) {
-  const container = containerRef.value
-  if (!container)
-    return
-
-  isProgrammaticScroll = true
-  if (instant) {
-    container.scrollTop = container.scrollHeight - container.clientHeight
-  }
-  else {
-    container.scrollTo({ top: container.scrollHeight - container.clientHeight, behavior: 'smooth' })
-  }
-  showScrollButton.value = false
-
-  requestAnimationFrame(() => {
-    isProgrammaticScroll = false
-  })
-}
-
-function scheduleScrollToBottom() {
-  if (scrollRafId !== null)
-    return
-  scrollRafId = requestAnimationFrame(() => {
-    scrollRafId = null
-    scrollToBottom(true)
-  })
-}
-
-// --- Auto-scroll on content change ---
-watch(
-  () => {
-    const len = props.messages.length
-    const last = len > 0 ? props.messages[len - 1] : null
-    return [len, last?.content?.length ?? 0] as const
-  },
-  async ([newLen]) => {
-    if (newLen === 0) {
-      previousMessagesLength.value = 0
-      userScrolledUp.value = false
-      return
-    }
-
-    const isInitialLoad = previousMessagesLength.value === 0 && newLen > 0
-    previousMessagesLength.value = newLen
-
-    if (userScrolledUp.value && !isInitialLoad)
-      return
-    if (Date.now() < scrollLockUntil && !isInitialLoad)
-      return
-
-    await nextTick()
-    virtualizer.value.measure()
-    await nextTick()
-
-    if (isInitialLoad) {
-      scrollToBottom(true)
-      ;[50, 150, 300].forEach(delay => setTimeout(scrollToBottom, delay, true))
-    }
-    else {
-      scheduleScrollToBottom()
-    }
-  },
-)
-
-function handleScrollToBottomClick() {
-  userScrolledUp.value = false
-  scrollToBottom(false)
-}
-
-function scrollToToolCall(toolCallId: string) {
-  const els = containerRef.value?.querySelectorAll(`[data-tool-call-id="${toolCallId}"]`)
-  if (els && els.length > 0) {
-    const last = Array.from(els).at(-1)
-    last?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }
-}
+const {
+  showScrollButton,
+  onScroll,
+  handleScrollToBottomClick,
+  scrollToBottom,
+  scrollToToolCall,
+} = useMessageListScroll({
+  containerRef,
+  scrollMeasureRef,
+  messages: () => props.messages,
+  isStreaming: () => props.isStreaming,
+  virtualizer,
+  userScrolledUp,
+})
 
 defineExpose({ scrollToBottom, scrollToToolCall })
 </script>
@@ -158,7 +55,7 @@ defineExpose({ scrollToBottom, scrollToToolCall })
       class="h-full overflow-y-auto overflow-x-hidden px-4 py-4 bg-background"
       @scroll.passive="onScroll"
     >
-      <div class="max-w-3xl mx-auto">
+      <div ref="scrollMeasureRef" class="max-w-3xl mx-auto">
         <!-- Loading conversation -->
         <div
           v-if="messages.length === 0 && isLoadingConversation"
