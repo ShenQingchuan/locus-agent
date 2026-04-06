@@ -1,3 +1,20 @@
+## [0.2.5] - 2026-04-06
+
+### Features
+
+- *(server)* Introduce dedicated memory module
+
+- *(server)* Search conversations by message content
+
+- *(web)* Virtual scroll, focus fix and dependency updates
+
+
+### Refactor
+
+- *(server)* Migrate routes and tools to memory module
+
+- *(web)* Split large composables and chat store
+
 ## [0.2.4] - 2026-04-06
 
 ### Bug Fixes
