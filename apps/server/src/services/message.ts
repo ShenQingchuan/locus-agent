@@ -1,6 +1,6 @@
 import type { MessageImageAttachment, ToolCall, ToolResult } from '@univedge/locus-agent-sdk'
 import type { Message, NewMessage } from '../db/schema.js'
-import { asc, desc, eq, sql } from 'drizzle-orm'
+import { asc, desc, eq, like, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { conversations, messages } from '../db/schema.js'
 import { touchConversation } from './conversation.js'
@@ -248,4 +248,18 @@ export async function getMessageCount(conversationId: string): Promise<number> {
     .where(eq(messages.conversationId, conversationId))
 
   return result.length
+}
+
+/**
+ * 搜索消息内容，返回关联的会话 ID 列表（去重）
+ */
+export async function searchMessages(query: string): Promise<{ conversationId: string, content: string }[]> {
+  const result = await db
+    .select({ conversationId: messages.conversationId, content: messages.content })
+    .from(messages)
+    .where(like(messages.content, `%${query}%`))
+    .orderBy(desc(sql`rowid`))
+    .limit(100)
+
+  return result
 }

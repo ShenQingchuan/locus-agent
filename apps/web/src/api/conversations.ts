@@ -23,6 +23,16 @@ export async function fetchConversations(scope?: {
   }
 }
 
+export async function searchConversations(query: string): Promise<Conversation[]> {
+  try {
+    const data = await apiClient.get<{ conversations: Conversation[] }>(`/api/conversations/search?q=${encodeURIComponent(query)}`)
+    return data.conversations
+  }
+  catch {
+    return []
+  }
+}
+
 export async function fetchConversation(
   conversationId: string,
 ): Promise<{ conversation: Conversation, messages: Message[] } | null> {

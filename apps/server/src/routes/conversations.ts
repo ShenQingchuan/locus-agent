@@ -12,7 +12,7 @@ import {
   listScopedConversations,
   updateConversation,
 } from '../services/conversation.js'
-import { addMessage, getMessages, truncateMessages } from '../services/message.js'
+import { addMessage, getMessages, searchMessages, truncateMessages } from '../services/message.js'
 import { updateActiveConfirmMode } from './chat.js'
 
 const RE_SURROUNDING_QUOTES = /^["']|["']$/g
@@ -60,6 +60,31 @@ conversationsRoutes.get('/', async (c) => {
     projectKey,
   })
   return c.json({ conversations: result })
+})
+
+// GET /api/conversations/search?q=... - Search conversations by title or message content
+conversationsRoutes.get('/search', async (c) => {
+  const q = c.req.query('q')?.trim() ?? ''
+  if (!q) {
+    return c.json({ conversations: [] })
+  }
+
+  const allConversations = await listScopedConversations({})
+  const lowerQ = q.toLowerCase()
+
+  // Match by title
+  const titleMatches = new Set(
+    allConversations.filter(conv => conv.title.toLowerCase().includes(lowerQ)).map(c => c.id),
+  )
+
+  // Match by message content
+  const messageMatches = await searchMessages(q)
+  for (const m of messageMatches) {
+    titleMatches.add(m.conversationId)
+  }
+
+  const results = allConversations.filter(conv => titleMatches.has(conv.id)).slice(0, 20)
+  return c.json({ conversations: results })
 })
 
 // POST /api/conversations - Create a new conversation

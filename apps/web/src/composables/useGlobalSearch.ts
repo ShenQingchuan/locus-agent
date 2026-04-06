@@ -1,9 +1,8 @@
-import type { Conversation } from '@univedge/locus-agent-sdk'
 import type { CommandItem } from '@univedge/locus-ui'
 import { useDebounceFn } from '@vueuse/core'
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchConversations } from '@/api/conversations'
+import { searchConversations } from '@/api/conversations'
 import * as api from '@/api/knowledge'
 
 export interface SearchCommandItemData {
@@ -38,9 +37,8 @@ export function useGlobalSearch() {
 
     isCommandSearching.value = true
     try {
-      const [memoryResults, conversationResults, tagsResult] = await Promise.all([
+      const [memoryResults, tagsResult] = await Promise.all([
         api.searchNotes(query),
-        fetchConversations(),
         api.fetchTags(),
       ])
 
@@ -73,11 +71,9 @@ export function useGlobalSearch() {
         })
       }
 
-      // Conversations matching query
-      const filteredConvs = (conversationResults ?? [])
-        .filter((c: Conversation) => c.title.toLowerCase().includes(q))
-        .slice(0, 5)
-      for (const conv of filteredConvs) {
+      // Conversations matching query (title + message content)
+      const filteredConvs = await searchConversations(query)
+      for (const conv of filteredConvs.slice(0, 5)) {
         items.push({
           id: `conv-${conv.id}`,
           label: conv.title,
