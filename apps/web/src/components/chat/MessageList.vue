@@ -161,7 +161,7 @@ defineExpose({ scrollToBottom, scrollToToolCall })
           v-if="messages.length === 0 && isLoadingConversation"
           class="flex-col-center h-full py-20 text-muted-foreground"
         >
-          <div class="i-svg-spinners:ring-resize h-10 w-10 mb-4 opacity-70" />
+          <div class="i-svg-spinners:bars-scale-fade h-10 w-10 mb-4 opacity-70" />
           <p class="text-base font-medium">
             加载会话中...
           </p>

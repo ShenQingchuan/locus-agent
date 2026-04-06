@@ -24,10 +24,8 @@ const {
   setSectionRef,
   handleContentScroll,
   navigateToSection,
-  codingKimi,
   loadConfig,
   saveConfig,
-  handleKimiCodeSave,
 } = useSettingsView()
 </script>
 
@@ -154,7 +152,7 @@ const {
                       LLM
                     </h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                      配置主模型提供商、API Key、模型名和 Coding 专用能力。
+                      配置主模型提供商、API Key 与模型名
                     </p>
                   </div>
 
@@ -165,9 +163,7 @@ const {
                     :requires-restart="requiresRestart"
                     :is-loading="isLoading"
                     :api-keys-masked="apiKeysMasked"
-                    :coding-kimi="codingKimi"
                     @submit="saveConfig"
-                    @kimi-code-save="handleKimiCodeSave"
                   />
                 </section>
 

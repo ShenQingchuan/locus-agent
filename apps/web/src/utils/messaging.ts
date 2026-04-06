@@ -1,7 +1,7 @@
 import type { CodingExecutorType, Conversation, LLMProviderType } from '@univedge/locus-agent-sdk'
 import type { Message } from '@/composables/assistant-runtime'
 import type { ConversationScope } from '@/composables/useConversationScopeState'
-import { ACP_CODING_PROVIDERS, CODING_PROVIDERS, DEFAULT_MODELS, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { ACP_CODING_PROVIDERS, DEFAULT_MODELS, isACPCodingProvider } from '@univedge/locus-agent-sdk'
 
 export function computeBackendKeepCount(history: Message[]): number {
   let backendKeepCount = 0
@@ -24,8 +24,6 @@ export interface BuildAssistantModelState {
 export function buildAssistantModel(state: BuildAssistantModelState): string {
   const executor = state.codingExecutor
   if (state.conversationScope.space === 'coding' && executor) {
-    if (isCodingModelProvider(executor))
-      return `${executor}/${CODING_PROVIDERS.find(cp => cp.value === executor)?.defaultModel || 'unknown'}`
     if (isACPCodingProvider(executor))
       return `acp/${ACP_CODING_PROVIDERS.find(cp => cp.value === executor)?.value || executor}`
   }

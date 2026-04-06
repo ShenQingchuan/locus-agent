@@ -10,7 +10,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   setActive: [groupId: string | null]
   deleteGroup: [groupId: string]
-  renameGroup: [groupId: string, title: string]
   removeAnnotation: [groupId: string, annotationId: string]
   submitGroup: [groupId: string]
   submitAll: []
@@ -19,20 +18,11 @@ const emit = defineEmits<{
 }>()
 
 const {
-  editingGroupId,
-  editingTitle,
   hasAnnotations,
-  startEditing,
-  finishEditing,
-  cancelEditing,
   groupAnnotationsByFile,
   formatRange,
   basename,
 } = useAnnotationGroups(() => props.groups)
-
-function handleFinishEditing(groupId: string) {
-  finishEditing(groupId, (id, title) => emit('renameGroup', id, title))
-}
 </script>
 
 <template>
@@ -87,7 +77,7 @@ function handleFinishEditing(groupId: string) {
       <!-- Group list -->
       <div v-else class="py-1">
         <div
-          v-for="group in groups"
+          v-for="(group, index) in groups"
           :key="group.id"
           class="border-b border-border/50 last:border-b-0"
         >
@@ -108,35 +98,15 @@ function handleFinishEditing(groupId: string) {
               ]"
             />
 
-            <!-- Editable title -->
-            <template v-if="editingGroupId === group.id">
-              <input
-                v-model="editingTitle"
-                class="flex-1 min-w-0 h-6 px-1.5 text-xs bg-muted border border-primary/30 rounded text-foreground"
-                @keydown.enter="handleFinishEditing(group.id)"
-                @keydown.escape="cancelEditing()"
-                @blur="handleFinishEditing(group.id)"
-                @click.stop
-              >
-            </template>
-            <template v-else>
-              <span class="flex-1 min-w-0 text-xs font-medium truncate">
-                {{ group.title }}
-              </span>
-              <span class="text-xs text-muted-foreground/60 flex-shrink-0 tabular-nums">
-                {{ group.annotations.length }} 条
-              </span>
-            </template>
+            <span class="flex-1 min-w-0 text-xs font-medium tabular-nums">
+              #{{ index + 1 }}
+            </span>
+            <span class="text-xs text-muted-foreground/60 flex-shrink-0 tabular-nums">
+              {{ group.annotations.length }} 条
+            </span>
 
             <!-- Group actions -->
             <div class="flex items-center gap-0.5 flex-shrink-0" @click.stop>
-              <button
-                class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
-                title="重命名"
-                @click="startEditing(group)"
-              >
-                <span class="i-carbon-edit h-3 w-3" />
-              </button>
               <button
                 v-if="group.annotations.length > 0"
                 class="h-5 w-5 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"

@@ -41,6 +41,7 @@
     "build": "bun run build.ts",
     "typecheck": "tsgo --noEmit",
     "db:generate": "drizzle-kit generate",
+    "db:patch-journal-baseline": "node scripts/patch-drizzle-journal-baseline.mjs",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },

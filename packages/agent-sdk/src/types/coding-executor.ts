@@ -1,30 +1,15 @@
 /**
  * Coding Executor Types and Configuration
  *
- * Defines available coding executors (Kimi Code, Claude Code) for code generation.
- * Use these types for selecting code generation providers separate from main LLM.
+ * Defines ACP-based coding executors (Claude Code, Kimi CLI, Codex) for code generation.
  *
  * @module types/coding-executor
  */
 
 import type { LLMProviderType } from './llm-provider.js'
 
-export type CodingModelProviderType = 'kimi-code'
 export type ACPCodingProviderType = 'claude-code' | 'kimi-cli' | 'codex'
-export type CodingExecutorType = CodingModelProviderType | ACPCodingProviderType
-
-export interface CodingProviderMeta {
-  value: CodingModelProviderType
-  label: string
-  /** Which main LLM provider tab this coding provider lives under */
-  parentProvider: LLMProviderType
-  defaultModel: string
-  defaultApiBase: string
-  /** 'api-key' = normal key input */
-  authMode: 'api-key'
-  /** SDK format used for API calls */
-  apiFormat: 'anthropic'
-}
+export type CodingExecutorType = ACPCodingProviderType
 
 export interface ACPCodingProviderMeta {
   value: ACPCodingProviderType
@@ -32,18 +17,6 @@ export interface ACPCodingProviderMeta {
   transport: 'local-cli' | 'remote-http'
   icon?: string
 }
-
-export const CODING_MODEL_PROVIDERS: CodingProviderMeta[] = [
-  {
-    value: 'kimi-code',
-    label: 'Kimi Code',
-    parentProvider: 'moonshotai',
-    defaultModel: 'kimi-k2.5',
-    defaultApiBase: 'https://api.kimi.com/coding/v1',
-    authMode: 'api-key',
-    apiFormat: 'anthropic',
-  },
-]
 
 export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
   {
@@ -66,20 +39,13 @@ export const ACP_CODING_PROVIDERS: ACPCodingProviderMeta[] = [
   },
 ]
 
-export const CODING_PROVIDERS = CODING_MODEL_PROVIDERS
-
 /**
- * Look up which coding provider belongs to a given main provider tab.
+ * Suggested default ACP coding agent for the active main LLM tab (e.g. Kimi CLI under Moonshot).
  */
-export function getCodingProviderForParent(parent: LLMProviderType): CodingProviderMeta | undefined {
-  return CODING_MODEL_PROVIDERS.find(cp => cp.parentProvider === parent)
-}
-
-/**
- * Type guard for coding model providers.
- */
-export function isCodingModelProvider(value: string): value is CodingModelProviderType {
-  return CODING_MODEL_PROVIDERS.some(cp => cp.value === value)
+export function getDefaultCodingExecutorForProvider(parent: LLMProviderType): ACPCodingProviderType | null {
+  if (parent === 'moonshotai')
+    return 'kimi-cli'
+  return null
 }
 
 /**
@@ -90,8 +56,8 @@ export function isACPCodingProvider(value: string): value is ACPCodingProviderTy
 }
 
 /**
- * Type guard for any coding executor (both model and ACP).
+ * Type guard for any coding executor (ACP-only).
  */
 export function isCodingExecutor(value: string): value is CodingExecutorType {
-  return isCodingModelProvider(value) || isACPCodingProvider(value)
+  return isACPCodingProvider(value)
 }

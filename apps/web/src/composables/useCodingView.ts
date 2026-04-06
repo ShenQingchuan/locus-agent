@@ -1,4 +1,4 @@
-import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { getDefaultCodingExecutorForProvider } from '@univedge/locus-agent-sdk'
 import { storeToRefs } from 'pinia'
 import { watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
@@ -33,9 +33,9 @@ export function useCodingView() {
 
   watch(workspace.codingScope, (scope) => {
     if (scope.space === 'coding') {
-      const meta = getCodingProviderForParent(provider.value)
-      if (meta && !codingExecutor.value)
-        codingExecutor.value = meta.value
+      const suggested = getDefaultCodingExecutorForProvider(provider.value)
+      if (suggested && !codingExecutor.value)
+        codingExecutor.value = suggested
     }
     else {
       codingExecutor.value = null

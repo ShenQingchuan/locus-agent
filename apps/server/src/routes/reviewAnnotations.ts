@@ -27,8 +27,8 @@ reviewAnnotationsRoutes.post('/groups', async (c) => {
   const body = await c.req.json()
   const { id, projectKey, title } = body
 
-  if (!projectKey || !title)
-    return c.json({ error: 'projectKey and title are required' }, 400)
+  if (!projectKey)
+    return c.json({ error: 'projectKey is required' }, 400)
 
   const group = await createGroup({ id, projectKey, title })
   return c.json(group, 201)

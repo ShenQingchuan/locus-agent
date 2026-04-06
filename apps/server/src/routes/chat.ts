@@ -5,7 +5,7 @@ import type {
   ToolResult,
 } from '@univedge/locus-agent-sdk'
 import type { ModelMessage } from 'ai'
-import { CODING_PROVIDERS, createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { createSSEEventPayload, extractDefaultPattern, getRiskLevel, isACPCodingProvider } from '@univedge/locus-agent-sdk'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { runCodexACP } from '../agent/acp/codex-acp.js'
@@ -13,7 +13,7 @@ import { runKimiCLI } from '../agent/acp/kimi-cli.js'
 import { runLocalClaudeCode } from '../agent/acp/local-claude-code.js'
 import { requestApproval } from '../agent/approval.js'
 import { runAgentLoop } from '../agent/loop.js'
-import { createCodingModel, createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
+import { createLLMModel, getCurrentModelInfo } from '../agent/providers/index.js'
 import { requestQuestionAnswer } from '../agent/question.js'
 import { executeReadPlan } from '../agent/tools/manage_plans.js'
 import { getWorkspaceRoot } from '../agent/tools/workspace-root.js'
@@ -204,10 +204,8 @@ chatRoutes.post('/', async (c) => {
 
     try {
       const runtimeModelInfo = getCurrentModelInfo()
-      const assistantModel = codingExecutor
-        ? (isCodingModelProvider(codingExecutor)
-            ? `${codingExecutor}/${CODING_PROVIDERS.find(cp => cp.value === codingExecutor)?.defaultModel || 'unknown'}`
-            : `acp/${codingExecutor}`)
+      const assistantModel = codingExecutor && isACPCodingProvider(codingExecutor)
+        ? `acp/${codingExecutor}`
         : `${runtimeModelInfo.provider}/${runtimeModelInfo.model}`
 
       // 从 DB 加载消息历史（后端权威状态，不依赖前端传入的 messages）
@@ -399,9 +397,7 @@ chatRoutes.post('/', async (c) => {
         }))
       }
       else {
-        const model = codingExecutor && isCodingModelProvider(codingExecutor)
-          ? await createCodingModel(codingExecutor)
-          : createLLMModel({ modelId: runtimeModelInfo.model, thinkingMode: effectiveThinkingMode })
+        const model = createLLMModel({ modelId: runtimeModelInfo.model, thinkingMode: effectiveThinkingMode })
 
         result = await runAgentLoop({
           model,

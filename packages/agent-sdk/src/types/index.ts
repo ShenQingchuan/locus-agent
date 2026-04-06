@@ -3,12 +3,9 @@ export type * from './api.js'
 export type * from './coding-executor.js'
 export {
   ACP_CODING_PROVIDERS,
-  CODING_MODEL_PROVIDERS,
-  CODING_PROVIDERS,
-  getCodingProviderForParent,
+  getDefaultCodingExecutorForProvider,
   isACPCodingProvider,
   isCodingExecutor,
-  isCodingModelProvider,
 } from './coding-executor.js'
 export type * from './conversation.js'
 export type * from './git.js'

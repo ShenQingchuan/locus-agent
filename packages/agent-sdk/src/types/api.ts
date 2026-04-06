@@ -35,7 +35,7 @@ export interface ChatRequest {
   planBinding?: PlanBinding
   /** 用户消息元数据（携带 trigger 时该消息不在 UI 渲染） */
   messageMetadata?: MessageMetadata
-  /** 使用编码 Agent（如 kimi-code、local-claude-code），为空则使用默认模型 */
+  /** 使用 ACP 编码 Agent（如 kimi-cli、claude-code），为空则使用默认主模型 */
   codingExecutor?: CodingExecutorType
 }
 

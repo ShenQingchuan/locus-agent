@@ -16,17 +16,12 @@ export type {
   ACPCodingProviderMeta,
   ACPCodingProviderType,
   CodingExecutorType,
-  CodingModelProviderType,
-  CodingProviderMeta,
 } from './coding-executor.js'
 export {
   ACP_CODING_PROVIDERS,
-  CODING_MODEL_PROVIDERS,
-  CODING_PROVIDERS,
-  getCodingProviderForParent,
+  getDefaultCodingExecutorForProvider,
   isACPCodingProvider,
   isCodingExecutor,
-  isCodingModelProvider,
 } from './coding-executor.js'
 
 // LLM Provider exports

@@ -53,7 +53,7 @@ export function useChatInput(
   } = useEscConfirm()
 
   const model = useChatInputModel(props.showCodingMode)
-  const menus = useChatInputMenus(props.showCodingMode)
+  const menus = useChatInputMenus()
   const queue = useChatInputQueue(
     chatStore.editQueueItem,
     chatStore.removeFromQueue,

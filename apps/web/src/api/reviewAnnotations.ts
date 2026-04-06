@@ -32,7 +32,7 @@ export async function fetchAnnotationGroups(projectKey: string): Promise<ReviewA
 export async function createAnnotationGroup(input: {
   id?: string
   projectKey: string
-  title: string
+  title?: string
 }): Promise<ReviewAnnotationGroupDTO> {
   return apiClient.post<ReviewAnnotationGroupDTO>(`${API_BASE}/groups`, input)
 }

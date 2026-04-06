@@ -1,13 +1,10 @@
 import type { DropdownItem } from '@univedge/locus-ui'
-import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
 import { useToast } from '@univedge/locus-ui'
 import { computed, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useModelSettingsStore } from '@/stores/modelSettings'
 
-export function useChatInputMenus(
-  showCodingMode: boolean | undefined,
-) {
+export function useChatInputMenus() {
   const chatStore = useChatStore()
   const modelSettings = useModelSettingsStore()
   const toast = useToast()
@@ -29,22 +26,11 @@ export function useChatInputMenus(
       },
     ]
 
-    const codingMeta = showCodingMode ? getCodingProviderForParent(modelSettings.provider) : undefined
-    if (codingMeta) {
-      items.push({
-        key: `coding-executor:${codingMeta.value}`,
-        label: `${codingMeta.label} 编码`,
-        icon: codingMeta.parentProvider === 'openai' ? 'i-simple-icons:openai' : 'i-custom:moonshot',
-        active: modelSettings.codingExecutor === codingMeta.value,
-        separator: true,
-      })
-    }
-
     items.push({
       key: 'whitelist',
       label: '工具白名单',
       icon: 'i-carbon-tool-box',
-      separator: !codingMeta,
+      separator: true,
     })
 
     return items
@@ -104,10 +90,6 @@ export function useChatInputMenus(
     }
     else if (key === 'whitelist') {
       whitelistOpen.value = !whitelistOpen.value
-    }
-    else if (key.startsWith('coding-executor:')) {
-      const provider = key.replace('coding-executor:', '')
-      modelSettings.codingExecutor = modelSettings.codingExecutor === provider ? null : provider as typeof modelSettings.codingExecutor
     }
   }
 

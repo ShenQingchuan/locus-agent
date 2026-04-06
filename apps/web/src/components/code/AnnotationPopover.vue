@@ -15,13 +15,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   submit: [payload: { groupId: string, comment: string }]
-  createGroup: [payload: { title: string, comment: string }]
+  createGroup: [payload: { comment: string }]
 }>()
 
 const comment = ref('')
 const selectedGroupId = ref<string | null>(null)
 const isCreatingGroup = ref(false)
-const newGroupTitle = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const rangeLabel = computed(() => {
@@ -35,13 +34,8 @@ const sideLabel = computed(() => props.side === 'additions' ? '新增' : '删除
 watch(() => props.open, async (open) => {
   if (open) {
     comment.value = ''
-    isCreatingGroup.value = false
-    newGroupTitle.value = ''
     selectedGroupId.value = props.activeGroupId ?? props.groups[0]?.id ?? null
-    if (!selectedGroupId.value) {
-      isCreatingGroup.value = true
-      newGroupTitle.value = '审阅意见 #1'
-    }
+    isCreatingGroup.value = props.groups.length === 0
     await nextTick()
     textareaRef.value?.focus()
   }
@@ -53,8 +47,7 @@ function handleSubmit() {
     return
 
   if (isCreatingGroup.value) {
-    const title = newGroupTitle.value.trim() || '审阅意见'
-    emit('createGroup', { title, comment: trimmedComment })
+    emit('createGroup', { comment: trimmedComment })
   }
   else if (selectedGroupId.value) {
     emit('submit', { groupId: selectedGroupId.value, comment: trimmedComment })
@@ -114,11 +107,11 @@ function handleKeydown(e: KeyboardEvent) {
                   class="flex-1 h-8 px-2 text-xs bg-muted border border-border rounded-md text-foreground appearance-none cursor-pointer"
                 >
                   <option
-                    v-for="group in groups"
+                    v-for="(group, gi) in groups"
                     :key="group.id"
                     :value="group.id"
                   >
-                    {{ group.title }} ({{ group.annotations.length }})
+                    #{{ gi + 1 }} ({{ group.annotations.length }})
                   </option>
                 </select>
                 <button
@@ -128,16 +121,15 @@ function handleKeydown(e: KeyboardEvent) {
                   新建组
                 </button>
               </div>
-              <div v-else class="flex items-center gap-2">
-                <input
-                  v-model="newGroupTitle"
-                  type="text"
-                  class="flex-1 h-8 px-2 text-xs bg-muted border border-border rounded-md text-foreground placeholder:text-muted-foreground/60"
-                  placeholder="输入意见组名称..."
-                >
+              <div
+                v-else
+                class="flex items-center gap-2 text-xs text-muted-foreground"
+              >
+                <span class="tabular-nums">新建意见组 #{{ groups.length + 1 }}</span>
                 <button
                   v-if="groups.length > 0"
-                  class="h-8 px-2 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                  type="button"
+                  class="ml-auto h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
                   @click="isCreatingGroup = false"
                 >
                   选已有

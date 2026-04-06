@@ -12,13 +12,6 @@ export interface SettingsConfigResponse {
   customMode?: CustomProviderMode
   port: number
   runtime?: { provider: string, model: string, contextWindow: number }
-  // Coding providers
-  codingKimi?: {
-    hasApiKey: boolean
-    apiKeyMasked: string | null
-    apiBase: string
-    model: string
-  }
 }
 
 export interface UpdateSettingsConfigRequest {
@@ -90,30 +83,5 @@ export async function updateSettingsConfig(
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error',
     }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Coding provider APIs
-// ---------------------------------------------------------------------------
-
-export async function updateKimiCodeSettings(data: {
-  apiKey?: string
-  apiBase?: string
-  model?: string
-}): Promise<{ success: boolean, message?: string, config?: SettingsConfigResponse }> {
-  try {
-    const json = await apiClient.put<{
-      success?: boolean
-      message?: string
-      config?: SettingsConfigResponse
-    }>('/api/settings/coding/kimi', data)
-    if (json.success === false) {
-      return { success: false, message: json.message || 'Failed to save Kimi Code settings' }
-    }
-    return { success: true, config: json.config }
-  }
-  catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

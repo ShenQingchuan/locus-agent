@@ -1,11 +1,11 @@
 import type { LLMProviderType } from '@univedge/locus-agent-sdk'
-import type { CodingKimiConfig, ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
+import type { ProviderConfigs } from '@/components/settings/SettingsLLMCard.vue'
 import type { SettingsSectionId } from '@/constants/settings'
 import { DEFAULT_API_BASES, DEFAULT_MODELS, LLM_PROVIDERS } from '@univedge/locus-agent-sdk'
 import { useToast } from '@univedge/locus-ui'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchSettingsConfig, updateKimiCodeSettings, updateSettingsConfig } from '@/api/settings'
+import { fetchSettingsConfig, updateSettingsConfig } from '@/api/settings'
 import { SETTINGS_SECTIONS } from '@/constants/settings'
 import { useModelSettingsStore } from '@/stores/modelSettings'
 import { initAllProviderConfigs } from '@/utils/settings'
@@ -53,18 +53,6 @@ export function useSettingsView() {
 
   // Provider-specific configurations
   const providerConfigs = reactive<ProviderConfigs>({})
-
-  // ---------------------------------------------------------------------------
-  // Coding provider state
-  // ---------------------------------------------------------------------------
-
-  const codingKimi = ref<CodingKimiConfig>({
-    hasApiKey: false,
-    apiKeyMasked: null,
-    apiBase: 'https://api.kimi.com/coding/v1',
-    model: 'kimi-k2.5',
-    newApiKey: '',
-  })
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -137,13 +125,6 @@ export function useSettingsView() {
       runtimeInfo.value = config.runtime ?? null
       requiresRestart.value = false
       embeddingStatusRefreshToken.value++
-
-      if (config.codingKimi) {
-        codingKimi.value = {
-          ...config.codingKimi,
-          newApiKey: '',
-        }
-      }
     }
     catch (error) {
       loadError.value = error instanceof Error ? error.message : '加载配置失败'
@@ -276,21 +257,6 @@ export function useSettingsView() {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Coding provider handlers
-  // ---------------------------------------------------------------------------
-
-  async function handleKimiCodeSave(payload: { apiKey?: string, apiBase?: string, model?: string }) {
-    const result = await updateKimiCodeSettings(payload)
-    if (!result.success) {
-      toast.error(result.message || '保存 Kimi Code 配置失败')
-      return
-    }
-    toast.success('Kimi Code 配置已保存')
-    if (result.config?.codingKimi)
-      codingKimi.value = { ...result.config.codingKimi, newApiKey: '' }
-  }
-
   return {
     router,
     route,
@@ -311,9 +277,7 @@ export function useSettingsView() {
     setSectionRef,
     handleContentScroll,
     navigateToSection,
-    codingKimi,
     loadConfig,
     saveConfig,
-    handleKimiCodeSave,
   }
 }

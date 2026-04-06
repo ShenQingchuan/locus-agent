@@ -1,5 +1,5 @@
 import type { CodingExecutorType, CoreMessage, CustomProviderMode, LLMProviderType } from '@univedge/locus-agent-sdk'
-import { DEFAULT_API_BASES, DEFAULT_MODELS, getCodingProviderForParent, isCodingModelProvider } from '@univedge/locus-agent-sdk'
+import { DEFAULT_API_BASES, DEFAULT_MODELS, getDefaultCodingExecutorForProvider } from '@univedge/locus-agent-sdk'
 import { useSessionStorage, useToggle } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -24,11 +24,12 @@ export const useModelSettingsStore = defineStore('modelSettings', () => {
 
   // Clear provider-affine coding executors when switching to a provider
   // that doesn't expose one. A2A executors are independent.
-  watch(provider, (newProvider) => {
-    if (codingExecutor.value && isCodingModelProvider(codingExecutor.value) && !getCodingProviderForParent(newProvider)) {
-      codingExecutor.value = null
-    }
-  })
+  watch([provider, codingExecutor], () => {
+    // Legacy sessionStorage may still hold removed executor id (not in CodingExecutorType)
+    const legacy = codingExecutor.value as string | null
+    if (legacy === 'kimi-code')
+      codingExecutor.value = getDefaultCodingExecutorForProvider(provider.value)
+  }, { immediate: true })
 
   // 模型上下文窗口配置（动态从 API 获取，默认：128K）
   const MAX_CONTEXT_TOKENS = ref(128_000)

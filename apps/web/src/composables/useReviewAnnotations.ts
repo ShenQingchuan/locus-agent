@@ -1,7 +1,35 @@
 import type { DiffLineAnnotation } from '@pierre/diffs'
 import type { Ref } from 'vue'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import * as api from '@/api/reviewAnnotations'
+
+/** After a successful git commit, clear in-memory + persisted review state for this project */
+const commitClearHandlers = new Map<string, Set<() => void>>()
+
+function registerCommitClearHandler(projectKey: string, handler: () => void): () => void {
+  let set = commitClearHandlers.get(projectKey)
+  if (!set) {
+    set = new Set()
+    commitClearHandlers.set(projectKey, set)
+  }
+  set.add(handler)
+  return () => {
+    set!.delete(handler)
+    if (set!.size === 0)
+      commitClearHandlers.delete(projectKey)
+  }
+}
+
+/**
+ * Called when the workspace commit succeeds — clears review annotations for this project (same as manual clear).
+ */
+export function notifyReviewAnnotationsAfterCommit(projectKey: string) {
+  const set = commitClearHandlers.get(projectKey)
+  if (!set)
+    return
+  for (const fn of set)
+    fn()
+}
 
 export interface ReviewAnnotation {
   id: string
@@ -15,8 +43,10 @@ export interface ReviewAnnotation {
 
 export interface ReviewAnnotationGroup {
   id: string
+  /** Stored label (usually `#1`, `#2`); display order uses createdAt */
   title: string
   annotations: ReviewAnnotation[]
+  createdAt: number
 }
 
 export interface AnnotationMetadata {
@@ -44,6 +74,7 @@ function dtoToGroup(dto: api.ReviewAnnotationGroupDTO): ReviewAnnotationGroup {
     id: dto.id,
     title: dto.title,
     annotations: dto.annotations.map(dtoToAnnotation),
+    createdAt: new Date(dto.createdAt).getTime(),
   }
 }
 
@@ -78,8 +109,13 @@ async function loadFromServer(projectKey: string) {
 }
 
 export function useReviewAnnotations(projectKey?: Ref<string | null>) {
+  let unregisterCommitClear: (() => void) | undefined
+
   if (projectKey) {
     watch(projectKey, (key) => {
+      unregisterCommitClear?.()
+      unregisterCommitClear = undefined
+
       if (key && key !== boundProjectKey.value) {
         boundProjectKey.value = key
         loadFromServer(key)
@@ -93,7 +129,9 @@ export function useReviewAnnotations(projectKey?: Ref<string | null>) {
     }, { immediate: true })
   }
 
-  const allGroups = computed(() => Array.from(groups.values()))
+  const allGroups = computed(() =>
+    Array.from(groups.values()).sort((a, b) => a.createdAt - b.createdAt),
+  )
 
   const activeGroup = computed(() => {
     if (!activeGroupId.value)
@@ -105,13 +143,16 @@ export function useReviewAnnotations(projectKey?: Ref<string | null>) {
     allGroups.value.reduce((sum, g) => sum + g.annotations.length, 0),
   )
 
-  function createGroup(title: string): string {
+  function createGroup(title?: string): string {
     const id = crypto.randomUUID()
-    groups.set(id, { id, title, annotations: [] })
+    const n = groups.size + 1
+    const t = title?.trim() || `#${n}`
+    const now = Date.now()
+    groups.set(id, { id, title: t, annotations: [], createdAt: now })
     activeGroupId.value = id
 
     if (boundProjectKey.value) {
-      const promise = api.createAnnotationGroup({ id, projectKey: boundProjectKey.value, title })
+      const promise = api.createAnnotationGroup({ id, projectKey: boundProjectKey.value, title: t })
         .then(() => {
           serverSyncedGroups.add(id)
           return true
@@ -251,10 +292,12 @@ export function useReviewAnnotations(projectKey?: Ref<string | null>) {
       byFile.set(ann.filePath, list)
     }
 
+    const orderIndex = allGroups.value.findIndex(g => g.id === groupId) + 1
+
     const lines: string[] = [
       `请根据以下代码审阅意见，对工作区中的文件进行修改：`,
       '',
-      `## 审阅意见组：${group.title}`,
+      `## 审阅意见组 #${orderIndex}`,
       '',
     ]
 
@@ -283,6 +326,23 @@ export function useReviewAnnotations(projectKey?: Ref<string | null>) {
     if (boundProjectKey.value) {
       api.clearAllAnnotations(boundProjectKey.value).catch(() => {})
     }
+  }
+
+  if (projectKey) {
+    watch(
+      () => boundProjectKey.value,
+      (key) => {
+        unregisterCommitClear?.()
+        unregisterCommitClear = undefined
+        if (key)
+          unregisterCommitClear = registerCommitClearHandler(key, () => clearAll())
+      },
+      { immediate: true },
+    )
+
+    onBeforeUnmount(() => {
+      unregisterCommitClear?.()
+    })
   }
 
   return {

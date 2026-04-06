@@ -1,6 +1,6 @@
 import type { Conversation, MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { ActiveDelegate } from '@/composables/assistant-runtime/types'
-import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
+import { getDefaultCodingExecutorForProvider } from '@univedge/locus-agent-sdk'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createAssistantRuntimeManager } from '@/composables/assistant-runtime'
@@ -135,9 +135,9 @@ export const useChatStore = defineStore('chat', () => {
   // Auto-enable the provider-affine coding executor when entering coding space
   watch(conversationScope, (scope) => {
     if (scope.space === 'coding') {
-      const meta = getCodingProviderForParent(provider.value)
-      if (meta && !codingExecutor.value)
-        codingExecutor.value = meta.value
+      const suggested = getDefaultCodingExecutorForProvider(provider.value)
+      if (suggested && !codingExecutor.value)
+        codingExecutor.value = suggested
     }
     else {
       codingExecutor.value = null

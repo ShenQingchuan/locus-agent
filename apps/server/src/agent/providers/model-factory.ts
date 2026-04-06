@@ -1,4 +1,3 @@
-import type { CodingModelProviderType } from '@univedge/locus-agent-sdk'
 import type { LanguageModel } from 'ai'
 import type { LLMProviderType } from './config-store.js'
 import { createAnthropic } from '@ai-sdk/anthropic'
@@ -7,9 +6,8 @@ import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { CODING_PROVIDERS, normalizeModelForProvider } from '@univedge/locus-agent-sdk'
+import { normalizeModelForProvider } from '@univedge/locus-agent-sdk'
 import { createZhipu } from 'zhipu-ai-provider'
-import { getSetting } from '../../settings/index.js'
 import { getDefaultModelId, getProviderConfig } from './config-store.js'
 
 const PROVIDER_DEFAULT_BASE_URLS: Partial<Record<LLMProviderType, string>> = {
@@ -112,36 +110,5 @@ export function createLLMModel(
       const openai = createOpenAI({ apiKey: cfg.apiKey })
       return openai(effectiveModelId)
     }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Coding model factory (Kimi Code)
-// ---------------------------------------------------------------------------
-
-export async function createCodingModel(
-  codingProvider: CodingModelProviderType,
-  modelId?: string,
-): Promise<LanguageModel> {
-  const meta = CODING_PROVIDERS.find(cp => cp.value === codingProvider)
-  if (!meta)
-    throw new Error(`Unknown coding provider: ${codingProvider}`)
-
-  const effectiveModelId = modelId || meta.defaultModel
-
-  switch (codingProvider) {
-    case 'kimi-code': {
-      const apiKey = getSetting('coding.kimi.api_key')
-      if (!apiKey)
-        throw new Error('Kimi Code API Key 未配置')
-      const apiBase = getSetting('coding.kimi.api_base') || meta.defaultApiBase
-      const anthropic = createAnthropic({
-        apiKey,
-        baseURL: apiBase,
-      })
-      return anthropic(effectiveModelId)
-    }
-    default:
-      throw new Error(`Unsupported coding provider: ${codingProvider}`)
   }
 }

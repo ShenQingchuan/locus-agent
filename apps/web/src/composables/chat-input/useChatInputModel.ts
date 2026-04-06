@@ -1,4 +1,4 @@
-import { ACP_CODING_PROVIDERS, getCodingProviderForParent, isACPCodingProvider } from '@univedge/locus-agent-sdk'
+import { ACP_CODING_PROVIDERS, getDefaultCodingExecutorForProvider, isACPCodingProvider } from '@univedge/locus-agent-sdk'
 import { computed } from 'vue'
 import { useModelSelector } from '@/composables/useModelSelector'
 import { useModelSettingsStore } from '@/stores/modelSettings'
@@ -53,7 +53,7 @@ export function useChatInputModel(
 
   async function handleCodingExecutorSelect(value: string) {
     if (!showCodingMode || !value.startsWith('acp:')) {
-      modelSettings.codingExecutor = getCodingProviderForParent(modelSettings.provider)?.value ?? null
+      modelSettings.codingExecutor = getDefaultCodingExecutorForProvider(modelSettings.provider)
       await handleProviderChange(value)
       return
     }

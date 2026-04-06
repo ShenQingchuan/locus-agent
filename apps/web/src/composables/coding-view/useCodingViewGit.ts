@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { useToast } from '@univedge/locus-ui'
 import { computed, ref, watch } from 'vue'
 import { useGitStatus } from '@/composables/useGitStatus'
+import { notifyReviewAnnotationsAfterCommit } from '@/composables/useReviewAnnotations'
 import { useChatStore } from '@/stores/chat'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -9,7 +10,7 @@ export function useCodingViewGit(
   currentProjectPath: ComputedRef<string>,
   activeSection: Ref<'chat' | 'planning' | 'workspace'>,
   isCodingViewActive: Ref<boolean>,
-  _currentProjectKey: Ref<string | undefined>,
+  currentProjectKey: Ref<string | undefined>,
 ) {
   const toast = useToast()
   const chatStore = useChatStore()
@@ -33,6 +34,9 @@ export function useCodingViewGit(
       const result = await gitStatus.commit(message)
       if (result?.success) {
         toast.success('提交成功')
+        const pk = currentProjectKey.value
+        if (pk)
+          notifyReviewAnnotationsAfterCommit(pk)
       }
       else {
         toast.error(result?.message || '提交失败')

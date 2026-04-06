@@ -1,1 +1,0 @@
-ALTER TABLE `tasks` ADD `context_markdown` text DEFAULT '' NOT NULL;

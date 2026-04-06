@@ -1,13 +1,13 @@
 import type { LLMProviderType } from '@univedge/locus-agent-sdk'
 import type { LLMConfig } from './config-store.js'
 import { getDefaultModelId, getProviderConfig, setProviderConfig } from './config-store.js'
-import { createCodingModel, createLLMModel } from './model-factory.js'
+import { createLLMModel } from './model-factory.js'
 import { getModelContextWindow, triggerCatalogRefresh } from './openrouter-catalog.js'
 
 export type { CustomProviderMode, LLMProviderType } from './config-store.js'
 export type { LLMConfig }
 
-export { createCodingModel, createLLMModel, getModelContextWindow }
+export { createLLMModel, getModelContextWindow }
 
 export function setLLMConfig(config: LLMConfig): void {
   setProviderConfig(config)

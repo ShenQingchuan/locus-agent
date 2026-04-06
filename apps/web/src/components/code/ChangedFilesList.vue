@@ -125,7 +125,7 @@ function fileName(filePath: string): string {
   <div class="h-full flex flex-col">
     <!-- Header -->
     <div class="px-2.5 py-2 border-b border-border flex items-center justify-between">
-      <div v-if="summary.totalFiles > 0" class="flex items-center gap-1 text-xs font-medium text-foreground whitespace-nowrap">
+      <div v-if="summary.totalFiles > 0" class="mr-4 flex items-center gap-1 text-xs font-medium text-foreground whitespace-nowrap">
         共计 <span class="font-mono">{{ summary.totalFiles }}</span> 个文件变更
       </div>
       <div v-else class="text-xs text-muted-foreground">

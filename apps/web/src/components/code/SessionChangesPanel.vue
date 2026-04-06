@@ -74,10 +74,10 @@ function handlePopoverSubmit(payload: { groupId: string, comment: string }) {
     isReviewPanelOpen.value = true
 }
 
-function handlePopoverCreateGroup(payload: { title: string, comment: string }) {
+function handlePopoverCreateGroup(payload: { comment: string }) {
   if (!props.selectedFilePath)
     return
-  const groupId = reviewAnnotations.createGroup(payload.title)
+  const groupId = reviewAnnotations.createGroup()
   reviewAnnotations.addAnnotation(
     groupId,
     props.selectedFilePath,
@@ -296,7 +296,6 @@ function goToNext() {
         :active-group-id="reviewAnnotations.activeGroupId.value"
         @set-active="reviewAnnotations.setActiveGroup"
         @delete-group="reviewAnnotations.deleteGroup"
-        @rename-group="reviewAnnotations.renameGroup"
         @remove-annotation="reviewAnnotations.removeAnnotation"
         @submit-group="handleSubmitGroup"
         @submit-all="handleSubmitAll"

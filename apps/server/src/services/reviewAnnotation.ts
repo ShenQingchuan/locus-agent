@@ -1,12 +1,22 @@
 import type { NewReviewAnnotationGroup, NewReviewAnnotationRow, ReviewAnnotationGroup, ReviewAnnotationRow } from '../db/schema.js'
-import { eq } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { reviewAnnotationGroups, reviewAnnotations } from '../db/schema.js'
 
 export interface CreateGroupInput {
   id?: string
   projectKey: string
-  title: string
+  /** Defaults to `#${1+existing count}` when omitted */
+  title?: string
+}
+
+async function nextGroupTitle(projectKey: string): Promise<string> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(reviewAnnotationGroups)
+    .where(eq(reviewAnnotationGroups.projectKey, projectKey))
+  const n = Number(row?.n ?? 0) + 1
+  return `#${n}`
 }
 
 export interface AddAnnotationInput {
@@ -45,11 +55,12 @@ export async function listGroupsByProject(projectKey: string): Promise<FullGroup
 export async function createGroup(input: CreateGroupInput): Promise<FullGroup> {
   const id = input.id ?? crypto.randomUUID()
   const now = new Date()
+  const title = input.title?.trim() || await nextGroupTitle(input.projectKey)
 
   const newGroup: NewReviewAnnotationGroup = {
     id,
     projectKey: input.projectKey,
-    title: input.title,
+    title,
     createdAt: now,
     updatedAt: now,
   }

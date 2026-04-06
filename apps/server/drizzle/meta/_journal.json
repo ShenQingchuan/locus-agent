@@ -5,85 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1772158809493,
-      "tag": "0000_complex_centennial",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1772363122897,
-      "tag": "0001_yielding_jackal",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1772434083978,
-      "tag": "0002_charming_jack_murdock",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1772563130528,
-      "tag": "0003_fair_may_parker",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1772590737924,
-      "tag": "0004_happy_mother_askani",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1772593720922,
-      "tag": "0005_oval_thunderball",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1772611575436,
-      "tag": "0006_busy_ultimatum",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1772805228697,
-      "tag": "0007_right_ghost_rider",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1773147920592,
-      "tag": "0008_absent_mikhail_rasputin",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1773208301353,
-      "tag": "0009_giant_doctor_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1775466483456,
-      "tag": "0010_careless_korvac",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1775468604384,
-      "tag": "0011_bored_thunderbolts",
+      "when": 1,
+      "tag": "0000_polite_triathlon",
       "breakpoints": true
     }
   ]

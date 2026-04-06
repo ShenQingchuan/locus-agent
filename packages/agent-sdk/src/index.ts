@@ -50,14 +50,11 @@ export {
 export type * from './types/index.js'
 export {
   ACP_CODING_PROVIDERS,
-  CODING_MODEL_PROVIDERS,
-  CODING_PROVIDERS,
   DEFAULT_API_BASES,
   DEFAULT_MODELS,
-  getCodingProviderForParent,
+  getDefaultCodingExecutorForProvider,
   isACPCodingProvider,
   isCodingExecutor,
-  isCodingModelProvider,
   LLM_PROVIDERS,
   normalizeModelForProvider,
 } from './types/index.js'
