@@ -438,6 +438,9 @@ importers:
       '@pinia/colada':
         specifier: catalog:vue-family
         version: 1.1.0(pinia@3.0.4(typescript@6.0.2)(vue@3.5.32(typescript@6.0.2)))(vue@3.5.32(typescript@6.0.2))
+      '@tanstack/vue-virtual':
+        specifier: catalog:vue-family
+        version: 3.13.23(vue@3.5.32(typescript@6.0.2))
       '@univedge/locus-agent-sdk':
         specifier: workspace:*
         version: link:../../packages/agent-sdk

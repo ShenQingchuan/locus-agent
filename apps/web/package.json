@@ -19,6 +19,7 @@
     "@ai-sdk/vue": "catalog:vue-family",
     "@pierre/diffs": "catalog:vue-family",
     "@pinia/colada": "catalog:vue-family",
+    "@tanstack/vue-virtual": "catalog:vue-family",
     "@univedge/locus-agent-sdk": "workspace:*",
     "@univedge/locus-ui": "workspace:*",
     "@vueuse/core": "catalog:vue-family",

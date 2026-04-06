@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Message } from '@/composables/assistant-runtime'
-import { nextTick, ref, watch } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
+import { computed, nextTick, ref, watch } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 
 const props = withDefaults(defineProps<{
@@ -17,19 +18,22 @@ const props = withDefaults(defineProps<{
 const containerRef = ref<HTMLElement | null>(null)
 const previousMessagesLength = ref(0)
 
+// --- Virtual scroll ---
+const virtualizer = useVirtualizer(computed(() => ({
+  count: props.messages.length,
+  getScrollElement: () => containerRef.value,
+  estimateSize: () => 80,
+  measureElement: (el: HTMLElement) => el.getBoundingClientRect().height,
+  overscan: 5,
+})))
+
 // --- Smart scroll state ---
-// Whether the user has intentionally scrolled away from the bottom
 const userScrolledUp = ref(false)
-// Guard: ignore scroll events that we triggered programmatically
 let isProgrammaticScroll = false
-// Debounce handle for rAF-based auto-scroll
 let scrollRafId: number | null = null
-// Lock auto-scroll for a short duration after user scrolls up to prevent
-// streaming content updates from fighting the user's scroll intent.
 let scrollLockUntil = 0
 const SCROLL_LOCK_DURATION = 300
 
-// Threshold (px) to consider "at bottom"
 const BOTTOM_THRESHOLD = 80
 
 function isAtBottom(): boolean {
@@ -39,12 +43,9 @@ function isAtBottom(): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD
 }
 
-// Reactive flag for template (scroll-to-bottom button visibility)
 const showScrollButton = ref(false)
 
-// --- Detect user scroll intent via native event ---
 function onScroll() {
-  // Skip scroll events we fired ourselves
   if (isProgrammaticScroll)
     return
 
@@ -53,16 +54,11 @@ function onScroll() {
   const now = Date.now()
 
   if (atBottom) {
-    // User scrolled back to bottom (manually) → re-enable auto-scroll,
-    // but only if the scroll-lock cooldown has expired.
     if (now >= scrollLockUntil) {
       userScrolledUp.value = false
     }
   }
   else {
-    // User is not at bottom → they scrolled up, respect their intent.
-    // Cancel any pending programmatic scroll and lock auto-scroll briefly
-    // so streaming deltas don't immediately pull the viewport back down.
     userScrolledUp.value = true
     scrollLockUntil = now + SCROLL_LOCK_DURATION
     if (scrollRafId !== null) {
@@ -72,11 +68,6 @@ function onScroll() {
   }
 }
 
-// --- Scroll to bottom (instant, no animation) ---
-// During streaming, content changes every few ms. Smooth scroll animations
-// get queued up and fight each other, causing jank. We always use instant
-// scroll and coalesce via requestAnimationFrame so we scroll at most once
-// per frame — this is buttery smooth.
 function scrollToBottom(instant = true) {
   const container = containerRef.value
   if (!container)
@@ -91,13 +82,11 @@ function scrollToBottom(instant = true) {
   }
   showScrollButton.value = false
 
-  // Release the guard after the browser has had a chance to fire scroll events
   requestAnimationFrame(() => {
     isProgrammaticScroll = false
   })
 }
 
-// Coalesced version: at most one scroll per animation frame
 function scheduleScrollToBottom() {
   if (scrollRafId !== null)
     return
@@ -109,14 +98,12 @@ function scheduleScrollToBottom() {
 
 // --- Auto-scroll on content change ---
 watch(
-  // Watch message count + last message content length (cheap, avoids deep)
   () => {
     const len = props.messages.length
     const last = len > 0 ? props.messages[len - 1] : null
     return [len, last?.content?.length ?? 0] as const
   },
   async ([newLen]) => {
-    // Session switched / cleared
     if (newLen === 0) {
       previousMessagesLength.value = 0
       userScrolledUp.value = false
@@ -126,50 +113,38 @@ watch(
     const isInitialLoad = previousMessagesLength.value === 0 && newLen > 0
     previousMessagesLength.value = newLen
 
-    // If user scrolled up, respect it — don't auto-scroll
     if (userScrolledUp.value && !isInitialLoad)
       return
-
-    // Also respect the scroll-lock cooldown to prevent jitter
     if (Date.now() < scrollLockUntil && !isInitialLoad)
       return
 
     await nextTick()
+    virtualizer.value.measure()
+    await nextTick()
 
     if (isInitialLoad) {
-      // First load / session switch: instant scroll with retries for lazy DOM
       scrollToBottom(true)
-      // Retry for images / code blocks that render async
       ;[50, 150, 300].forEach(delay => setTimeout(scrollToBottom, delay, true))
     }
     else {
-      // Streaming or new message: coalesce to one scroll per frame
       scheduleScrollToBottom()
     }
   },
 )
 
-// User clicks the "scroll to bottom" button
 function handleScrollToBottomClick() {
   userScrolledUp.value = false
-  scrollToBottom(false) // smooth scroll for explicit user action
+  scrollToBottom(false)
 }
 
-// Scroll a specific tool-call card into view (used by jump-to-delegate).
-// Use querySelectorAll + last element so that if the same toolCallId appears in
-// multiple turns (some providers reuse sequential IDs across API calls), we
-// always scroll to the most recent card — which is lowest in the DOM.
 function scrollToToolCall(toolCallId: string) {
   const els = containerRef.value?.querySelectorAll(`[data-tool-call-id="${toolCallId}"]`)
   if (els && els.length > 0) {
-    // Convert to array so we can use standard indexing; take the last match so
-    // that if toolCallIds collide across turns we always land on the newest card.
     const last = Array.from(els).at(-1)
     last?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 }
 
-// Expose scroll helpers for external use
 defineExpose({ scrollToBottom, scrollToToolCall })
 </script>
 
@@ -207,13 +182,28 @@ defineExpose({ scrollToBottom, scrollToToolCall })
           </slot>
         </div>
 
-        <!-- Messages -->
-        <div class="space-y-1">
-          <MessageBubble
-            v-for="message in messages"
-            :key="message.id"
-            :message="message"
-          />
+        <!-- Messages (virtualized) -->
+        <div
+          v-else
+          :style="{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }"
+        >
+          <div
+            v-for="virtualItem in virtualizer.getVirtualItems()"
+            :key="String(virtualItem.key)"
+            :ref="(el) => virtualizer.measureElement(el as HTMLElement | null)"
+            :data-index="virtualItem.index"
+            :style="{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualItem.start}px)`,
+            }"
+          >
+            <MessageBubble
+              :message="props.messages[virtualItem.index]"
+            />
+          </div>
         </div>
 
         <!-- Typing indicator -->
