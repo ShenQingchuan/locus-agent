@@ -1,28 +1,43 @@
 # @univedge/locus-cli
 
-Locus Agent 的命令行工具，提供本地开发服务器启动、交互式配置（LLM / MCP）等功能。
+Locus Agent 的命令行工具：在后台启动内置 Web + API 服务、交互式配置 LLM（提供商、API Key、模型、端口）等。
+
+**运行环境**：发布包使用 `#!/usr/bin/env bun` 入口，需已安装 [Bun](https://bun.sh)。
 
 ## 安装
 
 ```bash
+pnpm add -g @univedge/locus-cli
+# 或
 npm install -g @univedge/locus-cli
 ```
 
 ## 使用
 
-```bash
-# 交互式配置 LLM 提供商和 API Key
-locus config
+根命令需指定子命令，例如：
 
-# 启动本地开发服务器（同时启动 Web 和 Server）
-locus
+```bash
+locus --help
 ```
 
-## 功能
+### 常用命令
 
-- **交互式配置** — 通过命令行向导完成 LLM 模型、API Key、MCP 服务器等设置
-- **本地开发服务器** — 一键启动 Web + Server，支持 HMR 热更新
-- **工作区管理** — 自动检测并管理项目工作区
+| 命令 | 说明 |
+|------|------|
+| `locus start` | 后台启动 Locus Agent（默认端口 3000） |
+| `locus start --port 4000` | 指定端口启动 |
+| `locus config` | 交互式重新配置 LLM 与监听端口 |
+| `locus stop` | 停止当前后台进程 |
+
+首次启动前建议先执行 `locus config` 完成 LLM 提供商、API Key、模型与端口等设置。
+
+## 数据目录
+
+配置与本地数据默认位于：`~/.local/share/locus-agent/`。
+
+## 从本仓库开发 / 本地链接
+
+在 monorepo 内构建并全局链接后，可在任意目录使用 `locus` 命令，步骤见仓库根目录 [README.md](https://github.com/ShenQingchuan/locus-agent/blob/main/README.md#本地安装并测试-locus-命令)。
 
 ## License
 
