@@ -1,3 +1,22 @@
+## [0.3.0] - 2026-04-06
+
+### Features
+
+- *(server)* Add review annotations feature
+
+- *(web)* Enhance annotation and diff viewer components
+
+- *(web)* Add inline diff viewer for tool call items
+
+- *(web)* Enhance chat components with inline diff integration and styling improvements
+
+- *(web)* Refactor chat message list with new scrolling and virtualization logic
+
+
+### Miscellaneous
+
+- *(server)* Update database schema and add patch script
+
 ## [0.2.5] - 2026-04-06
 
 ### Features
