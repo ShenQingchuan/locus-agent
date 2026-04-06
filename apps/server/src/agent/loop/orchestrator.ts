@@ -4,6 +4,8 @@ import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult } fro
 import { BuiltinTool, HookEvent } from '@univedge/locus-agent-sdk'
 import { processDecisions } from '@univedge/locus-plugin-kit'
 import { streamText } from 'ai'
+import { buildRelevantMemoriesPrompt } from '../../memory/prompt/injection.js'
+import { retrieveRelevantMemories } from '../../memory/retrieval/index.js'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
 import { mcpManager } from '../mcp/manager.js'
@@ -39,6 +41,22 @@ function canRunInParallel(tc: PendingToolCall): boolean {
 }
 
 const DEFAULT_TOOL_TIMEOUT_MS = 90_000
+
+function extractLastUserQuery(messages: ModelMessage[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role === 'user') {
+      if (typeof m.content === 'string')
+        return m.content
+      if (Array.isArray(m.content)) {
+        const textPart = m.content.find(p => p.type === 'text')
+        if (textPart && 'text' in textPart)
+          return textPart.text
+      }
+    }
+  }
+  return undefined
+}
 
 /** Max number of tool calls that may run concurrently within a single parallel batch. */
 const PARALLEL_TOOL_CONCURRENCY = 3
@@ -128,6 +146,17 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   if (memoryTagsPrompt) {
     effectiveSystemPrompt += `\n\n${memoryTagsPrompt}`
   }
+
+  // Proactive memory retrieval on first iteration
+  const lastUserQuery = extractLastUserQuery(initialMessages)
+  if (lastUserQuery) {
+    const memories = await retrieveRelevantMemories(lastUserQuery, workspaceRoot, { topK: 5 })
+    const memoriesPrompt = buildRelevantMemoriesPrompt(memories)
+    if (memoriesPrompt) {
+      effectiveSystemPrompt += `\n\n${memoriesPrompt}`
+    }
+  }
+
   if (space === 'coding' && codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
   }

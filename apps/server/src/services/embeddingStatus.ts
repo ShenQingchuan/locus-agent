@@ -2,19 +2,19 @@ import type {
   EmbeddingLocalFamily,
   EmbeddingProvider,
   EmbeddingSelection,
-} from './embedding.js'
+} from '../memory/embedding/provider.js'
 import type { ModelFileInfo } from './localEmbedding.js'
 import { isVecAvailable } from '../db/index.js'
-import { getSetting, setSetting } from '../settings/index.js'
 import {
   getActiveEmbeddingSelection,
   getEmbeddingProvider,
   getLocalEmbeddingModelFamily,
   isEmbeddingConfigured,
-} from './embedding.js'
+} from '../memory/embedding/provider.js'
+import { getEmbeddingCount } from '../memory/store/vectorDb.js'
+import { getSetting, setSetting } from '../settings/index.js'
 import { isLocalDepsInstalled } from './localDeps.js'
 import { getLocalEmbeddingModel, getLocalModelFiles, isLocalModelReady } from './localEmbedding.js'
-import { getEmbeddingCount } from './vectorStore.js'
 
 // ==================== Types ====================
 

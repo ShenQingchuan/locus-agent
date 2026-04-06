@@ -1,4 +1,4 @@
-import type { EmbeddingLocalFamily, EmbeddingProvider } from '../services/embedding.js'
+import type { EmbeddingLocalFamily, EmbeddingProvider } from '../memory/embedding/provider.js'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
@@ -11,7 +11,13 @@ import {
   getLocalEmbeddingModelFamily,
   setEmbeddingProvider,
   setLocalEmbeddingModelFamily,
-} from '../services/embedding.js'
+} from '../memory/embedding/provider.js'
+import { buildEmbeddingText } from '../memory/embedding/queue.js'
+import {
+  clearAllEmbeddings,
+  getEmbeddingCount,
+  upsertMemoryEmbedding,
+} from '../memory/store/vectorDb.js'
 import {
   clearTransientStatus,
   getEmbeddingStatus,
@@ -26,8 +32,6 @@ import {
   isLocalModelReady,
   resetPipeline,
 } from '../services/localEmbedding.js'
-import { buildEmbeddingText } from '../services/note.js'
-import { clearAllEmbeddings, getEmbeddingCount, upsertNoteEmbedding } from '../services/vectorStore.js'
 
 export const embeddingRoutes = new Hono()
 
@@ -302,7 +306,7 @@ embeddingRoutes.post('/reindex', (c) => {
       })
 
       for (let i = 0; i < allNotes.length; i++) {
-        upsertNoteEmbedding(allNotes[i].id, embeddings[i])
+        upsertMemoryEmbedding(allNotes[i].id, embeddings[i])
       }
 
       // Record which model built this index

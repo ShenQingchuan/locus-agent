@@ -1,15 +1,19 @@
 import { Hono } from 'hono'
 import {
-  createNote,
-  deleteNote,
+  createMemory,
+  deleteMemory,
+  listMemories,
+  updateMemory,
+} from '../memory/core/crud.js'
+import {
+  searchMemories,
+  searchMemoriesByTags,
+} from '../memory/core/search.js'
+import {
   getMemoryStats,
   getNoteConversationIds,
   getNoteWithTags,
-  listNotes,
-  searchNotesByTags,
-  searchNotesHybrid,
-  updateNote,
-} from '../services/note.js'
+} from '../memory/store/noteBridge.js'
 
 export const notesRoutes = new Hono()
 
@@ -21,7 +25,7 @@ notesRoutes.get('/', async (c) => {
   const limit = c.req.query('limit')
   const offset = c.req.query('offset')
 
-  const result = await listNotes({
+  const result = await listMemories({
     folderId: folderId || undefined,
     tagId,
     workspacePath: workspacePath || undefined,
@@ -37,7 +41,7 @@ notesRoutes.post('/', async (c) => {
   const body = await c.req.json()
   const { content, editorState, folderId, tagNames, conversationId, workspacePath } = body
 
-  const note = await createNote({
+  const note = await createMemory({
     content,
     editorState,
     folderId,
@@ -62,7 +66,7 @@ notesRoutes.post('/search-by-tags', async (c) => {
   if (!Array.isArray(tags)) {
     return c.json({ error: 'tags must be an array' }, 400)
   }
-  const result = await searchNotesByTags(tags)
+  const result = await searchMemoriesByTags(tags)
   return c.json({ notes: result })
 })
 
@@ -73,7 +77,7 @@ notesRoutes.get('/search', async (c) => {
     return c.json({ notes: [] })
   }
 
-  const result = await searchNotesHybrid(q)
+  const result = await searchMemories(q)
   return c.json({ notes: result })
 })
 
@@ -95,7 +99,7 @@ notesRoutes.patch('/:id', async (c) => {
   const body = await c.req.json()
   const { content, editorState, folderId, tagNames } = body
 
-  const updated = await updateNote(id, {
+  const updated = await updateMemory(id, {
     content,
     editorState,
     folderId,
@@ -112,7 +116,7 @@ notesRoutes.patch('/:id', async (c) => {
 // DELETE /api/notes/:id - 删除笔记
 notesRoutes.delete('/:id', async (c) => {
   const id = c.req.param('id')
-  const deleted = await deleteNote(id)
+  const deleted = await deleteMemory(id)
 
   if (!deleted) {
     return c.json({ error: 'Note not found' }, 404)

@@ -1,12 +1,12 @@
 import type { StreamingToolExecutor, ToolExecutor } from '@univedge/locus-agent-sdk'
 import type { ToolName } from './tool-definitions.js'
 import { HookEvent } from '@univedge/locus-agent-sdk'
+import { executeManageMemory, executeSearchMemory, formatManageMemoryResult, formatSearchMemoryResult } from '../../memory/index.js'
 import { hookBus } from '../plugins/index.js'
 import { executeBash, formatBashResult } from './bash.js'
 import { executeGlob, formatGlobResult } from './glob.js'
 import { executeGrep, formatGrepResult } from './grep.js'
 import { executeManageKanban, formatManageKanbanResult } from './manage_kanban.js'
-import { executeManageMemory, executeSearchMemory, formatManageMemoryResult, formatSearchMemoryResult } from './manage_memory.js'
 import {
   executePlanExit,
   executeReadPlan,
