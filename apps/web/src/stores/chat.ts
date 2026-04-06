@@ -3,13 +3,14 @@ import type { ActiveDelegate } from '@/composables/assistant-runtime/types'
 import { getCodingProviderForParent } from '@univedge/locus-agent-sdk'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { deleteConversation, updateConversation } from '@/api/conversations'
 import { createAssistantRuntimeManager } from '@/composables/assistant-runtime'
 import { createConversationMessagingActions } from '@/composables/useConversationMessaging'
 import { createConversationScopeState } from '@/composables/useConversationScopeState'
 import { useModelSettingsStore } from '@/stores/modelSettings'
 import { usePlanStore } from '@/stores/plan'
 import { useWhitelistStore } from '@/stores/whitelist'
+import { useChatConversation } from './chat/helpers/useChatConversation'
+import { useChatPlanExecution } from './chat/helpers/useChatPlanExecution'
 import { useChatConversationTitle } from './chat/useChatConversationTitle'
 import { useChatMessageEditing } from './chat/useChatMessageEditing'
 import { useChatPlanBridge } from './chat/useChatPlanBridge'
@@ -102,9 +103,7 @@ export const useChatStore = defineStore('chat', () => {
     saveModelSettings,
   } = modelSettingsStore
 
-  const {
-    codingMode,
-  } = storeToRefs(planStore)
+  const { codingMode } = storeToRefs(planStore)
   const {
     toggleCodingMode,
     setCodingMode,
@@ -133,8 +132,7 @@ export const useChatStore = defineStore('chat', () => {
   )
   const conversationTitle = useChatConversationTitle(conversations)
 
-  // Auto-enable the provider-affine coding executor when entering coding space;
-  // clear all coding executors when leaving.
+  // Auto-enable the provider-affine coding executor when entering coding space
   watch(conversationScope, (scope) => {
     if (scope.space === 'coding') {
       const meta = getCodingProviderForParent(provider.value)
@@ -158,11 +156,6 @@ export const useChatStore = defineStore('chat', () => {
   const completedTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'completed').length)
   const inProgressTodoCount = computed(() => todoTasks.value.filter(t => t.status === 'in_progress').length)
 
-  /**
-   * Delegates from the most recent assistant message that contains any delegate tool calls.
-   * Derived from messages — no separate state needed. Resets naturally when a new turn
-   * starts and the latest assistant message no longer contains delegates.
-   */
   const activeDelegates = computed<ActiveDelegate[]>(() => {
     const msgs = messages.value
     for (let i = msgs.length - 1; i >= 0; i--) {
@@ -171,7 +164,7 @@ export const useChatStore = defineStore('chat', () => {
         continue
       const delegates = msg.toolCalls.filter(tc => tc.toolCall.toolName === 'delegate')
       if (delegates.length === 0)
-        break // latest assistant message has no delegates — stop looking
+        break
       return delegates.map((tc): ActiveDelegate => ({
         toolCallId: tc.toolCall.toolCallId,
         agentName: String(tc.toolCall.args?.agent_name ?? tc.toolCall.args?.agent_type ?? '子代理'),
@@ -191,11 +184,6 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value.find(c => c.id === currentConversationId.value),
   )
 
-  /**
-   * toolCallId of the delegate card that the user wants to scroll into view.
-   * MessageList (or any consumer) can watch this ref and perform the scroll.
-   * Reset to null after consumption.
-   */
   const pendingJumpToolCallId = ref<string | null>(null)
 
   function jumpToDelegate(toolCallId: string) {
@@ -206,84 +194,26 @@ export const useChatStore = defineStore('chat', () => {
     pendingJumpToolCallId.value = null
   }
 
-  // Incremented when newConversation is called; ChatInput watches this to focus the prompt input
   const focusInputTrigger = ref(0)
 
-  function newConversation() {
-    messageEditing.cancelEditMessage()
-    currentConversationId.value = null
-    yoloMode.value = false
-    clearConversationRuntimeState(null)
-    planBridge.currentPlan.value = null
-    focusInputTrigger.value++
-  }
+  // Conversation lifecycle helpers
+  const conversationHelpers = useChatConversation({
+    currentConversationId,
+    conversations,
+    yoloMode,
+    clearConversationRuntimeState,
+    removeConversationRuntimeState,
+    clearError,
+    getConversationRuntimeState,
+    setToolCallExecuting,
+    clearPendingApprovals,
+    pendingApprovals,
+    cancelEditMessage: messageEditing.cancelEditMessage,
+    refreshConversationPlans: planBridge.refreshConversationPlans,
+    focusInputTrigger,
+  })
 
-  function switchConversation(id: string) {
-    if (id === currentConversationId.value)
-      return
-
-    messageEditing.cancelEditMessage()
-    currentConversationId.value = id
-    getConversationRuntimeState(id)
-    clearError(id)
-    whitelistStore.loadWhitelistRules(id)
-    void planBridge.refreshConversationPlans(id)
-  }
-
-  async function removeConversation(id: string) {
-    const success = await deleteConversation(id)
-    if (success) {
-      removeConversationRuntimeState(id)
-      conversations.value = conversations.value.filter(c => c.id !== id)
-      if (currentConversationId.value === id) {
-        const firstConversation = conversations.value[0]
-        if (firstConversation) {
-          switchConversation(firstConversation.id)
-        }
-        else {
-          newConversation()
-        }
-      }
-    }
-    return success
-  }
-
-  async function toggleYoloMode() {
-    const previousYoloMode = yoloMode.value
-    const nextYoloMode = !previousYoloMode
-    const conversationId = currentConversationId.value
-
-    yoloMode.value = nextYoloMode
-
-    if (!conversationId)
-      return
-
-    const pendingToolCallIds = nextYoloMode
-      ? [...pendingApprovals.value.keys()]
-      : []
-
-    const updated = await updateConversation(conversationId, {
-      confirmMode: !nextYoloMode,
-    })
-
-    if (!updated) {
-      yoloMode.value = previousYoloMode
-      return
-    }
-
-    const conversationIndex = conversations.value.findIndex(c => c.id === conversationId)
-    if (conversationIndex !== -1) {
-      conversations.value[conversationIndex] = updated
-    }
-
-    if (nextYoloMode && pendingToolCallIds.length > 0) {
-      for (const toolCallId of pendingToolCallIds) {
-        setToolCallExecuting(toolCallId, conversationId)
-      }
-      clearPendingApprovals(conversationId)
-    }
-  }
-
+  // Messaging actions
   const messaging = createConversationMessagingActions({
     state: {
       currentConversationId,
@@ -335,33 +265,19 @@ export const useChatStore = defineStore('chat', () => {
     deleteMessagesFrom,
   } = messaging
 
-  function startPlanExecution(filename: string, content: string) {
-    const conversationId = currentConversationId.value
-    if (!conversationId)
-      return
-
-    const snapshot = { filename, content }
-    planStore.latestPlanByConversation[conversationId] = snapshot
-    planBridge.currentPlan.value = snapshot
-
-    planBridge.useAutoPlanBinding()
-    setCodingMode('build')
-
-    void sendMessage(
-      '开始执行当前已绑定计划。请先 read_plan，再按计划顺序实施，并使用 manage_todos 跟踪进度。',
-      undefined,
-      conversationId,
-      { metadata: { trigger: 'start_plan_execution' } },
-    )
-  }
+  // Plan execution helper
+  const planExecution = useChatPlanExecution({
+    currentConversationId,
+    latestPlanByConversation: planStore.latestPlanByConversation,
+    currentPlan: planBridge.currentPlan,
+    useAutoPlanBinding: planBridge.useAutoPlanBinding,
+    setCodingMode,
+    sendMessage,
+  })
 
   // Whitelist actions delegated to useWhitelistStore
   const { whitelistRules, loadWhitelistRules, removeWhitelistRule } = whitelistStore
 
-  /**
-   * 保存编辑后的消息并重新发送
-   * @returns 会话 ID，用于调用方标记 dirtyConversations
-   */
   async function saveEditMessage(messageId: string, newContent: string, newAttachments: MessageImageAttachment[]): Promise<string | null> {
     messageEditing.editingMessageId.value = null
     messageEditing.editingContent.value = ''
@@ -458,7 +374,7 @@ export const useChatStore = defineStore('chat', () => {
     editingContent,
     editingAttachments,
 
-    // Focus input trigger (incremented on newConversation; ChatInput watches to focus)
+    // Focus input trigger
     focusInputTrigger,
 
     // Computed
@@ -481,19 +397,19 @@ export const useChatStore = defineStore('chat', () => {
     loadModelSettings,
     saveModelSettings,
     setConversationScope,
-    switchConversation,
+    switchConversation: conversationHelpers.switchConversation,
     applyConversationData,
-    removeConversation,
+    removeConversation: conversationHelpers.removeConversation,
     toggleSidebar,
     setSidebarWidth,
-    toggleYoloMode,
+    toggleYoloMode: conversationHelpers.toggleYoloMode,
     toggleThinkMode,
     toggleCodingMode,
     setCodingMode,
     setPlanBinding,
     unbindPlan,
     useAutoPlanBinding,
-    startPlanExecution,
+    startPlanExecution: planExecution.startPlanExecution,
     openCurrentPlan,
     refreshConversationPlans,
     openPlan,
@@ -515,7 +431,7 @@ export const useChatStore = defineStore('chat', () => {
     setLoading,
     setError,
     clearError,
-    newConversation,
+    newConversation: conversationHelpers.newConversation,
     sendMessage,
     removeFromQueue,
     editQueueItem,
