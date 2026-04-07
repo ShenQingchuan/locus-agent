@@ -36,6 +36,7 @@ const {
   cancelEditing,
   handleDeleteNote,
   handleToGlobal,
+  handleTogglePin,
   showAddTagsModal,
   addTagsNoteTags,
   openTagsModal,
@@ -229,6 +230,7 @@ const {
                         @open-tags="openTagsModal"
                         @delete="handleDeleteNote"
                         @to-global="handleToGlobal"
+                        @toggle-pin="handleTogglePin"
                       />
                     </div>
                   </div>

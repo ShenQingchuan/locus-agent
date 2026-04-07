@@ -28,23 +28,35 @@ export function deleteMemoryEmbedding(noteId: string): void {
 export function searchByVector(
   queryVector: Float32Array,
   limit: number = 30,
+  candidateNoteIds?: string[],
 ): { noteId: string, distance: number }[] {
   if (!isVecAvailable())
     return []
 
   const sqlite = getSqlite()
-  const stmt = sqlite.prepare(`
+
+  let sql = `
     SELECT note_id, distance
     FROM vec_notes
     WHERE embedding MATCH ?
-    ORDER BY distance
-    LIMIT ?
-  `)
-
-  const results = stmt.all(
+  `
+  const params: (Uint8Array | number | string)[] = [
     new Uint8Array(queryVector.buffer, queryVector.byteOffset, queryVector.byteLength),
-    limit,
-  ) as { note_id: string, distance: number }[]
+  ]
+
+  if (candidateNoteIds && candidateNoteIds.length > 0) {
+    // Cap to stay under SQLite parameter limits (usually 999)
+    const cappedIds = candidateNoteIds.slice(0, 900)
+    const placeholders = cappedIds.map(() => '?').join(',')
+    sql += ` AND note_id IN (${placeholders})`
+    params.push(...cappedIds)
+  }
+
+  sql += ` ORDER BY distance LIMIT ?`
+  params.push(limit)
+
+  const stmt = sqlite.prepare(sql)
+  const results = stmt.all(...params) as { note_id: string, distance: number }[]
 
   return results.map(r => ({
     noteId: r.note_id,

@@ -20,6 +20,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<NoteWithTa
     editorState: input.editorState ?? null,
     folderId: input.folderId ?? null,
     workspacePath: input.workspacePath ?? null,
+    pinned: input.pinned ?? false,
     createdAt: now,
     updatedAt: now,
   })
@@ -57,6 +58,8 @@ export async function updateMemory(
     updates.folderId = input.folderId
   if (input.workspacePath !== undefined)
     updates.workspacePath = input.workspacePath
+  if (input.pinned !== undefined)
+    updates.pinned = input.pinned
 
   await db.update(notes).set(updates).where(eq(notes.id, id))
 

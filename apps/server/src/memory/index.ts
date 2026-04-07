@@ -3,6 +3,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { createMemory, deleteMemory, listMemories, updateMemory } from './core/crud.js'
 import { searchMemories, searchMemoriesByTags } from './core/search.js'
+import { logMemoryAccess } from './store/accessLog.js'
 
 // ==================== search_memory (read-only) ====================
 
@@ -60,6 +61,7 @@ const memoryItemSchema = z.object({
     + 'Examples: "preference/food/snacks", "project/my-app/stack", "lesson/debugging". '
     + 'Avoid flat tags like "food" or "preference" — always prefer the most specific existing path.',
   ),
+  pinned: z.boolean().optional().describe('Whether this memory should be pinned to the working set.'),
 })
 
 const batchUpdateItemSchema = z.object({
@@ -68,6 +70,7 @@ const batchUpdateItemSchema = z.object({
   tags: z.array(z.string()).optional().describe(
     'New tags (replaces all existing). Prefer existing tags; use most specific first; omit to keep existing.',
   ),
+  pinned: z.boolean().optional().describe('Whether this memory should be pinned to the working set.'),
 })
 
 export const manageMemoryTool = tool({
@@ -122,10 +125,10 @@ export const manageMemoryTool = tool({
 
 export type ManageMemoryInput
   = | { action: 'list', page?: number, page_size?: number }
-    | { action: 'create', memories: { content: string, tags: string[] }[] }
+    | { action: 'create', memories: { content: string, tags: string[], pinned?: boolean }[] }
     | { action: 'read', query?: string, tags?: string[] }
-    | { action: 'update', memory_id: string, content?: string, tags?: string[] }
-    | { action: 'batch_update', updates: { memory_id: string, content?: string, tags?: string[] }[] }
+    | { action: 'update', memory_id: string, content?: string, tags?: string[], pinned?: boolean }
+    | { action: 'batch_update', updates: { memory_id: string, content?: string, tags?: string[], pinned?: boolean }[] }
     | { action: 'delete', memory_ids: string[] }
 
 export interface ManageMemoryListResult {
@@ -244,6 +247,7 @@ export async function executeManageMemory(
           tagNames: mem.tags,
           conversationId,
           workspacePath: workspacePath || null,
+          pinned: mem.pinned,
         })
         created.push({
           id: note.id,
@@ -253,14 +257,25 @@ export async function executeManageMemory(
       }
       return { action: 'create', created, totalCreated: created.length }
     }
-    case 'read':
-      return runRead(args)
+    case 'read': {
+      const result = await runRead(args)
+      if (conversationId && result.memories.length > 0) {
+        void logMemoryAccess(
+          result.memories.map(m => m.id),
+          conversationId,
+          'tool_call',
+        )
+      }
+      return result
+    }
     case 'update': {
-      const updatePayload: { content?: string, tagNames?: string[] } = {}
+      const updatePayload: { content?: string, tagNames?: string[], pinned?: boolean } = {}
       if (args.content !== undefined)
         updatePayload.content = args.content
       if (args.tags !== undefined)
         updatePayload.tagNames = args.tags
+      if (args.pinned !== undefined)
+        updatePayload.pinned = args.pinned
       const updated = await updateMemory(args.memory_id, updatePayload)
       if (!updated)
         return { action: 'update', updated: null, error: 'Memory not found or already deleted.' }
@@ -277,11 +292,13 @@ export async function executeManageMemory(
       const updated: ManageMemoryBatchUpdateResult['updated'] = []
       const failed: ManageMemoryBatchUpdateResult['failed'] = []
       for (const item of args.updates) {
-        const payload: { content?: string, tagNames?: string[] } = {}
+        const payload: { content?: string, tagNames?: string[], pinned?: boolean } = {}
         if (item.content !== undefined)
           payload.content = item.content
         if (item.tags !== undefined)
           payload.tagNames = item.tags
+        if (item.pinned !== undefined)
+          payload.pinned = item.pinned
         const result = await updateMemory(item.memory_id, payload)
         if (result) {
           updated.push({

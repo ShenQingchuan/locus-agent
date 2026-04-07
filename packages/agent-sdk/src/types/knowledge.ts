@@ -26,6 +26,7 @@ export interface Note {
   folderId: string | null
   /** null = 全局记忆，有值 = 工作空间维度记忆 */
   workspacePath?: string | null
+  pinned?: boolean
   createdAt: Date
   updatedAt: Date
 }

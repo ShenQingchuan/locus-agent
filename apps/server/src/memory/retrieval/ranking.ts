@@ -1,50 +1,46 @@
-import type { NoteWithTags } from '../core/types.js'
+import type { RankedResult } from './ranking-core.js'
+import { getAccessCounts, getRecentAccessedNoteIds } from '../store/accessLog.js'
+import { applyTimeDecay, reciprocalRankFusion } from './ranking-core.js'
 
-export interface RankedResult {
-  note: NoteWithTags
-  score: number
-  vecRank?: number
-  keywordRank?: number
-}
+export { applyTimeDecay, type RankedResult, reciprocalRankFusion }
 
 /**
- * Reciprocal Rank Fusion (RRF).
- * k=60 is the standard constant from the original paper.
+ * Boost recently accessed and pinned memories.
  */
-export function reciprocalRankFusion(
-  vecResults: { noteId: string, distance: number }[],
-  keywordResults: { noteId: string }[],
-  k = 60,
-): Map<string, number> {
-  const scores = new Map<string, number>()
-
-  vecResults.forEach((r, i) => {
-    scores.set(r.noteId, (scores.get(r.noteId) ?? 0) + 1 / (k + i + 1))
-  })
-
-  keywordResults.forEach((r, i) => {
-    scores.set(r.noteId, (scores.get(r.noteId) ?? 0) + 1 / (k + i + 1))
-  })
-
-  return scores
-}
-
-/**
- * Apply time-decay weighting to memory relevance.
- * Newer memories get a slight boost.
- */
-export function applyTimeDecay(
+export async function applyAccessBoost(
   results: RankedResult[],
-  halfLifeDays = 30,
-): RankedResult[] {
-  const now = Date.now()
-  const halfLifeMs = halfLifeDays * 24 * 60 * 60 * 1000
+): Promise<RankedResult[]> {
+  if (results.length === 0)
+    return []
+
+  const noteIds = results.map(r => r.note.id)
+  const [accessedIds, accessCounts] = await Promise.all([
+    getRecentAccessedNoteIds(7, 1000),
+    getAccessCounts(noteIds, 7),
+  ])
+
+  const accessedSet = new Set(accessedIds)
+
+  // Bulk fetch pinned status for all result notes
+  const { db } = await import('../../db/index.js')
+  const { notes } = await import('../../db/schema.js')
+  const { eq } = await import('drizzle-orm')
+  const pinnedRows = await db
+    .select({ id: notes.id })
+    .from(notes)
+    .where(eq(notes.pinned, true))
+    .all()
+  const pinnedSet = new Set(pinnedRows.map(r => r.id))
 
   return results.map((r) => {
-    const ageMs = now - new Date(r.note.updatedAt).getTime()
-    const decay = Math.exp(-ageMs / halfLifeMs)
-    // Blend RRF score with decay factor (70% semantic rank, 30% recency)
-    const boosted = r.score * (0.7 + 0.3 * decay)
-    return { ...r, score: boosted }
-  })
+    let boost = 0
+    if (pinnedSet.has(r.note.id)) {
+      boost += 0.25
+    }
+    if (accessedSet.has(r.note.id)) {
+      const count = Math.min(accessCounts.get(r.note.id) ?? 1, 3)
+      boost += count * 0.05 // up to 0.15
+    }
+    return { ...r, score: r.score + boost }
+  }).sort((a, b) => b.score - a.score)
 }

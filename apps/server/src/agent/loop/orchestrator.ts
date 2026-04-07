@@ -4,8 +4,9 @@ import type { AgentLoopOptions, AgentLoopResult, ExecuteToolPipelineResult } fro
 import { BuiltinTool, HookEvent } from '@univedge/locus-agent-sdk'
 import { processDecisions } from '@univedge/locus-plugin-kit'
 import { streamText } from 'ai'
-import { buildRelevantMemoriesPrompt } from '../../memory/prompt/injection.js'
+import { renderL0Identity, renderL1WorkingSet, renderL2PrimedContext, renderL3DeepContext } from '../../memory/prompt/layers.js'
 import { retrieveRelevantMemories } from '../../memory/retrieval/index.js'
+import { logMemoryAccess } from '../../memory/store/accessLog.js'
 import { performCompaction, shouldCompact } from '../context/auto-compaction.js'
 import { compactToolResults } from '../context/tool-result-cache.js'
 import { mcpManager } from '../mcp/manager.js'
@@ -56,6 +57,12 @@ function extractLastUserQuery(messages: ModelMessage[]): string | undefined {
     }
   }
   return undefined
+}
+
+const GREETING_PATTERN = /^(?:你好|您好|哈喽|hello|hi|hey|在吗|在么|在？|在\?|早上好|中午好|晚上好|好久不见)\s*(?:[!！。]\s*)?$/i
+
+function isGreeting(query: string): boolean {
+  return GREETING_PATTERN.test(query.trim())
 }
 
 /** Max number of tool calls that may run concurrently within a single parallel batch. */
@@ -134,28 +141,43 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   }
 
   // 根据 codingMode 扩展 system prompt
-  let effectiveSystemPrompt = `${systemPrompt}\n\n${buildRuntimeContextPrompt(workspaceRoot)}`
-  const [skillsCatalogPrompt, memoryTagsPrompt] = await Promise.all([
+  const [skillsCatalogPrompt, memoryTagsPrompt, l0Identity, l1WorkingSet] = await Promise.all([
     buildSkillsCatalogPrompt(workspaceRootOption),
     buildMemoryTagsPrompt(),
+    renderL0Identity(),
+    renderL1WorkingSet(workspaceRoot),
   ])
   const hasAvailableSkills = skillsCatalogPrompt.length > 0
-  if (skillsCatalogPrompt) {
-    effectiveSystemPrompt += `\n\n${skillsCatalogPrompt}`
-  }
-  if (memoryTagsPrompt) {
-    effectiveSystemPrompt += `\n\n${memoryTagsPrompt}`
-  }
 
-  // Proactive memory retrieval on first iteration
+  const l2Primed = renderL2PrimedContext()
+
+  // Proactive memory retrieval on first iteration (L3 Deep Search)
   const lastUserQuery = extractLastUserQuery(initialMessages)
-  if (lastUserQuery) {
+  let l3Deep = ''
+  if (lastUserQuery && lastUserQuery.trim().length > 10 && !isGreeting(lastUserQuery)) {
     const memories = await retrieveRelevantMemories(lastUserQuery, workspaceRoot, { topK: 5 })
-    const memoriesPrompt = buildRelevantMemoriesPrompt(memories)
-    if (memoriesPrompt) {
-      effectiveSystemPrompt += `\n\n${memoriesPrompt}`
+    if (memories.length) {
+      l3Deep = renderL3DeepContext(memories)
+      void logMemoryAccess(
+        memories.map(m => m.id),
+        conversationId,
+        'injection',
+      )
     }
   }
+
+  const promptParts = [
+    systemPrompt,
+    l0Identity,
+    l1WorkingSet,
+    l2Primed,
+    buildRuntimeContextPrompt(workspaceRoot),
+    skillsCatalogPrompt,
+    memoryTagsPrompt,
+    l3Deep,
+  ].filter(Boolean)
+
+  let effectiveSystemPrompt = promptParts.join('\n\n')
 
   if (space === 'coding' && codingMode === 'plan') {
     effectiveSystemPrompt += `\n\n${PLAN_MODE_PROMPT}`
@@ -308,6 +330,15 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             `[agent-loop] Auto-compacted: removed ${compactionResult.messagesRemoved} old messages, `
             + `input was ${lastInputTokens}/${contextWindow} tokens`,
           )
+        }
+      }
+
+      // Memory mining: archive conversation into searchable notes
+      if (conversationId) {
+        const { shouldMineConversation, mineConversation } = await import('../../memory/auto/miner.js')
+        const shouldMine = await shouldMineConversation(conversationId)
+        if (shouldMine) {
+          void mineConversation(conversationId)
         }
       }
 

@@ -6,13 +6,14 @@ import { isVecAvailable, searchByVector } from '../store/vectorDb.js'
 export async function searchMemoriesByVector(
   query: string,
   limit = 30,
+  candidateNoteIds?: string[],
 ): Promise<{ noteId: string, distance: number }[]> {
   if (!isEmbeddingConfigured() || !isVecAvailable())
     return []
 
   try {
     const queryVector = await embedQuery(query)
-    const vecResults = searchByVector(queryVector, limit)
+    const vecResults = searchByVector(queryVector, limit, candidateNoteIds)
     const filtered = applyThreshold(vecResults)
 
     consola.debug(`[search] vec query="${query}" hits=${filtered.length}/${vecResults.length}`)

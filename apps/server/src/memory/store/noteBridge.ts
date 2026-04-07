@@ -46,10 +46,15 @@ export async function listNotesWithTags(options?: {
   folderId?: string | null
   tagId?: string
   workspacePath?: string | 'global'
+  pinned?: boolean
   limit?: number
   offset?: number
 }): Promise<NoteWithTags[]> {
   const conditions = []
+
+  if (options?.pinned !== undefined) {
+    conditions.push(eq(notes.pinned, options.pinned))
+  }
 
   if (options?.folderId !== undefined && options.folderId !== null) {
     conditions.push(eq(notes.folderId, options.folderId))

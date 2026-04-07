@@ -15,11 +15,17 @@ const emit = defineEmits<{
   openTags: [noteId: string]
   delete: [noteId: string]
   toGlobal: [note: NoteWithTags]
+  togglePin: [note: NoteWithTags]
 }>()
 
 const contextMenuItems = computed<ContextMenuItem[]>(() => {
   const items: ContextMenuItem[] = [
     { key: 'tags', label: '管理标签', icon: 'i-carbon-tag' },
+    {
+      key: 'pin',
+      label: props.note.pinned ? '取消置顶' : '置顶记忆',
+      icon: props.note.pinned ? 'i-carbon-unpin' : 'i-carbon-pin',
+    },
   ]
 
   if (props.note.workspacePath) {
@@ -43,6 +49,9 @@ function handleContextMenuSelect(key: string) {
       break
     case 'to-global':
       emit('toGlobal', props.note)
+      break
+    case 'pin':
+      emit('togglePin', props.note)
       break
     case 'delete':
       emit('delete', props.note.id)
@@ -85,17 +94,25 @@ function formatRelativeTime(date: Date | string): string {
         : 'border-border/60 bg-card hover:border-border hover:shadow-sm'"
       @click="handleClick(note)"
     >
-      <div v-if="note.tags.length > 0" class="px-3.5 pt-2.5 flex items-center gap-1.5 flex-wrap">
+      <div class="px-3.5 pt-2.5 flex items-center gap-1.5 flex-wrap">
         <span
-          v-for="tag in note.tags.slice(0, 3)"
-          :key="tag.id"
-          class="text-[11px] leading-none px-1.5 py-1 rounded-md bg-secondary/40 text-secondary-foreground/70 truncate font-mono"
+          v-if="note.pinned"
+          class="text-[10px] leading-none px-1.5 py-1 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium"
         >
-          #{{ tag.name }}
+          <div class="i-carbon-pin h-3 w-3 inline-block" />
         </span>
-        <span v-if="note.tags.length > 3" class="text-[10px] text-muted-foreground/60 font-mono">
-          +{{ note.tags.length - 3 }}
-        </span>
+        <template v-if="note.tags.length > 0">
+          <span
+            v-for="tag in note.tags.slice(0, 3)"
+            :key="tag.id"
+            class="text-[11px] leading-none px-1.5 py-1 rounded-md bg-secondary/40 text-secondary-foreground/70 truncate font-mono"
+          >
+            #{{ tag.name }}
+          </span>
+          <span v-if="note.tags.length > 3" class="text-[10px] text-muted-foreground/60 font-mono">
+            +{{ note.tags.length - 3 }}
+          </span>
+        </template>
       </div>
 
       <div class="px-3.5 pt-2.5 pb-1.5">

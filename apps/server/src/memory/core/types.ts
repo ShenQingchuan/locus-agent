@@ -11,6 +11,7 @@ export interface CreateMemoryInput {
   tagNames?: string[]
   conversationId?: string
   workspacePath?: string | null
+  pinned?: boolean
 }
 
 export interface UpdateMemoryInput {
@@ -19,4 +20,5 @@ export interface UpdateMemoryInput {
   folderId?: string | null
   tagNames?: string[]
   workspacePath?: string | null
+  pinned?: boolean
 }

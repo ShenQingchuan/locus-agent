@@ -1,9 +1,9 @@
 import type { NoteWithTags } from '../core/types.js'
-import { like } from 'drizzle-orm'
+import { and, inArray, like } from 'drizzle-orm'
 import { db } from '../../db/index.js'
 import { notes } from '../../db/schema.js'
 import { getNotesWithTagsByIds, searchNotesByTags } from '../store/noteBridge.js'
-import { applyTimeDecay, reciprocalRankFusion } from './ranking.js'
+import { applyAccessBoost, applyTimeDecay, reciprocalRankFusion } from './ranking.js'
 import { searchMemoriesByVector } from './vector.js'
 
 export async function searchMemoriesHybrid(
@@ -17,21 +17,35 @@ export async function searchMemoriesHybrid(
   let vecResults: { noteId: string, distance: number }[] = []
   let keywordResults: { noteId: string }[] = []
   let tagResults: NoteWithTags[] = []
-
-  if (hasQuery) {
-    vecResults = await searchMemoriesByVector(trimmedQuery)
-
-    const pattern = `%${trimmedQuery}%`
-    const likeResults = await db
-      .select({ id: notes.id })
-      .from(notes)
-      .where(like(notes.content, pattern))
-      .limit(30)
-    keywordResults = likeResults.map(r => ({ noteId: r.id }))
-  }
+  let candidateNoteIds: string[] | undefined
 
   if (hasTags) {
     tagResults = await searchNotesByTags(tags!)
+    candidateNoteIds = tagResults.map(n => n.id)
+  }
+
+  if (hasQuery) {
+    // Use tag-filtered candidates for vector search when tags are provided.
+    // If candidate list is too small, fall back to full search.
+    const useCandidateFilter = candidateNoteIds && candidateNoteIds.length >= 3
+    vecResults = await searchMemoriesByVector(
+      trimmedQuery,
+      30,
+      useCandidateFilter ? candidateNoteIds : undefined,
+    )
+
+    const pattern = `%${trimmedQuery}%`
+    const likeConditions = [like(notes.content, pattern)]
+    if (useCandidateFilter && candidateNoteIds) {
+      likeConditions.push(inArray(notes.id, candidateNoteIds))
+    }
+
+    const likeResults = await db
+      .select({ id: notes.id })
+      .from(notes)
+      .where(and(...likeConditions))
+      .limit(30)
+    keywordResults = likeResults.map(r => ({ noteId: r.id }))
   }
 
   // Merge vector + keyword with RRF
@@ -62,5 +76,7 @@ export async function searchMemoriesHybrid(
 
   ranked.sort((a, b) => b.score - a.score)
 
-  return applyTimeDecay(ranked).map(r => r.note)
+  const decayed = applyTimeDecay(ranked)
+  const boosted = await applyAccessBoost(decayed)
+  return boosted.map(r => r.note)
 }

@@ -8,6 +8,13 @@
       "when": 1,
       "tag": "0000_polite_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1775579461006,
+      "tag": "0001_moaning_meltdown",
+      "breakpoints": true
     }
   ]
 }

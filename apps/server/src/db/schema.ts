@@ -147,6 +147,7 @@ export const notes = sqliteTable('notes', {
   folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
   /** null = 全局记忆，有值 = 工作空间维度记忆 */
   workspacePath: text('workspace_path'),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -193,6 +194,34 @@ export const noteConversations = sqliteTable('note_conversations', {
   primaryKey({ columns: [t.noteId, t.conversationId] }),
 ])
 
+/** 记忆访问日志 */
+export const memoryAccessLogs = sqliteTable('memory_access_logs', {
+  id: text('id').primaryKey(),
+  noteId: text('note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+  conversationId: text('conversation_id')
+    .references(() => conversations.id, { onDelete: 'set null' }),
+  accessType: text('access_type', { enum: ['injection', 'tool_call'] }).notNull(),
+  accessedAt: integer('accessed_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, t => [
+  index('idx_memory_access_logs_note_id').on(t.noteId),
+  index('idx_memory_access_logs_accessed_at').on(t.accessedAt),
+])
+
+/** 记忆自动挖掘任务记录 */
+export const memoryMiningJobs = sqliteTable('memory_mining_jobs', {
+  conversationId: text('conversation_id')
+    .primaryKey()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+  minedAt: integer('mined_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  notesCreated: integer('notes_created').notNull().default(0),
+})
+
 // ==================== Review Annotations ====================
 
 /** Review annotation groups (batch of code review comments) */
@@ -235,6 +264,8 @@ export const conversationsRelations = relations(conversations, ({ many }) => ({
   noteConversations: many(noteConversations),
   todoItems: many(todoItems),
   delegateSessions: many(delegateSessions),
+  memoryAccessLogs: many(memoryAccessLogs),
+  memoryMiningJobs: many(memoryMiningJobs),
 }))
 
 export const delegateSessionsRelations = relations(delegateSessions, ({ one }) => ({
@@ -275,6 +306,7 @@ export const notesRelations = relations(notes, ({ one, many }) => ({
   }),
   noteTags: many(noteTags),
   noteConversations: many(noteConversations),
+  memoryAccessLogs: many(memoryAccessLogs),
 }))
 
 export const tagsRelations = relations(tags, ({ many }) => ({
@@ -299,6 +331,24 @@ export const noteConversationsRelations = relations(noteConversations, ({ one })
   }),
   conversation: one(conversations, {
     fields: [noteConversations.conversationId],
+    references: [conversations.id],
+  }),
+}))
+
+export const memoryAccessLogsRelations = relations(memoryAccessLogs, ({ one }) => ({
+  note: one(notes, {
+    fields: [memoryAccessLogs.noteId],
+    references: [notes.id],
+  }),
+  conversation: one(conversations, {
+    fields: [memoryAccessLogs.conversationId],
+    references: [conversations.id],
+  }),
+}))
+
+export const memoryMiningJobsRelations = relations(memoryMiningJobs, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [memoryMiningJobs.conversationId],
     references: [conversations.id],
   }),
 }))
@@ -433,3 +483,7 @@ export type ReviewAnnotationGroup = typeof reviewAnnotationGroups.$inferSelect
 export type NewReviewAnnotationGroup = typeof reviewAnnotationGroups.$inferInsert
 export type ReviewAnnotationRow = typeof reviewAnnotations.$inferSelect
 export type NewReviewAnnotationRow = typeof reviewAnnotations.$inferInsert
+export type MemoryAccessLog = typeof memoryAccessLogs.$inferSelect
+export type NewMemoryAccessLog = typeof memoryAccessLogs.$inferInsert
+export type MemoryMiningJob = typeof memoryMiningJobs.$inferSelect
+export type NewMemoryMiningJob = typeof memoryMiningJobs.$inferInsert

@@ -9,6 +9,7 @@ import {
   searchMemories,
   searchMemoriesByTags,
 } from '../memory/core/search.js'
+import { getMemoryIdentity, setMemoryIdentity } from '../memory/prompt/identity.js'
 import {
   getMemoryStats,
   getNoteConversationIds,
@@ -41,6 +42,7 @@ notesRoutes.post('/', async (c) => {
   const body = await c.req.json()
   const { content, editorState, folderId, tagNames, conversationId, workspacePath } = body
 
+  const { pinned } = body
   const note = await createMemory({
     content,
     editorState,
@@ -48,6 +50,7 @@ notesRoutes.post('/', async (c) => {
     tagNames,
     conversationId,
     workspacePath,
+    pinned,
   })
 
   return c.json(note, 201)
@@ -97,13 +100,14 @@ notesRoutes.get('/:id', async (c) => {
 notesRoutes.patch('/:id', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
-  const { content, editorState, folderId, tagNames } = body
+  const { content, editorState, folderId, tagNames, pinned } = body
 
   const updated = await updateMemory(id, {
     content,
     editorState,
     folderId,
     tagNames,
+    pinned,
   })
 
   if (!updated) {
@@ -130,4 +134,21 @@ notesRoutes.get('/:id/conversations', async (c) => {
   const id = c.req.param('id')
   const conversationIds = await getNoteConversationIds(id)
   return c.json({ conversationIds })
+})
+
+// GET /api/memory/identity - 获取记忆身份卡
+notesRoutes.get('/identity', async (c) => {
+  const identity = getMemoryIdentity()
+  return c.json({ identity })
+})
+
+// POST /api/memory/identity - 设置记忆身份卡
+notesRoutes.post('/identity', async (c) => {
+  const body = await c.req.json()
+  const { identity } = body
+  if (typeof identity !== 'string') {
+    return c.json({ error: 'identity must be a string' }, 400)
+  }
+  setMemoryIdentity(identity)
+  return c.json({ success: true })
 })

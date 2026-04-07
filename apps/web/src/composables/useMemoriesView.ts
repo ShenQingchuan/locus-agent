@@ -278,6 +278,20 @@ export function useMemoriesView() {
     }
   }
 
+  async function handleTogglePin(note: NoteWithTags) {
+    try {
+      const updated = await api.updateNote(note.id, { pinned: !note.pinned })
+      if (updated) {
+        queryCache.setQueryData(['note', note.id], updated)
+        queryCache.invalidateQueries({ key: ['notes'] })
+        toast.success(updated.pinned ? '已置顶' : '已取消置顶')
+      }
+    }
+    catch (e: unknown) {
+      toast.error((e as { message?: string })?.message || '操作失败')
+    }
+  }
+
   // ==================== Tags modal ====================
 
   const {
@@ -332,6 +346,7 @@ export function useMemoriesView() {
     cancelEditing,
     handleDeleteNote,
     handleToGlobal,
+    handleTogglePin,
     showAddTagsModal,
     addTagsNoteTags,
     openTagsModal,
