@@ -1,3 +1,28 @@
+## [0.4.0] - 2026-04-08
+
+### Documentation
+
+- *(cli)* Update README.md with enhanced usage instructions and command details
+
+
+### Features
+
+- *(server)* Implement memory access logging and mining features
+
+- *(memory)* Enhance memory management and taxonomy
+
+
+### Miscellaneous
+
+- *(server)* Squash drizzle migrations into single baseline
+
+
+### Refactor
+
+- *(CodingView)* Simplify git loading bar visibility logic
+
+- Migrate runtime from Bun to Node.js
+
 ## [0.3.0] - 2026-04-06
 
 ### Features
