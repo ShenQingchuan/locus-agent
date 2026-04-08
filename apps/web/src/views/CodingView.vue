@@ -232,11 +232,8 @@ const reviewAnnotationCountForHeader = computed(() =>
 
           <!-- ── 变更审阅 section ── -->
           <template v-else-if="activeSection === 'workspace'">
-            <div
-              v-if="isGitStatusUpdating"
-              class="git-loading-bar relative h-0.5 w-full flex-shrink-0 overflow-hidden bg-muted"
-            >
-              <div class="git-loading-bar-inner absolute left-0 h-full w-20 rounded-full bg-primary" />
+            <div class="relative h-0.5 w-full flex-shrink-0 overflow-hidden" :class="isGitStatusUpdating ? 'bg-muted' : ''">
+              <div v-if="isGitStatusUpdating" class="git-loading-bar-inner absolute left-0 h-full w-20 rounded-full bg-primary" />
             </div>
             <div class="flex-1 min-h-0">
               <SessionChangesPanel
