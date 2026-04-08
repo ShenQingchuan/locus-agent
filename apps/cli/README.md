@@ -2,8 +2,6 @@
 
 Locus Agent 的命令行工具：在后台启动内置 Web + API 服务、交互式配置 LLM（提供商、API Key、模型、端口）等。
 
-**运行环境**：发布包使用 `#!/usr/bin/env bun` 入口，需已安装 [Bun](https://bun.sh)。
-
 ## 安装
 
 ```bash
