@@ -118,8 +118,8 @@ embeddingRoutes.post('/model/download', (c) => {
     downloading = true
 
     try {
-      await downloadModel((data) => {
-        stream.writeSSE({
+      await downloadModel(async (data) => {
+        await stream.writeSSE({
           event: 'file-progress',
           data: JSON.stringify(data),
         })

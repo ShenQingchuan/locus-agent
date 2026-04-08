@@ -186,17 +186,17 @@ const {
 
           <!-- Model not downloaded (runtime installed) -->
           <template v-if="embeddingState.localRuntimeInstalled && !embeddingState.localModelReady && !modelDownloading">
-            <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-start gap-1.5">
+            <div class="rounded-lg border border-border bg-muted/30 p-3 text-xs flex items-center gap-1.5">
               <div class="i-carbon-information h-4 w-4 flex-shrink-0 text-muted-foreground" />
               <span class="text-muted-foreground">需要下载 {{ embeddingState.localModelLabel }} 到本地，来源已记录；切换模型后请重新索引</span>
+              <button
+                class="btn-primary btn-xs text-xs ml-auto py-0.5 px-2"
+                @click="startModelDownload"
+              >
+                <div class="i-carbon-download text-xs mr-1" />
+                下载模型
+              </button>
             </div>
-            <button
-              class="btn-primary btn-sm"
-              @click="startModelDownload"
-            >
-              <div class="i-carbon-download h-3.5 w-3.5 mr-1" />
-              下载模型
-            </button>
           </template>
 
           <!-- Model downloading - file table -->

@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getSetting, setSetting } from '../settings/index.js'
 import { getModelsDir } from '../settings/paths.js'
+import { downloadHfRepoFilesToCache, listHfEmbeddingRepoFiles } from './hfHubDownload.js'
 import { importTransformersFromDeps, isLocalDepsInstalled } from './localDeps.js'
 
 // ==================== Constants ====================
@@ -246,38 +247,52 @@ function scanDir(baseDir: string, dir: string, out: ModelFileInfo[]): void {
 
 /**
  * Download the active ONNX model from HuggingFace with per-file progress.
+ *
+ * Uses direct HTTP download to the same paths as Transformers.js FileCache, then
+ * `pipeline(..., { local_files_only: true })` so loads hit disk via FileResponse.
+ * This avoids a known failure mode where remote fetch + `return_path` in Node fails
+ * to persist/cache the body ("Unable to get model file path or buffer").
  */
 export async function downloadModel(
-  onProgress: (data: ModelFileProgress) => void,
+  onProgress: (data: ModelFileProgress) => void | Promise<void>,
 ): Promise<void> {
   const family = getLocalEmbeddingFamily()
   const config = getModelConfig(family)
   const cacheDir = getModelCacheDir(family)
-  const { pipeline } = await importTransformers()
 
   pipelineInstance = null
   loadingPromise = null
 
-  const p = pipeline('feature-extraction', config.modelId, {
-    ...(config.dtype ? { dtype: config.dtype } : {}),
-    cache_dir: cacheDir,
-    progress_callback: (event: any) => {
-      if (event.file) {
-        onProgress({
-          file: event.file,
-          status: event.status,
-          progress: event.progress,
-          loaded: event.loaded,
-          total: event.total,
-        })
+  const files = listHfEmbeddingRepoFiles({
+    family: config.family,
+    dtype: config.dtype,
+  })
+
+  await downloadHfRepoFilesToCache({
+    modelId: config.modelId,
+    cacheDir,
+    files,
+    onProgress: async (data) => {
+      try {
+        await Promise.resolve(onProgress(data))
+      }
+      catch {
+        // Do not abort disk download if SSE/UI fails (e.g. stream closed).
       }
     },
   })
 
+  const { pipeline } = await importTransformers()
+  const p = pipeline('feature-extraction', config.modelId, {
+    ...(config.dtype ? { dtype: config.dtype } : {}),
+    cache_dir: cacheDir,
+    local_files_only: true,
+  })
+
   pipelineInstance = await p
 
-  const files = getLocalModelFiles()
-  setSetting(getModelFilesKey(family), JSON.stringify(files))
+  const fileList = getLocalModelFiles()
+  setSetting(getModelFilesKey(family), JSON.stringify(fileList))
   setSetting(getModelReadyKey(family), 'true')
 }
 

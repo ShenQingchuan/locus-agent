@@ -214,39 +214,7 @@ function scanDir(baseDir: string, dir: string, out: ModelFileInfo[]): void {
   }
 }
 
-export async function downloadModel(
-  onProgress: (data: ModelFileProgress) => void,
-): Promise<void> {
-  const family = getLocalEmbeddingFamily()
-  const config = getModelConfig(family)
-  const cacheDir = getModelCacheDir(family)
-  const { pipeline } = await importTransformers()
-
-  pipelineInstance = null
-  loadingPromise = null
-
-  const p = pipeline('feature-extraction', config.modelId, {
-    ...(config.dtype ? { dtype: config.dtype } : {}),
-    cache_dir: cacheDir,
-    progress_callback: (event: any) => {
-      if (event.file) {
-        onProgress({
-          file: event.file,
-          status: event.status,
-          progress: event.progress,
-          loaded: event.loaded,
-          total: event.total,
-        })
-      }
-    },
-  })
-
-  pipelineInstance = await p
-
-  const files = getLocalModelFiles()
-  setSetting(getModelFilesKey(family), JSON.stringify(files))
-  setSetting(getModelReadyKey(family), 'true')
-}
+export { downloadModel } from '../../services/localEmbedding.js'
 
 async function ensurePipeline(): Promise<any> {
   if (pipelineInstance)
