@@ -1,3 +1,9 @@
+## [0.4.2] - 2026-04-08
+
+### Features
+
+- *(embedding)* Refactor model download process and introduce Hugging Face integration
+
 ## [0.4.1] - 2026-04-08
 
 ### Documentation
