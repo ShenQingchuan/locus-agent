@@ -1,3 +1,9 @@
+## [0.4.1] - 2026-04-08
+
+### Documentation
+
+- *(cli)* Remove Bun environment requirement from README.md
+
 ## [0.4.0] - 2026-04-08
 
 ### Documentation
