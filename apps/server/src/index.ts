@@ -1,4 +1,6 @@
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -72,7 +74,7 @@ export function createApp(): Hono {
   return app
 }
 
-// Dev mode: start server only when this file is the entry point (bun --watch src/index.ts)
+// Dev mode: start server only when this file is the entry point (tsx --watch src/index.ts)
 // Bun launches HTTP server from the entry file's default export
 function startDev() {
   // 1. Ensure data directory and initialize DB (runs Drizzle migrations)
@@ -148,7 +150,14 @@ function startDev() {
     })
   }
 
-  return { fetch: app.fetch, port, idleTimeout: 255 }
+  serve({ fetch: app.fetch, port }, () => {
+    // eslint-disable-next-line no-console
+    console.log(`Started development server: http://localhost:${port}`)
+  })
 }
 
-export default import.meta.main ? startDev() : undefined
+// Dev mode: start server only when this file is the entry point
+const isMain = process.argv[1] === fileURLToPath(import.meta.url)
+if (isMain) {
+  startDev()
+}

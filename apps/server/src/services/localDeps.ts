@@ -55,7 +55,7 @@ export function installLocalDeps(
       }))
     }
 
-    const child = spawn('bun', ['add', ...ONNX_DEPS], {
+    const child = spawn('pnpm', ['add', ...ONNX_DEPS], {
       cwd: depsDir,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -73,7 +73,7 @@ export function installLocalDeps(
         resolve({ success: true })
       }
       else {
-        resolve({ success: false, error: `bun add exited with code ${code}` })
+        resolve({ success: false, error: `pnpm add exited with code ${code}` })
       }
     })
 

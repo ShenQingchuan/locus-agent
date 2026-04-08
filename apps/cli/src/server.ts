@@ -1,10 +1,12 @@
 import type { LLMSettings } from '@univedge/locus-server/settings'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
 import { createApp } from '@univedge/locus-server'
 import { setServerConfig } from '@univedge/locus-server/config'
 import { initDB } from '@univedge/locus-server/db'
 import { setLLMConfig } from '@univedge/locus-server/providers'
-import { serveStatic } from 'hono/bun'
 
 export interface StartOptions {
   dbPath: string
@@ -49,15 +51,14 @@ export function startServer(options: StartOptions): void {
     if (c.req.path.startsWith('/api/')) {
       return c.json({ error: 'Not found' }, 404)
     }
-    return new Response(Bun.file(resolve(webDistDir, 'index.html')))
+    const html = readFileSync(resolve(webDistDir, 'index.html'))
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
   })
 
   // 6. 启动服务
-  Bun.serve({
-    fetch: app.fetch,
-    port,
-    idleTimeout: 255,
-  })
+  serve({ fetch: app.fetch, port })
 
   console.log(`\nLocus Agent is running at http://localhost:${port}\n`)
 }

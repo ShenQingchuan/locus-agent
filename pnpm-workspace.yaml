@@ -22,14 +22,14 @@ catalogs:
     ai: ^6.0.145
     zhipu-ai-provider: ^0.3.0
     zod: ^4.3.6
-  bun-family:
-    '@types/bun': ^1.3.11
   cli-tools:
     '@clack/prompts': ^1.2.0
     citty: ^0.2.2
     consola: ^3.4.2
     git-cliff: ^2.12.0
   database:
+    '@types/better-sqlite3': ^7.6.13
+    better-sqlite3: ^11.9.1
     drizzle-kit: ^0.31.10
     drizzle-orm: ^0.45.2
   dev-tools:
@@ -40,18 +40,20 @@ catalogs:
     eslint: ^10.1.0
     simple-git-hooks: ^2.13.1
     tsdown: ^0.21.7
+    tsx: ^4.19.4
     turbo: ^2.5.0
     typescript: ^6.0.2
     vitest: ^3.2.0
   embedding:
     '@huggingface/transformers': ^4.0.1
-    onnxruntime-node: ^1.24.3
     sqlite-vec: ^0.1.9
   fs-utils:
+    fast-glob: ^3.3.3
     ignore: ^7.0.5
   highlight:
     shiki: ^4.0.2
   hono-family:
+    '@hono/node-server': ^1.14.1
     hono: ^4.12.10
   prosekit-family:
     modern-monaco: ^0.4.0

@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env tsx
 /**
  * Release 脚本：统一版本号、生成 CHANGELOG.md 与 RELEASE_NOTES.md、打 tag、推送、构建、发布 npm、创建 GitHub Release。
  *
@@ -7,11 +7,11 @@
  * 首次发布作用域包需在 package.json 中配置 "publishConfig": { "access": "public" } 或单次使用 pnpm publish --access public。
  *
  * 用法：
- *   bun scripts/release.ts --bump          # patch: 0.1.2 -> 0.1.3
- *   bun scripts/release.ts --minor         # minor: 0.1.2 -> 0.2.0
- *   bun scripts/release.ts --major         # major: 0.1.2 -> 1.0.0
- *   bun scripts/release.ts --bump --dry    # dry-run，不 commit/tag/push/build/publish/release
- *   bun scripts/release.ts 0.2.0           # 直接指定版本号
+ *   tsx scripts/release.ts --bump          # patch: 0.1.2 -> 0.1.3
+ *   tsx scripts/release.ts --minor         # minor: 0.1.2 -> 0.2.0
+ *   tsx scripts/release.ts --major         # major: 0.1.2 -> 1.0.0
+ *   tsx scripts/release.ts --bump --dry    # dry-run，不 commit/tag/push/build/publish/release
+ *   tsx scripts/release.ts 0.2.0           # 直接指定版本号
  */
 
 import { execSync } from 'node:child_process'

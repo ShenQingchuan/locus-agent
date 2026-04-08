@@ -2,7 +2,7 @@ import type { MentionSearchEntry, WorkspaceDirectoryEntry, WorkspaceTreeNode } f
 import { readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join, relative, resolve, sep } from 'node:path'
-import { Glob } from 'bun'
+import fg from 'fast-glob'
 import { getGitignoreFilter } from '../agent/tools/gitignore-filter.js'
 import { getAllowedRoots, resolveAllowedDirectory } from './workspace-access.js'
 
@@ -191,16 +191,17 @@ export async function searchMentions(
   const raw: MentionSearchEntry[] = []
 
   if (filter) {
-    const glob = new Glob('**/*')
     const isIgnored = await getGitignoreFilter(resolvedBase)
     let scanned = 0
 
-    for await (const relPath of glob.scan({
+    const stream = fg.stream('**/*', {
       cwd: resolvedBase,
       dot: includeHidden,
       onlyFiles: false,
-      followSymlinks: false,
-    })) {
+      followSymbolicLinks: false,
+    })
+    for await (const entry of stream) {
+      const relPath = typeof entry === 'string' ? entry : String(entry)
       if (++scanned > MAX_FUZZY_SCAN)
         break
       if (relPath.includes('node_modules'))

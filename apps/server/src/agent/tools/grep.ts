@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+import { spawn } from 'node:child_process'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { resolveToolPath } from './resolve-path.js'
@@ -137,15 +139,16 @@ export async function executeGrep(args: {
   rgArgs.push('--', pattern, '.')
 
   try {
-    const proc = Bun.spawn(rgArgs, {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      cwd: resolvedCwd,
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const proc = spawn(rgArgs[0], rgArgs.slice(1), {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: resolvedCwd,
+      })
+      const chunks: Buffer[] = []
+      proc.stdout!.on('data', (chunk: Buffer) => chunks.push(chunk))
+      proc.on('error', reject)
+      proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf-8')))
     })
-
-    const decoder = new TextDecoder()
-    const stdout = decoder.decode(await new Response(proc.stdout as ReadableStream).arrayBuffer())
-    await proc.exited
 
     // Parse ripgrep output
     const matches: GrepMatch[] = []
@@ -249,7 +252,7 @@ export async function executeGrep(args: {
 }
 
 /**
- * Fallback grep using Bun.spawn with basic grep
+ * Fallback grep using basic grep
  */
 async function executeGrepFallback(
   pattern: string,
@@ -271,15 +274,16 @@ async function executeGrepFallback(
 
   grepArgs.push('-E', pattern, '.')
 
-  const proc = Bun.spawn(grepArgs, {
-    stdout: 'pipe',
-    stderr: 'pipe',
-    cwd,
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const proc = spawn(grepArgs[0], grepArgs.slice(1), {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd,
+    })
+    const chunks: Buffer[] = []
+    proc.stdout!.on('data', (chunk: Buffer) => chunks.push(chunk))
+    proc.on('error', reject)
+    proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf-8')))
   })
-
-  const decoder = new TextDecoder()
-  const stdout = decoder.decode(await new Response(proc.stdout as ReadableStream).arrayBuffer())
-  await proc.exited
 
   const matches: GrepMatch[] = []
   for (const line of stdout.split('\n')) {

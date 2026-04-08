@@ -10,7 +10,7 @@
   },
   "scripts": {
     "prepare": "pnpm exec simple-git-hooks",
-    "dev": "bun scripts/dev.ts",
+    "dev": "tsx scripts/dev.ts",
     "dev:server": "pnpm -F @univedge/locus-server dev",
     "dev:web": "pnpm -F @univedge/locus-web dev",
     "build": "turbo run build",
@@ -20,7 +20,7 @@
     "db:generate": "pnpm -F @univedge/locus-server db:generate",
     "db:migrate": "pnpm -F @univedge/locus-server db:migrate",
     "db:studio": "pnpm -F @univedge/locus-server db:studio",
-    "release": "bun scripts/release.ts"
+    "release": "tsx scripts/release.ts"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-tools",
@@ -28,6 +28,7 @@
     "eslint": "catalog:dev-tools",
     "git-cliff": "catalog:cli-tools",
     "simple-git-hooks": "catalog:dev-tools",
+    "tsx": "catalog:dev-tools",
     "turbo": "catalog:dev-tools",
     "typescript": "catalog:dev-tools",
     "vitest": "catalog:dev-tools"

@@ -52,7 +52,7 @@ export default defineCommand({
 
     const port = portFlag ?? getServerPort()
 
-    const childArgs = [Bun.main, 'daemon']
+    const childArgs = [process.argv[1], 'daemon']
     if (portFlag)
       childArgs.push('--port', String(portFlag))
 

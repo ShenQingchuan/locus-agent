@@ -1,3 +1,7 @@
+import type { Buffer } from 'node:buffer'
+import type { Readable } from 'node:stream'
+import { spawn } from 'node:child_process'
+import process from 'node:process'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { resolveToolPath } from './resolve-path.js'
@@ -34,41 +38,32 @@ export interface BashStreamCallbacks {
 }
 
 /**
- * 从 ReadableStream 逐块读取并回调，同时收集完整内容
+ * 从 Node Readable stream 逐块读取并回调，同时收集完整内容
  */
 async function consumeStream(
-  stream: ReadableStream<Uint8Array> | null,
+  stream: Readable | null,
   onChunk?: (chunk: string) => void | Promise<void>,
 ): Promise<string> {
   if (!stream)
     return ''
 
   const decoder = new TextDecoder()
-  const reader = stream.getReader()
   let collected = ''
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done)
-        break
-      const text = decoder.decode(value, { stream: true })
-      collected += text
-      if (onChunk) {
-        await onChunk(text)
-      }
-    }
-    // Flush remaining bytes
-    const remaining = decoder.decode()
-    if (remaining) {
-      collected += remaining
-      if (onChunk) {
-        await onChunk(remaining)
-      }
+  for await (const chunk of stream) {
+    const text = decoder.decode(chunk as Buffer, { stream: true })
+    collected += text
+    if (onChunk) {
+      await onChunk(text)
     }
   }
-  finally {
-    reader.releaseLock()
+  // Flush remaining bytes
+  const remaining = decoder.decode()
+  if (remaining) {
+    collected += remaining
+    if (onChunk) {
+      await onChunk(remaining)
+    }
   }
 
   return collected
@@ -85,10 +80,9 @@ export async function executeBash(
   const resolvedCwd = cwd ? resolveToolPath(cwd) : getWorkspaceRoot()
 
   try {
-    const proc = Bun.spawn(['bash', '-c', command], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...Bun.env },
+    const proc = spawn('bash', ['-c', command], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
       cwd: resolvedCwd,
     })
 
@@ -99,11 +93,15 @@ export async function executeBash(
       proc.kill()
     }, timeout)
 
+    const exitedPromise = new Promise<number>(resolve =>
+      proc.on('close', code => resolve(code ?? 1)),
+    )
+
     // 并发流式读取 stdout 和 stderr，同时等待进程退出
     const [stdout, stderr, exitCode] = await Promise.all([
-      consumeStream(proc.stdout as ReadableStream<Uint8Array>, streamCallbacks?.onStdout),
-      consumeStream(proc.stderr as ReadableStream<Uint8Array>, streamCallbacks?.onStderr),
-      proc.exited,
+      consumeStream(proc.stdout, streamCallbacks?.onStdout),
+      consumeStream(proc.stderr, streamCallbacks?.onStderr),
+      exitedPromise,
     ])
 
     // 清除超时

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { tool } from 'ai'
-import { Glob } from 'bun'
+import fg from 'fast-glob'
 import { z } from 'zod'
 import { getGitignoreFilter } from './gitignore-filter.js'
 import { resolveToolPath } from './resolve-path.js'
@@ -106,16 +106,15 @@ export async function executeGlob(args: {
     throw new Error(`Not a directory: ${cwdArg ?? resolvedCwd}`)
   }
 
-  // --- Scan with Bun.Glob ---
-  const glob = new Glob(pattern)
+  // --- Scan with fast-glob ---
   const allMatches: string[] = []
-
-  for await (const filePath of glob.scan({
+  const entries = await fg(pattern, {
     cwd: resolvedCwd,
     dot: false,
     onlyFiles: true,
-    followSymlinks: false,
-  })) {
+    followSymbolicLinks: false,
+  })
+  for (const filePath of entries) {
     const absPath = resolve(resolvedCwd, filePath)
     if (!isIgnored(absPath, false)) {
       allMatches.push(filePath)

@@ -8,13 +8,13 @@ export function upsertMemoryEmbedding(noteId: string, embedding: Float32Array): 
     return
 
   const sqlite = getSqlite()
-  sqlite.transaction(() => {
-    sqlite.run('DELETE FROM vec_notes WHERE note_id = ?', [noteId])
-    sqlite.run(
+  const upsert = sqlite.transaction(() => {
+    sqlite.prepare('DELETE FROM vec_notes WHERE note_id = ?').run(noteId)
+    sqlite.prepare(
       'INSERT INTO vec_notes(note_id, embedding) VALUES (?, ?)',
-      [noteId, new Uint8Array(embedding.buffer, embedding.byteOffset, embedding.byteLength)],
-    )
-  })()
+    ).run(noteId, new Uint8Array(embedding.buffer, embedding.byteOffset, embedding.byteLength))
+  })
+  upsert()
 }
 
 export function deleteMemoryEmbedding(noteId: string): void {
@@ -22,7 +22,7 @@ export function deleteMemoryEmbedding(noteId: string): void {
     return
 
   const sqlite = getSqlite()
-  sqlite.run('DELETE FROM vec_notes WHERE note_id = ?', [noteId])
+  sqlite.prepare('DELETE FROM vec_notes WHERE note_id = ?').run(noteId)
 }
 
 export function searchByVector(
@@ -80,8 +80,8 @@ export function hasMemoryEmbedding(noteId: string): boolean {
   const sqlite = getSqlite()
   const result = sqlite.prepare(
     'SELECT 1 FROM vec_notes WHERE note_id = ? LIMIT 1',
-  ).get(noteId) as Record<string, unknown> | null
-  return result !== null
+  ).get(noteId) as Record<string, unknown> | undefined
+  return result !== undefined
 }
 
 export function clearAllEmbeddings(): void {
@@ -89,5 +89,5 @@ export function clearAllEmbeddings(): void {
     return
 
   const sqlite = getSqlite()
-  sqlite.run('DELETE FROM vec_notes')
+  sqlite.prepare('DELETE FROM vec_notes').run()
 }

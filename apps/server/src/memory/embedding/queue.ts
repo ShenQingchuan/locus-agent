@@ -91,7 +91,7 @@ export function enqueueEmbedding(noteId: string, content: string, tagNames: stri
 export function enqueueEmbeddingDeletion(noteId: string): void {
   const sqlite = getSqlite()
   try {
-    sqlite.run('DELETE FROM vec_notes WHERE note_id = ?', [noteId])
+    sqlite.prepare('DELETE FROM vec_notes WHERE note_id = ?').run(noteId)
   }
   catch {
     // ignore

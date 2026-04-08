@@ -1,53 +1,22 @@
-/// <reference types="bun" />
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import process from 'node:process'
 
-async function runBuild() {
-  const root = import.meta.dir
-  const distDir = resolve(root, 'dist')
+/**
+ * Post-build script: copy drizzle migrations and web dist into dist/.
+ * The actual TS compilation is handled by tsdown (see tsdown.config.ts).
+ */
+const root = import.meta.dirname
 
-  // Clean dist before build to remove stale files
-  if (existsSync(distDir))
-    rmSync(distDir, { recursive: true, force: true })
-  mkdirSync(distDir, { recursive: true })
-
-  const result = await Bun.build({
-    entrypoints: [
-      resolve(root, 'src/index.ts'),
-      resolve(root, 'src/db/index.ts'),
-      resolve(root, 'src/config.ts'),
-      resolve(root, 'src/agent/providers/index.ts'),
-      resolve(root, 'src/settings/index.ts'),
-    ],
-    outdir: resolve(root, 'dist'),
-    target: 'bun',
-    external: [
-      'onnxruntime-node',
-      '@huggingface/transformers',
-    ],
-    sourcemap: 'external',
-  })
-
-  if (!result.success) {
-    for (const log of result.logs)
-      console.error(log)
-    process.exit(1)
-  }
-
-  const drizzleSource = resolve(root, 'drizzle')
-  if (existsSync(drizzleSource)) {
-    const drizzleDest = resolve(root, 'dist/drizzle')
-    mkdirSync(drizzleDest, { recursive: true })
-    cpSync(drizzleSource, drizzleDest, { recursive: true })
-  }
-
-  const webDistSource = resolve(root, '../web/dist')
-  if (!existsSync(webDistSource))
-    throw new Error(`Web dist not found: ${webDistSource}. Run web build first.`)
-  const webDest = resolve(root, 'dist/web')
-  mkdirSync(webDest, { recursive: true })
-  cpSync(webDistSource, webDest, { recursive: true })
+const drizzleSource = resolve(root, 'drizzle')
+if (existsSync(drizzleSource)) {
+  const drizzleDest = resolve(root, 'dist/drizzle')
+  mkdirSync(drizzleDest, { recursive: true })
+  cpSync(drizzleSource, drizzleDest, { recursive: true })
 }
 
-runBuild().catch(console.error)
+const webDistSource = resolve(root, '../web/dist')
+if (!existsSync(webDistSource))
+  throw new Error(`Web dist not found: ${webDistSource}. Run web build first.`)
+const webDest = resolve(root, 'dist/web')
+mkdirSync(webDest, { recursive: true })
+cpSync(webDistSource, webDest, { recursive: true })

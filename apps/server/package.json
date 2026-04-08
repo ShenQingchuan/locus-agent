@@ -11,34 +11,29 @@
   },
   "exports": {
     ".": {
-      "bun": "./src/index.ts",
       "dev": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./db": {
-      "bun": "./src/db/index.ts",
       "dev": "./src/db/index.ts",
       "default": "./dist/db/index.js"
     },
     "./config": {
-      "bun": "./src/config.ts",
       "dev": "./src/config.ts",
       "default": "./dist/config.js"
     },
     "./providers": {
-      "bun": "./src/agent/providers/index.ts",
       "dev": "./src/agent/providers/index.ts",
       "default": "./dist/agent/providers/index.js"
     },
     "./settings": {
-      "bun": "./src/settings/index.ts",
       "dev": "./src/settings/index.ts",
       "default": "./dist/settings/index.js"
     }
   },
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "build": "bun run build.ts",
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsdown && tsx build.ts",
     "typecheck": "tsgo --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:patch-journal-baseline": "node scripts/patch-drizzle-journal-baseline.mjs",
@@ -55,27 +50,30 @@
     "@ai-sdk/moonshotai": "catalog:ai-sdk",
     "@ai-sdk/openai": "catalog:ai-sdk",
     "@ai-sdk/openai-compatible": "catalog:ai-sdk",
+    "@hono/node-server": "catalog:hono-family",
     "@huggingface/transformers": "catalog:embedding",
     "@openrouter/ai-sdk-provider": "catalog:ai-sdk",
     "@univedge/locus-agent-sdk": "workspace:*",
     "@univedge/locus-plugin-kit": "workspace:*",
     "@zed-industries/codex-acp": "catalog:ai-sdk",
     "ai": "catalog:ai-sdk",
+    "better-sqlite3": "catalog:database",
     "consola": "catalog:cli-tools",
     "drizzle-orm": "catalog:database",
+    "fast-glob": "catalog:fs-utils",
     "hono": "catalog:hono-family",
     "ignore": "catalog:fs-utils",
     "sqlite-vec": "catalog:embedding",
     "zhipu-ai-provider": "catalog:ai-sdk",
     "zod": "catalog:ai-sdk"
   },
-  "optionalDependencies": {
-    "onnxruntime-node": "catalog:embedding"
-  },
+  "optionalDependencies": {},
   "devDependencies": {
-    "@types/bun": "catalog:bun-family",
+    "@types/better-sqlite3": "catalog:database",
     "@typescript/native-preview": "catalog:dev-tools",
     "drizzle-kit": "catalog:database",
+    "tsdown": "catalog:dev-tools",
+    "tsx": "catalog:dev-tools",
     "typescript": "catalog:dev-tools"
   }
 }

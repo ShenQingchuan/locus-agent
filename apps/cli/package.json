@@ -18,20 +18,22 @@
     "dist"
   ],
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "build": "bun run build.ts",
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsdown && tsx build.ts",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "catalog:cli-tools",
+    "@hono/node-server": "catalog:hono-family",
     "@univedge/locus-agent-sdk": "workspace:*",
     "@univedge/locus-server": "workspace:*",
     "citty": "catalog:cli-tools",
     "hono": "catalog:hono-family"
   },
   "devDependencies": {
-    "@types/bun": "catalog:bun-family",
     "@types/node": "catalog:dev-tools",
-    "@typescript/native-preview": "catalog:dev-tools"
+    "@typescript/native-preview": "catalog:dev-tools",
+    "tsdown": "catalog:dev-tools",
+    "tsx": "catalog:dev-tools"
   }
 }

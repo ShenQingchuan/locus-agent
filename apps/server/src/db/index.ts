@@ -1,47 +1,21 @@
+import type BetterSqlite3 from 'better-sqlite3'
 import { existsSync, mkdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
-import { Database } from 'bun:sqlite'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import * as schema from './schema.js'
 
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
-let _sqlite: Database | null = null
+const require = createRequire(import.meta.url)
+
+export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>
+
+let _db: DrizzleDB | null = null
+let _sqlite: BetterSqlite3.Database | null = null
 let _migrationsFolder: string | null = null
 let _vecAvailable = false
-let _customSqliteLoaded = false
-
-/**
- * 尝试加载支持扩展的系统 SQLite（macOS 上 Bun 内置 SQLite 不支持 loadExtension）
- * 必须在任何 new Database() 调用前执行
- */
-function tryLoadCustomSQLite(): void {
-  if (_customSqliteLoaded)
-    return
-  _customSqliteLoaded = true
-
-  if (process.platform !== 'darwin')
-    return
-
-  const candidates = [
-    '/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib', // Apple Silicon
-    '/usr/local/opt/sqlite3/lib/libsqlite3.dylib', // Intel Mac
-  ]
-
-  for (const path of candidates) {
-    if (existsSync(path)) {
-      try {
-        Database.setCustomSQLite(path)
-        return
-      }
-      catch {
-        // ignore, try next
-      }
-    }
-  }
-  // 如果没有找到系统 SQLite，使用 Bun 内置版本（sqlite-vec 将不可用）
-}
 
 function getDefaultDbPath(): string {
   return resolve(process.cwd(), './data/locus.db')
@@ -71,16 +45,13 @@ export function initDB(options?: InitDBOptions): void {
   if (_db)
     return
 
-  // macOS: 需要系统 SQLite 才能加载 sqlite-vec 扩展
-  tryLoadCustomSQLite()
-
   const dbPath = options?.dbPath ?? getDefaultDbPath()
   _migrationsFolder = options?.migrationsFolder ?? getDefaultMigrationsFolder()
 
   ensureDir(dirname(dbPath))
 
-  _sqlite = new Database(dbPath, { create: true })
-  _sqlite.run('PRAGMA foreign_keys = ON;')
+  _sqlite = new Database(dbPath)
+  _sqlite.exec('PRAGMA foreign_keys = ON;')
 
   _db = drizzle(_sqlite, { schema })
 
@@ -105,15 +76,14 @@ const EXPECTED_VEC_SQL = `CREATE VIRTUAL TABLE IF NOT EXISTS vec_notes USING vec
  * Init sqlite-vec extension and ensure vec_notes table matches expected schema
  * (dimension + distance metric). Drops & recreates on mismatch.
  */
-function initVec(sqlite: Database): void {
+function initVec(sqlite: BetterSqlite3.Database): void {
   try {
-    // eslint-disable-next-line ts/no-require-imports
     const sqliteVec = require('sqlite-vec')
     sqliteVec.load(sqlite)
 
-    const existing = sqlite.query(
+    const existing = sqlite.prepare(
       `SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_notes'`,
-    ).get() as { sql: string } | null
+    ).get() as { sql: string } | undefined
 
     if (existing) {
       const needsRebuild
@@ -124,11 +94,11 @@ function initVec(sqlite: Database): void {
         console.warn(
           `[sqlite-vec] vec_notes schema mismatch, rebuilding (need ${EXPECTED_VEC_DIM}d cosine)...`,
         )
-        sqlite.run(`DROP TABLE vec_notes`)
+        sqlite.exec(`DROP TABLE vec_notes`)
       }
     }
 
-    sqlite.run(EXPECTED_VEC_SQL)
+    sqlite.exec(EXPECTED_VEC_SQL)
     _vecAvailable = true
   }
   catch (err) {
@@ -151,24 +121,24 @@ export function isVecAvailable(): boolean {
  * 获取 Drizzle 实例
  * 若未初始化则使用默认路径自动初始化（dev 模式兼容）
  */
-export function getDb() {
+export function getDb(): DrizzleDB {
   if (!_db)
     initDB()
   return _db!
 }
 
 /**
- * 获取底层 bun:sqlite Database 实例
+ * 获取底层 better-sqlite3 Database 实例
  * 用于 sqlite-vec 等 Drizzle 不直接支持的原始 SQL 操作
  */
-export function getSqlite(): Database {
+export function getSqlite(): BetterSqlite3.Database {
   if (!_sqlite)
     initDB()
   return _sqlite!
 }
 
 // 向后兼容：现有代码 `import { db } from '../db'` 继续工作
-export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+export const db: DrizzleDB = new Proxy({} as DrizzleDB, {
   get(_target, prop, receiver) {
     return Reflect.get(getDb(), prop, receiver)
   },

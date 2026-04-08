@@ -1,9 +1,9 @@
-#!/usr/bin/env bun
+#!/usr/bin/env tsx
 /**
  * Unified dev entry — single browser URL with HMR.
  *
  * Vite serves the app on :3000 (so CSS / @vite/client / HMR match the page origin).
- * Bun serves API only on :3001; Vite proxies `/api` and `/health` to Bun.
+ * Node serves API only on :3001; Vite proxies `/api` and `/health` to Node.
  *
  * (Older "Bun proxies everything to Vite" mode broke Vite's dev CSS pipeline and caused FOUC.)
  *
@@ -12,28 +12,22 @@
  *   pnpm dev config    → Run interactive LLM config setup
  *   pnpm dev <command> → Delegate to CLI entry (config, help, version, etc.)
  */
+import type { ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import process from 'node:process'
-
-// Note: the root TS config may not include Bun's global types.
-// Declare minimal types to keep editor/linter happy.
-interface Subprocess {
-  exited: Promise<number>
-  kill: () => void
-}
-
-declare const Bun: {
-  spawn: (cmd: string[], options?: any) => Subprocess
-}
 
 const args = process.argv.slice(2)
 
+function processExited(proc: ChildProcess): Promise<number> {
+  return new Promise(resolve => proc.on('close', code => resolve(code ?? 1)))
+}
+
 if (args.length > 0) {
   // Delegate to CLI entry with the given args
-  const proc = Bun.spawn(
-    ['bun', 'apps/cli/src/index.ts', ...args],
-    { stdout: 'inherit', stderr: 'inherit', stdin: 'inherit' },
-  )
-  const code = await proc.exited
+  const proc = spawn('tsx', ['apps/cli/src/index.ts', ...args], {
+    stdio: 'inherit',
+  })
+  const code = await processExited(proc)
   process.exit(code)
 }
 
@@ -41,7 +35,7 @@ if (args.length > 0) {
 
 /** Browser / Vite dev server */
 const VITE_PORT = 3000
-/** API (Bun + Hono) — must match vite.config.ts proxy target */
+/** API (Node + Hono) — must match vite.config.ts proxy target */
 const API_PORT = 3001
 
 const VITE_ORIGIN = `http://localhost:${VITE_PORT}`
@@ -70,7 +64,7 @@ async function fetchOk(url: string, timeoutMs: number): Promise<boolean> {
 async function waitForProcessReady(
   label: string,
   readyUrl: string,
-  proc: Subprocess,
+  proc: ChildProcess,
   timeoutMs: number = 30_000,
 ): Promise<void> {
   const startedAt = Date.now()
@@ -79,7 +73,7 @@ async function waitForProcessReady(
   while (Date.now() - startedAt < timeoutMs) {
     const result = await Promise.race([
       fetchOk(readyUrl, 500).then(ok => ({ kind: 'fetch' as const, ok })),
-      proc.exited.then((code: number) => ({ kind: 'exit' as const, code })),
+      processExited(proc).then(code => ({ kind: 'exit' as const, code })),
     ])
 
     if (result.kind === 'exit') {
@@ -110,33 +104,30 @@ const viteEnv = {
 } as Record<string, string>
 
 // 1. API server first (Vite proxy needs a live backend)
-const apiServer = Bun.spawn(
-  ['bun', '--watch', 'src/index.ts'],
+const apiServer = spawn(
+  'tsx',
+  ['--watch', 'src/index.ts'],
   {
     cwd: 'apps/server',
-    stdout: 'inherit',
-    stderr: 'inherit',
-    stdin: 'inherit',
+    stdio: 'inherit',
     env: devEnv,
   },
 )
 
-await waitForProcessReady('Bun API', API_HEALTH_URL, apiServer)
+await waitForProcessReady('API', API_HEALTH_URL, apiServer)
 
 // 2. Vite on the browser port (HMR + CSS pipeline aligned with document origin)
-const vite = Bun.spawn(
-  ['pnpm', '-F', '@univedge/locus-web', 'exec', 'vite', '--port', String(VITE_PORT), '--strictPort'],
+const vite = spawn(
+  'pnpm',
+  ['-F', '@univedge/locus-web', 'exec', 'vite', '--port', String(VITE_PORT), '--strictPort'],
   {
-    stdout: isAnalyze ? 'inherit' : 'ignore',
-    stderr: 'inherit',
-    stdin: isAnalyze ? 'inherit' : 'ignore',
+    stdio: [isAnalyze ? 'inherit' : 'ignore', isAnalyze ? 'inherit' : 'ignore', 'inherit'],
     env: viteEnv,
   },
 )
 
 await waitForProcessReady('Vite', VITE_READY_URL, vite)
 
-// Bun prints its own URL for the API child (port 3001) — clarify the browser entry vs API.
 console.log(
   `\n  ➜  Web UI (open in browser): ${VITE_ORIGIN}/`,
   `\n  ➜  API Server: http://localhost:${API_PORT}/\n`,
@@ -163,6 +154,6 @@ process.on('SIGTERM', () => {
   process.exit(0)
 })
 
-const apiExitCode = await apiServer.exited
+const apiExitCode = await processExited(apiServer)
 cleanup()
 process.exit(apiExitCode)

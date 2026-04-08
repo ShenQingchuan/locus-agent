@@ -1,4 +1,6 @@
 import type { GitChangedFile, GitFileStatus } from '@univedge/locus-agent-sdk'
+import { Buffer } from 'node:buffer'
+import { spawn } from 'node:child_process'
 import { watch as fsWatch } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -15,13 +17,21 @@ const MAX_DIFF_CHARS = 8_000
 const MAX_LINES_PER_FILE = 80
 
 async function runGit(cwd: string, args: string[]): Promise<{ stdout: string, stderr: string, exitCode: number }> {
-  const proc = Bun.spawn(['git', ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ])
-  const exitCode = await proc.exited
-  return { stdout, stderr, exitCode }
+  return new Promise((resolve, reject) => {
+    const proc = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    const stdoutChunks: Buffer[] = []
+    const stderrChunks: Buffer[] = []
+    proc.stdout!.on('data', (chunk: Buffer) => stdoutChunks.push(chunk))
+    proc.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk))
+    proc.on('error', reject)
+    proc.on('close', (code) => {
+      resolve({
+        stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+        exitCode: code ?? 1,
+      })
+    })
+  })
 }
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
