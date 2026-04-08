@@ -1,6 +1,7 @@
 import type { NoteWithTags } from './core/types.js'
 import { tool } from 'ai'
 import { z } from 'zod'
+import { deleteTag, listTags, renameTag } from '../services/tag.js'
 import { createMemory, deleteMemory, listMemories, updateMemory } from './core/crud.js'
 import { searchMemories, searchMemoriesByTags } from './core/search.js'
 import { logMemoryAccess } from './store/accessLog.js'
@@ -22,7 +23,7 @@ export const searchMemoryTool = tool({
     ),
     tags: z.array(z.string()).optional().describe(
       'For "read": filter by tag names (prefix matching). '
-      + 'Format: ["preference/tools/editor", "project/locus-agent/stack"].',
+      + 'Format: ["preference/development/editor", "knowledge/project"].',
     ),
     page: z.number().int().min(1).optional().describe(
       'For "list". Page number (1-based). Defaults to 1.',
@@ -58,7 +59,9 @@ const memoryItemSchema = z.object({
     + 'Use the most specific (granular) existing tag that fits first; only use a parent-level tag when no subcategory applies; '
     + 'create a new tag ONLY when no existing tag is semantically appropriate. '
     + 'Use multi-level hierarchical format with "/" separator (at least 2 levels). '
-    + 'Examples: "preference/food/snacks", "project/my-app/stack", "lesson/debugging". '
+    + 'Five root domains: identity/ (personal, professional, social), preference/ (development, communication, lifestyle), '
+    + 'knowledge/ (domain, project, reference), experience/ (lesson, decision, milestone), procedure/ (workflow, convention, routine). '
+    + 'Examples: "identity/professional", "preference/development/language", "experience/lesson", "knowledge/project". '
     + 'Avoid flat tags like "food" or "preference" — always prefer the most specific existing path.',
   ),
   pinned: z.boolean().optional().describe('Whether this memory should be pinned to the working set.'),
@@ -82,13 +85,17 @@ export const manageMemoryTool = tool({
     + 'Use "update" to change a single memory\'s content and/or tags. '
     + 'Use "batch_update" to update multiple memories at once (reorganize tags, merge content, etc.). '
     + 'Use "delete" to remove memories by ID. '
+    + 'Use "rename_tag" to rename a tag across all memories (e.g. migrate from old to new taxonomy). '
+    + 'Use "delete_tag" to remove a tag entirely (unlinks from all memories). '
     + 'Tags MUST use hierarchical multi-level format with "/" separator (at least 2 levels). '
+    + 'Five root domains: identity/, preference/, knowledge/, experience/, procedure/. '
     + 'PREFER existing tags; use most specific first, parent only when needed; create new only when necessary. '
-    + 'Good: reuse "preference/food/snacks" from existing. Bad: "food", "preference" (too broad).',
+    + 'Good: reuse "preference/development/language" from existing. Bad: "food", "preference" (too broad).',
   inputSchema: z.object({
-    action: z.enum(['list', 'create', 'read', 'update', 'batch_update', 'delete']).describe(
+    action: z.enum(['list', 'create', 'read', 'update', 'batch_update', 'delete', 'rename_tag', 'delete_tag']).describe(
       'The action to perform: "list" to retrieve all memories, "create" to save new memories, "read" to search, '
-      + '"update" to modify one memory, "batch_update" to modify multiple memories at once, "delete" to remove.',
+      + '"update" to modify one memory, "batch_update" to modify multiple memories at once, "delete" to remove memories, '
+      + '"rename_tag" to rename a tag across all memories, "delete_tag" to remove a tag entirely.',
     ),
     memories: z.array(memoryItemSchema).optional().describe(
       'Required for "create". Array of memories to create.',
@@ -99,7 +106,7 @@ export const manageMemoryTool = tool({
     tags: z.array(z.string()).optional().describe(
       'For "read": filter by tag names (prefix matching). '
       + 'For "update": new tags (replaces all existing). Prefer existing tags; use most specific first. '
-      + 'Format: ["preference/tools/editor", "project/locus-agent/stack"].',
+      + 'Format: ["preference/development/editor", "knowledge/project"].',
     ),
     memory_id: z.string().optional().describe(
       'Required for "update". ID of the memory to update (from a prior read result).',
@@ -113,6 +120,12 @@ export const manageMemoryTool = tool({
     ),
     memory_ids: z.array(z.string()).optional().describe(
       'Required for "delete". IDs of memories to delete (from a prior read result).',
+    ),
+    tag_name: z.string().optional().describe(
+      'Required for "rename_tag" and "delete_tag". The current tag name to rename or delete.',
+    ),
+    new_tag_name: z.string().optional().describe(
+      'Required for "rename_tag". The new tag name (must follow hierarchical "/" format, at least 2 levels).',
     ),
     page: z.number().int().min(1).optional().describe(
       'For "list". Page number (1-based). Defaults to 1.',
@@ -130,6 +143,8 @@ export type ManageMemoryInput
     | { action: 'update', memory_id: string, content?: string, tags?: string[], pinned?: boolean }
     | { action: 'batch_update', updates: { memory_id: string, content?: string, tags?: string[], pinned?: boolean }[] }
     | { action: 'delete', memory_ids: string[] }
+    | { action: 'rename_tag', tag_name: string, new_tag_name: string }
+    | { action: 'delete_tag', tag_name: string }
 
 export interface ManageMemoryListResult {
   action: 'list'
@@ -172,6 +187,21 @@ export interface ManageMemoryDeleteResult {
   totalDeleted: number
 }
 
+export interface ManageMemoryRenameTagResult {
+  action: 'rename_tag'
+  oldName: string
+  newName: string
+  success: boolean
+  error?: string
+}
+
+export interface ManageMemoryDeleteTagResult {
+  action: 'delete_tag'
+  tagName: string
+  success: boolean
+  error?: string
+}
+
 export type ManageMemoryResult
   = | ManageMemoryListResult
     | ManageMemoryCreateResult
@@ -179,6 +209,8 @@ export type ManageMemoryResult
     | ManageMemoryUpdateResult
     | ManageMemoryBatchUpdateResult
     | ManageMemoryDeleteResult
+    | ManageMemoryRenameTagResult
+    | ManageMemoryDeleteTagResult
 
 async function runRead(args: { query?: string, tags?: string[] }): Promise<ManageMemoryReadResult> {
   const hasQuery = !!args.query?.trim()
@@ -325,6 +357,33 @@ export async function executeManageMemory(
       }
       return { action: 'delete', deleted, failed, totalDeleted: deleted.length }
     }
+    case 'rename_tag': {
+      if (!args.tag_name?.trim() || !args.new_tag_name?.trim()) {
+        return { action: 'rename_tag', oldName: args.tag_name ?? '', newName: args.new_tag_name ?? '', success: false, error: 'Both tag_name and new_tag_name are required.' }
+      }
+      const allTags = await listTags()
+      const target = allTags.find(t => t.name === args.tag_name.trim().toLowerCase())
+      if (!target) {
+        return { action: 'rename_tag', oldName: args.tag_name, newName: args.new_tag_name, success: false, error: `Tag "${args.tag_name}" not found.` }
+      }
+      const renamed = await renameTag(target.id, args.new_tag_name)
+      if (!renamed) {
+        return { action: 'rename_tag', oldName: args.tag_name, newName: args.new_tag_name, success: false, error: 'Rename failed.' }
+      }
+      return { action: 'rename_tag', oldName: args.tag_name, newName: renamed.name, success: true }
+    }
+    case 'delete_tag': {
+      if (!args.tag_name?.trim()) {
+        return { action: 'delete_tag', tagName: args.tag_name ?? '', success: false, error: 'tag_name is required.' }
+      }
+      const allTags2 = await listTags()
+      const target2 = allTags2.find(t => t.name === args.tag_name.trim().toLowerCase())
+      if (!target2) {
+        return { action: 'delete_tag', tagName: args.tag_name, success: false, error: `Tag "${args.tag_name}" not found.` }
+      }
+      const ok = await deleteTag(target2.id)
+      return { action: 'delete_tag', tagName: args.tag_name, success: ok, error: ok ? undefined : 'Delete failed.' }
+    }
     default: {
       const _: never = args
       return _ as never
@@ -401,5 +460,13 @@ export function formatManageMemoryResult(result: ManageMemoryResult): string {
         lines.push(`Failed to delete ${result.failed.length} (not found or already deleted): ${result.failed.map(f => f.id).join(', ')}`)
       return lines.length ? lines.join('\n') : 'No memory IDs were provided.'
     }
+    case 'rename_tag':
+      if (result.success)
+        return `Renamed tag "${result.oldName}" → "${result.newName}".`
+      return result.error ?? `Failed to rename tag "${result.oldName}".`
+    case 'delete_tag':
+      if (result.success)
+        return `Deleted tag "${result.tagName}" and removed it from all memories.`
+      return result.error ?? `Failed to delete tag "${result.tagName}".`
   }
 }

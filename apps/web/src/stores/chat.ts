@@ -1,5 +1,6 @@
 import type { Conversation, MessageImageAttachment } from '@univedge/locus-agent-sdk'
 import type { ActiveDelegate } from '@/composables/assistant-runtime/types'
+import { useQueryCache } from '@pinia/colada'
 import { getDefaultCodingExecutorForProvider } from '@univedge/locus-agent-sdk'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -19,6 +20,8 @@ import { useChatTokenTracking } from './chat/useChatTokenTracking'
 import { useChatToolApproval } from './chat/useChatToolApproval'
 
 export const useChatStore = defineStore('chat', () => {
+  const queryCache = useQueryCache()
+
   // Conversation management
   const conversations = ref<Conversation[]>([])
   const scopeState = createConversationScopeState()
@@ -265,6 +268,9 @@ export const useChatStore = defineStore('chat', () => {
       onPlanPreviewDelta: planBridge.onPlanPreviewDelta,
       onPlanPreviewDone: planBridge.onPlanPreviewDone,
       getPlanBinding: getPlanBindingPayload,
+    },
+    invalidateConversationQuery: (conversationId: string) => {
+      void queryCache.invalidateQueries({ key: ['conversation', conversationId] })
     },
   })
 

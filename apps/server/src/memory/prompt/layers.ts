@@ -26,11 +26,21 @@ export async function renderL1WorkingSet(workspacePath?: string): Promise<string
 export function renderL2PrimedContext(): string {
   return `## Memory Library
 
-You have access to a persistent memory library. When you need background about the user, use \`search_memory\` with relevant tags:
-- Preferences and habits: tags starting with \`preference/\`
-- Facts and background: tags starting with \`fact/\` or \`project/\`
-- Lessons and past decisions: tags starting with \`lesson/\` or \`decision/\`
-- Workflows and procedures: tags starting with \`workflow/\``
+You have access to a persistent memory library organized by cognitive categories. Use \`search_memory\` with relevant tag prefixes:
+- **identity/** — who the user is (personal, professional, social)
+- **preference/** — likes, habits, and style choices
+  - \`preference/development/\` — coding language, editor, code-style, framework
+  - \`preference/communication/\` — language, tone, format
+  - \`preference/lifestyle/\` — food, entertainment, schedule
+- **knowledge/** — domain expertise and project facts
+  - \`knowledge/project/\` — project architecture, tech stack
+  - \`knowledge/domain/\` — technical specializations
+- **experience/** — lessons learned and past decisions
+  - \`experience/lesson/\`, \`experience/decision/\`, \`experience/milestone/\`
+- **procedure/** — workflows, conventions, and routines
+  - \`procedure/workflow/\`, \`procedure/convention/\`, \`procedure/routine/\`
+
+Note: identity/* memories are always pre-loaded. Relevant preference/development/* and procedure/* are auto-loaded in coding context.`
 }
 
 export function renderL3DeepContext(memories: NoteWithTags[]): string {

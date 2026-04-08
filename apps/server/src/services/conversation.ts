@@ -28,13 +28,14 @@ export async function createConversation(title?: string, id?: string): Promise<C
   // 1. Insert new conversation
   // 2. Read back the inserted conversation
   // This prevents race conditions where the read might occur before insert completes
-  const [conversation] = await db.transaction(async (tx) => {
-    await tx.insert(conversations).values(newConversation)
+  const [conversation] = db.transaction((tx) => {
+    tx.insert(conversations).values(newConversation).run()
 
-    const result = await tx
+    const result = tx
       .select()
       .from(conversations)
       .where(eq(conversations.id, conversationId))
+      .all()
 
     return result
   })
@@ -66,13 +67,14 @@ export async function createScopedConversation(
   // 1. Insert new conversation
   // 2. Read back the inserted conversation
   // This prevents race conditions where the read might occur before insert completes
-  const [conversation] = await db.transaction(async (tx) => {
-    await tx.insert(conversations).values(newConversation)
+  const [conversation] = db.transaction((tx) => {
+    tx.insert(conversations).values(newConversation).run()
 
-    const result = await tx
+    const result = tx
       .select()
       .from(conversations)
       .where(eq(conversations.id, conversationId))
+      .all()
 
     return result
   })

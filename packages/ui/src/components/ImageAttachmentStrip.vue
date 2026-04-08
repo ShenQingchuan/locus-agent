@@ -89,7 +89,7 @@ onUnmounted(() => {
 
       <button
         v-if="removable"
-        class="absolute -right-1 -top-1 h-5 w-5 inline-flex items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+        class="absolute -right-0.5 -top-0.25 h-5 w-5 inline-flex items-center justify-center rounded-full bg-background text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
         title="移除图片"
         @click.stop="handleRemove(image.id)"

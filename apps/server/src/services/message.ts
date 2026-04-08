@@ -57,19 +57,21 @@ export async function addMessage(
   // 2. Update conversation updatedAt
   // 3. Read back the inserted message
   // This prevents race conditions and ensures consistency between message and conversation state
-  const [savedMessage] = await db.transaction(async (tx) => {
-    await tx.insert(messages).values(newMessage)
+  const [savedMessage] = db.transaction((tx) => {
+    tx.insert(messages).values(newMessage).run()
 
     // Update conversation's updatedAt timestamp
-    await tx
+    tx
       .update(conversations)
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(conversations.id, conversationId))
+      .run()
 
-    const result = await tx
+    const result = tx
       .select()
       .from(messages)
       .where(eq(messages.id, id))
+      .all()
 
     return result
   })
@@ -110,22 +112,24 @@ export async function addMessages(
   // 2. Update conversation updatedAt
   // 3. Read back all inserted messages
   // This prevents race conditions and ensures consistency between messages and conversation state
-  const savedMessages = await db.transaction(async (tx) => {
-    await tx.insert(messages).values(newMessages)
+  const savedMessages = db.transaction((tx) => {
+    tx.insert(messages).values(newMessages).run()
 
     // Update conversation's updatedAt timestamp
-    await tx
+    tx
       .update(conversations)
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(conversations.id, conversationId))
+      .run()
 
     // Fetch all inserted messages
     const ids = newMessages.map(m => m.id!)
-    const result = await tx
+    const result = tx
       .select()
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
       .orderBy(asc(sql`rowid`))
+      .all()
 
     // Return only the newly inserted messages
     return result.filter(m => ids.includes(m.id))

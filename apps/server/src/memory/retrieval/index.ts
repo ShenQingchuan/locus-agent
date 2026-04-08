@@ -1,10 +1,12 @@
 import type { NoteWithTags } from '../core/types.js'
 import { searchNotesByTags } from '../store/noteBridge.js'
+import { hasCodingPrimedTags, hasWorkspacePrimedTags } from '../taxonomy.js'
 import { searchMemoriesHybrid } from './hybrid.js'
 
 export interface RetrieveOptions {
   topK?: number
   maxTokens?: number
+  space?: string
 }
 
 export async function retrieveRelevantMemories(
@@ -12,25 +14,34 @@ export async function retrieveRelevantMemories(
   workspacePath: string | undefined,
   options: RetrieveOptions = {},
 ): Promise<NoteWithTags[]> {
-  const { topK = 5 } = options
+  const { topK = 5, space } = options
 
   const results = await searchMemoriesHybrid(query)
+  const isCoding = space === 'coding'
 
-  // Workspace scope boosting: same-workspace memories are preferred,
-  // but global memories are also included.
   const scored = results.map((note) => {
+    let score = 1.0
+    const tagNames = note.tags.map(t => t.name)
+
+    // Workspace scope boosting
     const isSameWorkspace = workspacePath
       ? note.workspacePath === workspacePath
       : note.workspacePath === null
-    // Small boost for workspace match
-    const score = isSameWorkspace ? 1.05 : 1.0
+
+    if (isSameWorkspace)
+      score *= 1.05
+
+    // Tier 2 context-primed boosting based on activation tiers
+    if (isCoding && hasCodingPrimedTags(tagNames))
+      score *= 1.15
+
+    if (isSameWorkspace && hasWorkspacePrimedTags(tagNames))
+      score *= 1.2
+
     return { note, score }
   })
 
-  // Re-sort by boosted relevance (already sorted from hybrid search,
-  // but we want workspace matches to bubble up slightly)
   scored.sort((a, b) => {
-    // Preserve original order for equal scores (stable-ish)
     if (b.score !== a.score)
       return b.score - a.score
     return 0

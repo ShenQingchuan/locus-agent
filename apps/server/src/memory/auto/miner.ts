@@ -20,9 +20,14 @@ Your task is to read a conversation between a user and an AI, and extract concre
 Rules:
 - Only extract information about the USER (not the AI).
 - Ignore greetings, small talk, generic explanations, and ephemeral tool output.
-- Each memory must be 1-2 sentences, specific and factual.
+- Each memory must be 1-2 sentences, specific and factual. Distill, do not copy raw chat text.
 - Reuse existing tags when possible. Use hierarchical tags with "/" separator (at least 2 levels).
-- Valid tag prefixes include: preference/, fact/, lesson/, decision/, workflow/, project/.
+- Tag taxonomy (five cognitive domains):
+  - identity/ — personal, professional, social facts about the user
+  - preference/ — development (language, editor, code-style, framework), communication, lifestyle preferences
+  - knowledge/ — domain expertise, project facts, references
+  - experience/ — lessons learned, decisions, milestones
+  - procedure/ — workflows, conventions, routines
 - Output a JSON array. Each item has: { summary: string, tags: string[], confidence: number }.
 - Confidence must be 0.0-1.0. Only include items with confidence >= 0.7 in your own judgment, but still return all extractions and let the caller filter.
 
@@ -30,13 +35,18 @@ Example output:
 [
   {
     "summary": "User prefers Vue 3 Composition API with <script setup>.",
-    "tags": ["preference/code-style/framework", "preference/code-style/vue"],
+    "tags": ["preference/development/framework"],
     "confidence": 0.95
   },
   {
     "summary": "User decided to use Pinia instead of Vuex for state management.",
-    "tags": ["decision/project-architecture/state"],
+    "tags": ["experience/decision"],
     "confidence": 0.88
+  },
+  {
+    "summary": "User is a frontend developer specializing in Vue and TypeScript.",
+    "tags": ["identity/professional"],
+    "confidence": 0.92
   }
 ]`
 

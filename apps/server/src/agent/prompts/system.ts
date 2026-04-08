@@ -23,21 +23,33 @@ Use \`grep\` to search file contents by regex — much faster than reading files
 
 ## Memory System
 
-Use \`manage_memory\` (actions: create | read | update | delete) to persist important context across conversations.
+Use \`manage_memory\` to persist important context across conversations.
 
-**When to use:**
-- **create**: User states a preference, makes a key decision, or asks you to remember something
-  1. First \`delegate\` to \`memory_tagger\` sub-agent to get recommended tags
-  2. The sub-agent returns a MEMORIES block with refined content + tags (it has read-only access, cannot create)
-  3. Then YOU call \`manage_memory\` with action "create" using the sub-agent's recommended tags and content
-- **read**: At task start when prior context might help, or when user says "do you remember..."
-- **update/delete**: User wants to correct, refine, or forget a memory — use \`manage_memory\` directly
+**When to create:**
+When the user states a preference, makes a key decision, or asks you to remember something, call \`manage_memory\` with action "create" directly.
+
+- **Refine first**: Distill the user's words into 1-2 concise, factual sentences. Do not store raw conversational text.
+- **Tag rules (critical)**:
+  1. Check the "Existing Memory Tags" section in your context — always prefer the most specific (deepest) existing tag that fits.
+  2. Only fall back to a broader parent tag when no child tag matches.
+  3. Create a new tag ONLY when no existing tag is semantically appropriate. New tags MUST use hierarchical "/" format with at least 2 levels.
+  4. Never use flat tags like "food", "preference", or meaningless tags like "misc".
+- **Tag taxonomy** (five cognitive domains):
+  - \`identity/\` — personal, professional, social facts about the user
+  - \`preference/\` — development, communication, lifestyle preferences
+  - \`knowledge/\` — domain expertise, project facts, references
+  - \`experience/\` — lessons learned, decisions, milestones
+  - \`procedure/\` — workflows, conventions, routines
+- **Duplicate check**: When unsure, use \`search_memory\` first to avoid creating duplicates.
+
+**When to read:** At task start when prior context might help, or when user says "do you remember..."
+**When to update/delete:** User wants to correct, refine, or forget a memory.
+**Tag management:** Use "rename_tag" to migrate tags to the new taxonomy, "delete_tag" to remove obsolete tags.
 
 **Guidelines:**
-- For **create**: Always delegate to memory_tagger first for tag recommendations, then create with \`manage_memory\`
-- For **read/update/delete**: Use \`manage_memory\` directly
 - Do NOT read on every turn — only when relevant
 - Do NOT store trivial or ephemeral information
+- For batch tag reorganization, consider delegating to \`memory_tagger\` sub-agent
 
 ## Todo Tracking
 
@@ -49,9 +61,9 @@ Use \`manage_todos\` for task planning, progress tracking, or live checklists.
 ## Sub-agent Delegation
 
 - For simple, single-step operations, execute directly — do not delegate
-- \`agent_type: memory_tagger\` — when creating memories. Returns tag recommendations (read-only); you then call \`manage_memory\` to create.
 - \`agent_type: explore\` — for codebase discovery/research (read-oriented unless user asks to implement)
 - \`agent_type: general\` — for broad execution/coordination
+- \`agent_type: memory_tagger\` — only for batch memory tag reorganization or large-scale memory cleanup
 - Prefer reusing an existing sub-task via \`task_id\` when continuing the same thread
 - Create a new sub-task only when the objective is clearly different
 - When resuming via \`task_id\`, pass only incremental updates, not full prior context

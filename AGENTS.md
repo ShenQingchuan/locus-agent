@@ -10,3 +10,6 @@
 
 ## Pay attention to type errors & lints
 - Run `pnpm typecheck` and `pnpm lint --fix` after each task to ensure code quality
+
+## Prompt Engineering
+- Always write prompt in English

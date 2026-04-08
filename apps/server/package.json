@@ -32,7 +32,7 @@
     }
   },
   "scripts": {
-    "dev": "tsx --watch src/index.ts",
+    "dev": "tsx --watch --conditions dev src/index.ts",
     "build": "tsdown && tsx build.ts",
     "typecheck": "tsgo --noEmit",
     "db:generate": "drizzle-kit generate",

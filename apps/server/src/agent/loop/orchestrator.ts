@@ -155,7 +155,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   const lastUserQuery = extractLastUserQuery(initialMessages)
   let l3Deep = ''
   if (lastUserQuery && lastUserQuery.trim().length > 10 && !isGreeting(lastUserQuery)) {
-    const memories = await retrieveRelevantMemories(lastUserQuery, workspaceRoot, { topK: 5 })
+    const memories = await retrieveRelevantMemories(lastUserQuery, workspaceRoot, { topK: 5, space })
     if (memories.length) {
       l3Deep = renderL3DeepContext(memories)
       void logMemoryAccess(

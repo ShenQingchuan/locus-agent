@@ -70,10 +70,21 @@ interface CreateConversationMessagingOptions {
   state: StateContext
   runtime: RuntimeActions
   callbacks: MessagingCallbacks
+  /**
+   * Clear Pinia Colada `useConversationQuery` cache after a turn settles so a
+   * mid-stream GET snapshot cannot overwrite the UI on remount/navigation.
+   */
+  invalidateConversationQuery?: (conversationId: string) => void
 }
 
 export function createConversationMessagingActions(options: CreateConversationMessagingOptions) {
   const { state, runtime, callbacks } = options
+
+  function bustConversationQueryCache(conversationId: string | null | undefined) {
+    if (!conversationId || !options.invalidateConversationQuery)
+      return
+    options.invalidateConversationQuery(conversationId)
+  }
 
   async function sendMessage(
     content: string,
@@ -215,6 +226,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
         doneState.currentStreamingMessageId = null
         doneState.isLoading = false
 
+        bustConversationQueryCache(conversationId)
+
         if (isNewConversation && conversationId)
           void callbacks.generateTitle(conversationId)
         if (isPlanningTurn)
@@ -229,6 +242,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
         }, conversationId)
         errorState.currentStreamingMessageId = null
         errorState.isLoading = false
+        bustConversationQueryCache(conversationId)
         if (isPlanningTurn)
           callbacks.onPlanPreviewDone?.(conversationId)
       },
@@ -237,6 +251,7 @@ export function createConversationMessagingActions(options: CreateConversationMe
         const fallbackState = runtime.getConversationRuntimeState(conversationId)
         fallbackState.currentStreamingMessageId = null
         fallbackState.isLoading = false
+        bustConversationQueryCache(conversationId)
         if (isPlanningTurn)
           callbacks.onPlanPreviewDone?.(conversationId)
       },
@@ -311,6 +326,8 @@ export function createConversationMessagingActions(options: CreateConversationMe
     )
     runtimeState.currentStreamingMessageId = null
     runtimeState.isLoading = false
+
+    bustConversationQueryCache(conversationId)
 
     await processMessageQueue(conversationId)
   }
