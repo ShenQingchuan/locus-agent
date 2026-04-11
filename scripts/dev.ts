@@ -106,7 +106,7 @@ const viteEnv = {
 // 1. API server first (Vite proxy needs a live backend)
 const apiServer = spawn(
   'tsx',
-  ['--watch', 'src/index.ts'],
+  ['watch', '--clear-screen=false', 'src/index.ts'],
   {
     cwd: 'apps/server',
     stdio: 'inherit',

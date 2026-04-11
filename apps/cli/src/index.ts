@@ -12,6 +12,7 @@ const main = defineCommand({
     stop: () => import('./commands/stop.js').then(m => m.default),
     config: () => import('./commands/config.js').then(m => m.default),
     daemon: () => import('./commands/daemon.js').then(m => m.default),
+    version: () => import('./commands/version.js').then(m => m.default),
   },
 })
 

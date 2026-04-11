@@ -150,10 +150,31 @@ function startDev() {
     })
   }
 
-  serve({ fetch: app.fetch, port }, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Started development server: http://localhost:${port}`)
+  const server = serve({ fetch: app.fetch, port })
+
+  // Track active sockets for fast teardown on reload
+  const sockets = new Set<import('node:net').Socket>()
+  server.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.on('close', () => sockets.delete(socket))
   })
+
+  function gracefulShutdown(): void {
+    // Stop accepting new connections
+    server.close(() => {
+      process.exit(0)
+    })
+    // Destroy existing sockets immediately so the process can exit fast
+    for (const socket of sockets) {
+      socket.destroy()
+    }
+    sockets.clear()
+    // Fallback: force exit if close callback stalls
+    setTimeout(() => process.exit(0), 200).unref()
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown())
+  process.on('SIGINT', () => gracefulShutdown())
 }
 
 // Dev mode: start server only when this file is the entry point

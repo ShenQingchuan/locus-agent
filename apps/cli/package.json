@@ -18,7 +18,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsx --watch --conditions dev src/index.ts",
+    "dev": "tsx watch --clear-screen=false --conditions dev src/index.ts",
     "build": "tsdown && tsx build.ts",
     "typecheck": "tsgo --noEmit"
   },
